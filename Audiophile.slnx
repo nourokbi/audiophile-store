@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Audiophile.API/Audiophile.API.csproj" />
+    <Project Path="src/Audiophile.Application/Audiophile.Application.csproj" />
+    <Project Path="src/Audiophile.Domain/Audiophile.Domain.csproj" />
+    <Project Path="src/Audiophile.Infrastructure/Audiophile.Infrastructure.csproj" />
+  </Folder>
+</Solution>
