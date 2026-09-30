@@ -14,7 +14,6 @@ public sealed record PlaceOrderRequest(
 
 public sealed record PlaceOrderResult(OrderDto Order, bool Created);
 
-public sealed record RefundRequest(decimal? Amount);
 
 public sealed record PaymentEventDto(
     DateTime ReceivedAt, string Provider, string EventType, string ExternalId, string RawPayload);

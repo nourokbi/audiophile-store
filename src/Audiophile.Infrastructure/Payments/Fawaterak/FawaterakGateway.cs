@@ -13,17 +13,15 @@ using Polly.Timeout;
 
 namespace Audiophile.Infrastructure.Payments.Fawaterak;
 
-// The Fawaterak adapter. Fawaterak calls a payment an "invoice": we create one per
-// order, send the customer to its hosted page, and learn the result from a signed
-// webhook. Nothing outside this folder knows Fawaterak's field names.
+// Everything that talks to Fawaterak. Fawaterak calls a payment an "invoice": we
+// create one per order, send the customer to its hosted page, and learn the result
+// from a signed webhook. Nothing outside this folder knows Fawaterak's field names.
 public sealed class FawaterakGateway(
     HttpClient http,
     IOptions<FawaterakOptions> options,
-    ILogger<FawaterakGateway> logger) : IPaymentGateway
+    ILogger<FawaterakGateway> logger) : IFawaterakGateway
 {
     private FawaterakOptions Options => options.Value;
-
-    public string Name => "fawaterak";
 
     // ---------------------------------------------------------------- checkout
 
@@ -91,28 +89,10 @@ public sealed class FawaterakGateway(
         return new CheckoutSession(invoiceKey, invoiceId, checkoutUrl, code);
     }
 
-    // ------------------------------------------------------- refund / void
-
-    // Fawaterak's public API documents no refund or void endpoint. Refunds are made
-    // in the Fawaterak dashboard, and a refund webhook reports them afterwards.
-    // Saying so is better than calling an undocumented endpoint with real money.
-    public Task<GatewayOperationResult> RefundAsync(string transactionId, long amountMinor, CancellationToken ct) =>
-        Task.FromResult(new GatewayOperationResult(false, null,
-            "Fawaterak has no public refund API. Issue the refund from the Fawaterak dashboard."));
-
-    public Task<GatewayOperationResult> VoidAsync(string transactionId, CancellationToken ct) =>
-        Task.FromResult(new GatewayOperationResult(false, null,
-            "Fawaterak has no public void API. Cancel the payment from the Fawaterak dashboard."));
-
     // ---------------------------------------------------------------- inquiry
 
-    public async Task<IReadOnlyList<GatewayTransaction>> FindTransactionsAsync(
-        string? transactionId, string? providerOrderId, CancellationToken ct)
+    public async Task<GatewayTransaction> GetInvoiceAsync(string invoiceId, CancellationToken ct)
     {
-        var invoiceId = providerOrderId ?? transactionId;
-        if (invoiceId is null)
-            return [];
-
         EnsureConfigured();
         using var message = new HttpRequestMessage(HttpMethod.Get, $"getInvoiceData/{Uri.EscapeDataString(invoiceId)}");
         using var doc = await SendAsync(message, "invoice lookup", ct);
@@ -121,27 +101,20 @@ public sealed class FawaterakGateway(
         var paid = Str(data, "paid") is "1" or "true";
         var total = decimal.TryParse(Str(data, "total"), NumberStyles.Number, CultureInfo.InvariantCulture, out var t) ? t : 0m;
 
-        return
-        [
-            new GatewayTransaction(
-                TransactionId: Str(data, "invoice_id") ?? invoiceId,
-                ProviderOrderId: Str(data, "invoice_id") ?? invoiceId,
-                MerchantReference: OrderIdFromPayload(data),
-                AmountMinor: (long)Math.Round(total * 100m),
-                Currency: Str(data, "currency") ?? "",
-                Success: paid,
-                Pending: !paid,
-                IsRefunded: false,
-                IsVoided: false,
-                IsChildTransaction: false,
-                SourceType: Str(data, "payment_method")),
-        ];
+        return new GatewayTransaction(
+            TransactionId: Str(data, "invoice_id") ?? invoiceId,
+            ProviderOrderId: Str(data, "invoice_id") ?? invoiceId,
+            MerchantReference: OrderIdFromPayload(data),
+            AmountMinor: (long)Math.Round(total * 100m),
+            Currency: Str(data, "currency") ?? "",
+            Success: paid,
+            Pending: !paid,
+            SourceType: Str(data, "payment_method"));
     }
 
     // -------------------------------------------------------------- callbacks
 
-    public async Task<GatewayCallback> ParseWebhookAsync(
-        string rawBody, IReadOnlyDictionary<string, string> query, CancellationToken ct)
+    public async Task<GatewayCallback> ParseWebhookAsync(string rawBody, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(Options.VendorKey))
         {
@@ -164,7 +137,7 @@ public sealed class FawaterakGateway(
             if (!FawaterakHash.Matches(expected, Str(root, "hashKey")))
                 return Reject("paid");
 
-            var confirmed = (await FindTransactionsAsync(null, invoiceId, ct)).Single();
+            var confirmed = await GetInvoiceAsync(invoiceId, ct);
             if (!confirmed.Success)
             {
                 logger.LogWarning("Webhook says invoice {InvoiceId} is paid but Fawaterak's lookup disagrees", invoiceId);
@@ -188,7 +161,6 @@ public sealed class FawaterakGateway(
                 ProviderOrderId: null,
                 MerchantReference: OrderIdFromPayload(root),
                 AmountMinor: 0, Currency: "", Success: false, Pending: false,
-                IsRefunded: false, IsVoided: false, IsChildTransaction: false,
                 SourceType: Str(root, "paymentMethod")));
         }
 
@@ -212,9 +184,6 @@ public sealed class FawaterakGateway(
 
         return Reject("unknown");
     }
-
-    // Fawaterak's redirect carries nothing signed; the return page reads our own record.
-    public GatewayCallback ParseRedirect(IReadOnlyDictionary<string, string> query) => GatewayCallback.Rejected;
 
     // ---------------------------------------------------------------- helpers
 

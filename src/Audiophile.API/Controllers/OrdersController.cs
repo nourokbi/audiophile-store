@@ -36,24 +36,15 @@ public sealed class OrdersController(OrderService orders) : ControllerBase
     public async Task<IActionResult> Get(Guid id, CancellationToken ct) =>
         Ok(await orders.GetOrderAsync(DemoUser.Id, id, ct));
 
-    // The three below are back-office operations. Without auth in this slice they
-    // are open; in the real project they sit behind [Authorize(Roles = Roles.Admin)].
+    // The two below are support tools. Refunds are made in the Fawaterak dashboard:
+    // Fawaterak has no public refund API.
 
-    // Full refund with an empty body, partial with { "amount": 500.00 }.
-    [HttpPost("{id:guid}/refund")]
-    public async Task<IActionResult> Refund(Guid id, RefundRequest? request, CancellationToken ct) =>
-        Ok(await orders.RefundAsync(id, request?.Amount, ct));
-
-    [HttpPost("{id:guid}/void")]
-    public async Task<IActionResult> Void(Guid id, CancellationToken ct) =>
-        Ok(await orders.VoidAsync(id, ct));
-
-    // The gateway notifications stored for this order (support / audit view).
+    // The Fawaterak notifications stored for this order (support / audit view).
     [HttpGet("{id:guid}/payment/events")]
     public async Task<IActionResult> Events(Guid id, CancellationToken ct) =>
         Ok(await orders.GetPaymentEventsAsync(id, ct));
 
-    // Asks the gateway for the real status. Use when a webhook seems to be missing.
+    // Asks Fawaterak for the real status. Use when a webhook seems to be missing.
     [HttpPost("{id:guid}/payment/sync")]
     public async Task<IActionResult> Sync(Guid id, CancellationToken ct) =>
         Ok(await orders.SyncWithGatewayAsync(id, ct));

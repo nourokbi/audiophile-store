@@ -20,7 +20,7 @@ public class FawaterakGatewayTests
             """.Replace("ORDER_ID", OrderId));
         var gateway = CreateGateway(lookup);
 
-        var callback = await gateway.ParseWebhookAsync(PaidBody(ValidPaidHash()), NoQuery, CancellationToken.None);
+        var callback = await gateway.ParseWebhookAsync(PaidBody(ValidPaidHash()), CancellationToken.None);
 
         Assert.True(callback.IsAuthentic);
         var tx = callback.Transaction!;
@@ -36,7 +36,7 @@ public class FawaterakGatewayTests
     public async Task Paid_webhook_with_wrong_hash_is_rejected_without_calling_fawaterak()
     {
         var lookup = new StubHandler("{}");
-        var callback = await CreateGateway(lookup).ParseWebhookAsync(PaidBody("forged"), NoQuery, CancellationToken.None);
+        var callback = await CreateGateway(lookup).ParseWebhookAsync(PaidBody("forged"), CancellationToken.None);
 
         Assert.False(callback.IsAuthentic);
         Assert.Null(lookup.LastRequest);
@@ -47,7 +47,7 @@ public class FawaterakGatewayTests
     {
         var lookup = new StubHandler("""{"status":"success","data":{"invoice_id":1000430,"paid":0,"total":3049.00}}""");
 
-        var callback = await CreateGateway(lookup).ParseWebhookAsync(PaidBody(ValidPaidHash()), NoQuery, CancellationToken.None);
+        var callback = await CreateGateway(lookup).ParseWebhookAsync(PaidBody(ValidPaidHash()), CancellationToken.None);
 
         Assert.True(callback.IsAuthentic);
         Assert.Null(callback.Transaction);                 // acknowledged, but nothing is applied
@@ -62,7 +62,7 @@ public class FawaterakGatewayTests
              "pay_load":"{\"order_id\":\"{{OrderId}}\"}","transactionId":28180,"transactionKey":"Asbv2zmnFfdUOOe"}
             """;
 
-        var callback = await CreateGateway(new StubHandler("{}")).ParseWebhookAsync(body, NoQuery, CancellationToken.None);
+        var callback = await CreateGateway(new StubHandler("{}")).ParseWebhookAsync(body, CancellationToken.None);
 
         Assert.True(callback.IsAuthentic);
         Assert.False(callback.Transaction!.Success);
@@ -78,7 +78,7 @@ public class FawaterakGatewayTests
              "reason":"Product not available","approvedAt":"2026-02-22 14:57:40"}
             """;
 
-        var callback = await CreateGateway(new StubHandler("{}")).ParseWebhookAsync(body, NoQuery, CancellationToken.None);
+        var callback = await CreateGateway(new StubHandler("{}")).ParseWebhookAsync(body, CancellationToken.None);
 
         Assert.True(callback.IsAuthentic);
         Assert.Null(callback.Transaction);
@@ -96,8 +96,6 @@ public class FawaterakGatewayTests
     }
 
     // ------------------------------------------------------------- helpers
-
-    private static readonly Dictionary<string, string> NoQuery = new();
 
     private static string ValidPaidHash() => FawaterakHash.ForInvoice("1000430", "69zpnFIcIPYNBwG", "Card", VendorKey);
 

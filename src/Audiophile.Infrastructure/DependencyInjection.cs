@@ -21,15 +21,12 @@ public static class DependencyInjection
 
         services.Configure<FawaterakOptions>(configuration.GetSection(FawaterakOptions.SectionName));
 
-        services.AddHttpClient<FawaterakGateway>((sp, client) =>
+        // Fawaterak is the only gateway: OrderService and FawaterakController ask for
+        // IFawaterakGateway and get FawaterakGateway with a typed HttpClient.
+        services.AddHttpClient<IFawaterakGateway, FawaterakGateway>((sp, client) =>
                 client.BaseAddress = new Uri(
                     sp.GetRequiredService<IOptions<FawaterakOptions>>().Value.BaseUrl.TrimEnd('/') + "/"))
             .AddStandardResilienceHandler(ConfigureGatewayResilience);
-
-        // Each gateway is reachable by name; the resolver picks the default for new checkouts.
-        // A second gateway is one more AddHttpClient + AddKeyedTransient pair.
-        services.AddKeyedTransient<IPaymentGateway>("fawaterak", (sp, _) => sp.GetRequiredService<FawaterakGateway>());
-        services.AddScoped<IPaymentGatewayResolver, PaymentGatewayResolver>();
 
         services.AddHostedService<PaymentExpiryWorker>();
         return services;
@@ -40,12 +37,12 @@ public static class DependencyInjection
         o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(20);
         o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(45);
 
-        // Retries only for GET (status lookups). Creating a payment, refunding or
-        // voiding is never repeated automatically: after a timeout we cannot know
+        // Retries only for GET (invoice lookups). Creating an invoice is never
+        // repeated automatically: after a timeout we cannot know
         // whether the first attempt went through.
         o.Retry.DisableForUnsafeHttpMethods();
 
-        // Stop calling a gateway for a while if half the recent calls fail, so an
+        // Stop calling Fawaterak for a while if half the recent calls fail, so an
         // outage fails fast instead of tying up every request thread.
         o.CircuitBreaker.FailureRatio = 0.5;
         o.CircuitBreaker.MinimumThroughput = 10;

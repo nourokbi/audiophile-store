@@ -6,12 +6,10 @@ namespace Audiophile.API.Controllers;
 [ApiController]
 [Route("payments/fawaterak")]
 public sealed class FawaterakController(
-    IPaymentGatewayResolver gateways,
+    IFawaterakGateway fawaterak,
     PaymentResultApplier applier,
     ILogger<FawaterakController> logger) : ControllerBase
 {
-    private const string Provider = "fawaterak";
-
     // Fawaterak's server-to-server notification. "_json" in the path makes
     // Fawaterak send JSON; the plain path is kept for the dashboard's default setting.
     // The only thing allowed to mark an order paid.
@@ -22,9 +20,7 @@ public sealed class FawaterakController(
         using var reader = new StreamReader(Request.Body);
         var rawBody = await reader.ReadToEndAsync(ct);
 
-        var gateway = gateways.Get(Provider);
-        var callback = await gateway.ParseWebhookAsync(
-            rawBody, Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString()), ct);
+        var callback = await fawaterak.ParseWebhookAsync(rawBody, ct);
 
         if (!callback.IsAuthentic)
             return Unauthorized();
@@ -35,7 +31,7 @@ public sealed class FawaterakController(
             return Ok();
         }
 
-        var outcome = await applier.ApplyAsync(Provider, "webhook", callback.Transaction, rawBody, ct);
+        var outcome = await applier.ApplyAsync(IFawaterakGateway.Provider, "webhook", callback.Transaction, rawBody, ct);
         return Ok(new { outcome = outcome.ToString() });
     }
 

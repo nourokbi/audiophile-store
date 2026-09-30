@@ -12,7 +12,7 @@ public enum PaymentUpdateOutcome
     Applied,            // our state changed
     Duplicate,          // seen this exact event before; nothing to do
     AttemptFailed,      // one attempt was declined; the customer can still retry on the same checkout
-    Ignored,            // a refund/void notice, or a late event for a payment already closed
+    Ignored,            // a late event for a payment already closed
     Unmatched,          // no order of ours matches; stored for support to look at
     AmountMismatch,     // paid amount differs from the order total; NOT confirmed
     NeedsManualRefund   // money taken for an order we had already cancelled
@@ -29,7 +29,7 @@ public sealed class PaymentResultApplier(IAppDbContext db, ILogger<PaymentResult
         // A kiosk transaction is reported twice with the same id: first "pending"
         // (reference issued), then "success" (cash paid). The state is part of the
         // key so the second report is not mistaken for a duplicate of the first.
-        var state = tx.IsChildTransaction ? "child" : tx.Pending ? "pending" : tx.Success ? "success" : "failed";
+        var state = tx.Pending ? "pending" : tx.Success ? "success" : "failed";
         var externalId = $"{tx.TransactionId}:{state}";
 
         if (await db.PaymentEvents.AnyAsync(e => e.Provider == provider && e.ExternalId == externalId, ct))
@@ -43,7 +43,7 @@ public sealed class PaymentResultApplier(IAppDbContext db, ILogger<PaymentResult
 
         var outcome = order is null
             ? PaymentUpdateOutcome.Unmatched
-            : tx.IsChildTransaction ? PaymentUpdateOutcome.Ignored : Apply(order, tx);
+            : Apply(order, tx);
 
         // The event row and the order/payment/stock changes commit together. If two
         // deliveries of one event race past the AnyAsync check, the unique index on

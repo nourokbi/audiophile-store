@@ -139,5 +139,5 @@ public sealed class PaymentResultApplierTests : IDisposable
     private static GatewayTransaction Tx(
         Guid orderId, string id, long amountMinor, bool success, bool pending = false, string? providerOrderId = null) =>
         new(id, providerOrderId, orderId.ToString(), amountMinor, "EGP",
-            success, pending, IsRefunded: false, IsVoided: false, IsChildTransaction: false, SourceType: "card");
+            success, pending, SourceType: "card");
 }

@@ -43,7 +43,7 @@ Safety nets: `POST /orders/{id}/payment/sync` asks Fawaterak directly, and an ex
 |---|---|
 | Payment state machine | `src/Audiophile.Domain/Entities/Payment.cs` |
 | Webhook audit log + de-duplication | `src/Audiophile.Domain/Entities/PaymentEvent.cs` |
-| Gateway interface + resolver | `src/Audiophile.Application/Payments/IPaymentGateway.cs` |
+| Gateway interface (Fawaterak only) | `src/Audiophile.Application/Payments/IFawaterakGateway.cs` |
 | Checkout, refund, void, sync, expiry | `src/Audiophile.Application/Orders/OrderService.cs` |
 | The one place a gateway report changes state | `src/Audiophile.Application/Payments/PaymentResultApplier.cs` |
 | Fawaterak adapter | `src/Audiophile.Infrastructure/Payments/Fawaterak/FawaterakGateway.cs` |

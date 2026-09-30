@@ -12,7 +12,7 @@ namespace Audiophile.Application.Orders;
 
 public sealed class OrderService(
     IAppDbContext db,
-    IPaymentGatewayResolver gateways,
+    IFawaterakGateway fawaterak,
     PaymentResultApplier applier,
     ILogger<OrderService> logger)
 {
@@ -56,26 +56,25 @@ public sealed class OrderService(
         var order = Order.Place(userId, request.PaymentMethod, shipping, lines,
             ShippingPolicy.FeeFor(subTotal), idempotencyKey);
         var payment = order.StartPayment();
-
+        // Cash On Delivery needs no gateway
         if (!payment.UsesGateway)
         {
-            order.Confirm();                                // M4-12: cash on delivery needs no gateway
+            order.Confirm();                                
             db.Orders.Add(order);
             await db.SaveChangesAsync(ct);
             return new PlaceOrderResult(OrderDto.From(order), Created: true);
         }
 
-        // Save before calling the gateway: the webhook can arrive within seconds and
+        // Save before calling Fawaterak: the webhook can arrive within seconds and
         // must find the order already in the database.
         db.Orders.Add(order);
         await db.SaveChangesAsync(ct);
 
         try
         {
-            var gateway = gateways.Default;
-            var session = await gateway.CreateCheckoutAsync(BuildCheckoutRequest(order, payment), ct);
+            var session = await fawaterak.CreateCheckoutAsync(BuildCheckoutRequest(order, payment), ct);
             payment.LinkToProvider(
-                gateway.Name, session.ProviderReference, session.ProviderOrderId, session.CheckoutUrl, session.PaymentCode);
+                IFawaterakGateway.Provider, session.ProviderReference, session.ProviderOrderId, session.CheckoutUrl, session.PaymentCode);
             await db.SaveChangesAsync(ct);
         }
         catch (Exception ex) when (ex is GatewayException or GatewayTimeoutException)
@@ -99,7 +98,7 @@ public sealed class OrderService(
         return OrderDto.From(order);
     }
 
-    // Everything the gateway told us about this order's payment, oldest first: the
+    // Everything Fawaterak told us about this order's payment, oldest first: the
     // audit trail support reads when a customer says "I paid but…".
     public async Task<IReadOnlyList<PaymentEventDto>> GetPaymentEventsAsync(Guid orderId, CancellationToken ct)
     {
@@ -119,79 +118,24 @@ public sealed class OrderService(
         return orders.OrderByDescending(o => o.CreatedAt).Select(OrderDto.From).ToList();
     }
 
-    // Full refund when amount is null, partial otherwise. A full
-    // refund of an order that has not shipped also cancels it and restores stock.
-    public async Task<OrderDto> RefundAsync(Guid orderId, decimal? amount, CancellationToken ct)
-    {
-        var order = await LoadGatewayOrderAsync(orderId, ct);
-        var payment = order.Payment!;
-
-        if (!payment.IsSettled || payment.ProviderTransactionId is null)
-            throw new ConflictException($"Order {orderId} has no successful payment to refund.");
-
-        var refundAmount = amount ?? payment.RefundableAmount;
-        if (refundAmount <= 0 || refundAmount > payment.RefundableAmount)
-            throw new ConflictException(
-                $"Refund must be between 0.01 and {payment.RefundableAmount} {Currency}.");
-
-        // No automatic retry. If this times out, the refund may already have happened
-        // at the gateway; retrying blindly could refund the customer twice.
-        var result = await gateways.Get(payment.Provider!).RefundAsync(payment.ProviderTransactionId, (long)(refundAmount * 100), ct);
-        if (!result.Success)
-            throw new GatewayException($"The gateway refused the refund: {result.Message}");
-
-        payment.RecordRefund(refundAmount);
-        if (payment.Status == PaymentStatus.Refunded && order.CanBeCancelled)
-            OrderStock.CancelAndRelease(order);
-
-        await db.SaveChangesAsync(ct);
-        logger.LogInformation("Refunded {Amount} {Currency} on order {OrderId} (gateway tx {TransactionId})",
-            refundAmount, Currency, orderId, result.TransactionId);
-        return OrderDto.From(order);
-    }
-
-    // Cancels a same-day card payment before settlement. Nothing is charged.
-    public async Task<OrderDto> VoidAsync(Guid orderId, CancellationToken ct)
-    {
-        var order = await LoadGatewayOrderAsync(orderId, ct);
-        var payment = order.Payment!;
-
-        if (payment.Status != PaymentStatus.Succeeded || payment.ProviderTransactionId is null)
-            throw new ConflictException("Only a successful payment with no refunds can be voided.");
-        if (payment.PaymentMethod != PaymentMethod.Card)
-            throw new ConflictException("Only card payments can be voided; use a refund instead.");
-        if (!order.CanBeCancelled)
-            throw new ConflictException($"An order that is {order.Status} cannot be voided.");
-
-        var result = await gateways.Get(payment.Provider!).VoidAsync(payment.ProviderTransactionId, ct);
-        if (!result.Success)
-            throw new GatewayException($"The gateway refused the void: {result.Message}");
-
-        payment.MarkVoided();
-        OrderStock.CancelAndRelease(order);
-        await db.SaveChangesAsync(ct);
-        return OrderDto.From(order);
-    }
-
-    // Asks the gateway for the payment's real status and applies it. For when a
+    // Asks Fawaterak for the invoice's real status and applies it. For when a
     // webhook was missed, or before support changes anything by hand.
     public async Task<OrderDto> SyncWithGatewayAsync(Guid orderId, CancellationToken ct)
     {
         var order = await LoadGatewayOrderAsync(orderId, ct);
         var payment = order.Payment!;
 
-        if (payment.Provider is null)
-            throw new ConflictException("This payment never reached the gateway.");
+        if (payment.ProviderOrderId is null)
+            throw new ConflictException("This payment never reached Fawaterak.");
 
-        var transactions = await gateways.Get(payment.Provider).FindTransactionsAsync(payment.ProviderTransactionId, payment.ProviderOrderId, ct);
-        foreach (var tx in transactions.Where(t => !t.IsChildTransaction))
-            await applier.ApplyAsync(payment.Provider, "inquiry", tx, JsonSerializer.Serialize(tx), ct);
+        var invoice = await fawaterak.GetInvoiceAsync(payment.ProviderOrderId, ct);
+        await applier.ApplyAsync(IFawaterakGateway.Provider, "inquiry", invoice, JsonSerializer.Serialize(invoice), ct);
 
         return await GetAnyOrderAsync(orderId, ct);
     }
 
     // Closes gateway payments nobody finished in time and releases their stock.
-    // Asks the gateway first, so a payment whose webhook was lost is confirmed, not cancelled.
+    // Asks Fawaterak first, so a payment whose webhook was lost is confirmed, not cancelled.
     public async Task<int> ExpireStalePaymentsAsync(CancellationToken ct)
     {
         var now = DateTime.UtcNow;
