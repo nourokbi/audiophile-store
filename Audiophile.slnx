@@ -1,8 +1,19 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="docs/audiophile-analysis.html" />
+    <File Path="docs/audiophile-guide.html" />
+    <File Path="docs/build-plan.html" />
+    <File Path="docs/build-plan.md" />
+    <File Path="docs/phase-1-board.html" />
+    <File Path="docs/phase-1-tasks.md" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Audiophile.API/Audiophile.API.csproj" />
     <Project Path="src/Audiophile.Application/Audiophile.Application.csproj" />
     <Project Path="src/Audiophile.Domain/Audiophile.Domain.csproj" />
     <Project Path="src/Audiophile.Infrastructure/Audiophile.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Audiophile.Tests/Audiophile.Tests.csproj" />
   </Folder>
 </Solution>

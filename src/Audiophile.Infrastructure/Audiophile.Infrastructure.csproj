@@ -1,13 +1,18 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\Audiophile.Application\Audiophile.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+    <!-- HttpClientFactory, options binding and hosted services for the Paymob adapter. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.10.0" />
   </ItemGroup>
 
   <PropertyGroup>
