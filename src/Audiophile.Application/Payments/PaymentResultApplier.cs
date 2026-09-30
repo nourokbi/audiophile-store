@@ -18,11 +18,9 @@ public enum PaymentUpdateOutcome
     NeedsManualRefund   // money taken for an order we had already cancelled
 }
 
-/// <summary>
-/// The single place a gateway's report about a transaction changes our state,
-/// whether the report came from a webhook or from us asking (inquiry). Both paths
-/// share the de-duplication key, so whichever arrives second is a no-op.
-/// </summary>
+// The single place a gateway's report about a transaction changes our state,
+// whether the report came from a webhook or from us asking (inquiry). Both paths
+// share the de-duplication key, so whichever arrives second is a no-op.
 public sealed class PaymentResultApplier(IAppDbContext db, ILogger<PaymentResultApplier> logger)
 {
     public async Task<PaymentUpdateOutcome> ApplyAsync(

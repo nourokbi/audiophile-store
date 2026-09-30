@@ -2,11 +2,9 @@ using Audiophile.Domain.Common;
 
 namespace Audiophile.Domain.ValueObjects;
 
-/// <summary>
-/// Where an order is going, validated once and then frozen onto the order as
-/// columns. It is a copy, not a reference: editing the address it came from
-/// must not rewrite where a past order was shipped.
-/// </summary>
+// Where an order is going, validated once and then frozen onto the order as
+// columns. It is a copy, not a reference: editing the address it came from
+// must not rewrite where a past order was shipped.
 public sealed record ShippingDetails
 {
     public ShippingDetails(

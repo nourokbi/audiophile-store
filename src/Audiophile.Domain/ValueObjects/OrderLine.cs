@@ -3,11 +3,9 @@ using Audiophile.Domain.Entities;
 
 namespace Audiophile.Domain.ValueObjects;
 
-/// <summary>
-/// One validated line handed to <see cref="Order.Place"/>. Building the list of
-/// these is where prices get re-read from the catalogue (M4-07); by the time an
-/// <see cref="OrderItem"/> exists the numbers are already known to be sound.
-/// </summary>
+// One validated line handed to Order.Place. Building the list of
+// these is where prices get re-read from the catalogue (M4-07); by the time an
+// OrderItem exists the numbers are already known to be sound.
 public sealed record OrderLine
 {
     public const int MaxProductNameLength = 200;
@@ -29,7 +27,7 @@ public sealed record OrderLine
 
     public decimal LineTotal => UnitPrice * Quantity;
 
-    /// <summary>Takes the price and description from the product as it is <em>now</em>, never from the cart.</summary>
+    // Takes the price and description from the product as it is now, never from the cart.
     public static OrderLine FromProduct(Product product, int quantity)
     {
         ArgumentNullException.ThrowIfNull(product);

@@ -22,10 +22,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }
 
-    /// <summary>
-    /// SQLite stores dates as text with no time zone, so they come back as
-    /// Unspecified. Everything we store is UTC; say so on the way out.
-    /// </summary>
+    // SQLite stores dates as text with no time zone, so they come back as
+    // Unspecified. Everything we store is UTC; say so on the way out.
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
         builder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();

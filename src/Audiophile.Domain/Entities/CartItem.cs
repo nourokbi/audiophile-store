@@ -2,16 +2,12 @@ using Audiophile.Domain.Common;
 
 namespace Audiophile.Domain.Entities;
 
-/// <summary>
-/// One line of a cart. Created and changed only by <see cref="Cart"/> — going
-/// through the aggregate root is what stops two lines appearing for one product.
-/// </summary>
+// One line of a cart. Created and changed only by Cart — going
+// through the aggregate root is what stops two lines appearing for one product.
 public sealed class CartItem
 {
-    /// <summary>
-    /// A sanity bound, not a stock check: stock is re-read and decremented at
-    /// checkout (M4-07). It exists so a line quantity cannot be driven to overflow.
-    /// </summary>
+    // A sanity bound, not a stock check: stock is re-read and decremented at
+    // checkout (M4-07). It exists so a line quantity cannot be driven to overflow.
     public const int MaxQuantity = 100;
 
     private CartItem() { } // EF Core

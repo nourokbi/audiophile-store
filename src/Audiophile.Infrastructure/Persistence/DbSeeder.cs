@@ -8,10 +8,8 @@ namespace Audiophile.Infrastructure.Persistence;
 
 public static class DbSeeder
 {
-    /// <summary>
-    /// Creates the SQLite database and fills it with a demo customer and catalogue.
-    /// EnsureCreated is a demo shortcut: the real project uses migrations (M6-05).
-    /// </summary>
+    // Creates the SQLite database and fills it with a demo customer and catalogue.
+    // EnsureCreated is a demo shortcut: the real project uses migrations (M6-05).
     public static async Task SeedAsync(IServiceProvider services, CancellationToken ct = default)
     {
         await using var scope = services.CreateAsyncScope();

@@ -99,10 +99,8 @@ public sealed class OrderService(
         return OrderDto.From(order);
     }
 
-    /// <summary>
-    /// Everything the gateway told us about this order's payment, oldest first: the
-    /// audit trail support reads when a customer says "I paid but…".
-    /// </summary>
+    // Everything the gateway told us about this order's payment, oldest first: the
+    // audit trail support reads when a customer says "I paid but…".
     public async Task<IReadOnlyList<PaymentEventDto>> GetPaymentEventsAsync(Guid orderId, CancellationToken ct)
     {
         var paymentId = await db.Payments.Where(p => p.OrderId == orderId).Select(p => (Guid?)p.Id).FirstOrDefaultAsync(ct)
@@ -121,10 +119,8 @@ public sealed class OrderService(
         return orders.OrderByDescending(o => o.CreatedAt).Select(OrderDto.From).ToList();
     }
 
-    /// <summary>
-    /// Full refund when <paramref name="amount"/> is null, partial otherwise. A full
-    /// refund of an order that has not shipped also cancels it and restores stock.
-    /// </summary>
+    // Full refund when amount is null, partial otherwise. A full
+    // refund of an order that has not shipped also cancels it and restores stock.
     public async Task<OrderDto> RefundAsync(Guid orderId, decimal? amount, CancellationToken ct)
     {
         var order = await LoadGatewayOrderAsync(orderId, ct);
@@ -154,7 +150,7 @@ public sealed class OrderService(
         return OrderDto.From(order);
     }
 
-    /// <summary>Cancels a same-day card payment before settlement. Nothing is charged.</summary>
+    // Cancels a same-day card payment before settlement. Nothing is charged.
     public async Task<OrderDto> VoidAsync(Guid orderId, CancellationToken ct)
     {
         var order = await LoadGatewayOrderAsync(orderId, ct);
@@ -177,10 +173,8 @@ public sealed class OrderService(
         return OrderDto.From(order);
     }
 
-    /// <summary>
-    /// Asks the gateway for the payment's real status and applies it. For when a
-    /// webhook was missed, or before support changes anything by hand.
-    /// </summary>
+    // Asks the gateway for the payment's real status and applies it. For when a
+    // webhook was missed, or before support changes anything by hand.
     public async Task<OrderDto> SyncWithGatewayAsync(Guid orderId, CancellationToken ct)
     {
         var order = await LoadGatewayOrderAsync(orderId, ct);
@@ -196,10 +190,8 @@ public sealed class OrderService(
         return await GetAnyOrderAsync(orderId, ct);
     }
 
-    /// <summary>
-    /// Closes gateway payments nobody finished in time and releases their stock.
-    /// Asks the gateway first, so a payment whose webhook was lost is confirmed, not cancelled.
-    /// </summary>
+    // Closes gateway payments nobody finished in time and releases their stock.
+    // Asks the gateway first, so a payment whose webhook was lost is confirmed, not cancelled.
     public async Task<int> ExpireStalePaymentsAsync(CancellationToken ct)
     {
         var now = DateTime.UtcNow;

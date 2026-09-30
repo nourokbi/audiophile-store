@@ -3,11 +3,9 @@ using Audiophile.Domain.Enums;
 
 namespace Audiophile.Domain.Entities;
 
-/// <summary>
-/// A catalogue item. Stock only ever moves through <see cref="DecreaseStock"/>
-/// and <see cref="Restock"/>, which is what makes "stock cannot go negative" a
-/// property of the type rather than a rule every caller has to remember.
-/// </summary>
+// A catalogue item. Stock only ever moves through DecreaseStock
+// and Restock, which is what makes "stock cannot go negative" a
+// property of the type rather than a rule every caller has to remember.
 public sealed class Product
 {
     public const int NameMaxLength = 200;
@@ -48,10 +46,10 @@ public sealed class Product
     public ProductCategory Category { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
-    /// <summary>Persisted as <c>jsonb</c>; mutated through the box methods, never assigned wholesale.</summary>
+    // Persisted as jsonb; mutated through the box methods, never assigned wholesale.
     public IReadOnlyDictionary<string, int> InTheBox => _inTheBox;
 
-    /// <summary>Buyable: listed, and enough on hand. Never the last word — checkout re-checks under a transaction (M4-05).</summary>
+    // Buyable: listed, and enough on hand. Never the last word — checkout re-checks under a transaction (M4-05).
     public bool IsAvailable(int quantity = 1) => IsActive && Stock >= Guard.AtLeast(quantity, 1, nameof(quantity));
 
     public void UpdateDetails(string name, string description, ProductCategory category, string? features = null)
@@ -96,10 +94,8 @@ public sealed class Product
 
     public void Restock(int quantity) => Stock += Guard.AtLeast(quantity, 1, nameof(quantity));
 
-    /// <summary>
-    /// Called inside the checkout transaction. Refusing here rather than clamping
-    /// to zero is what lets the loser of a race become a 409 (M4-06).
-    /// </summary>
+    // Called inside the checkout transaction. Refusing here rather than clamping
+    // to zero is what lets the loser of a race become a 409 (M4-06).
     public void DecreaseStock(int quantity)
     {
         Guard.AtLeast(quantity, 1, nameof(quantity));

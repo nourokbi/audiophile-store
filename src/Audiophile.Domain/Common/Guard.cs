@@ -1,11 +1,9 @@
 namespace Audiophile.Domain.Common;
 
-/// <summary>
-/// The one place input invariants are spelled out, so every entity rejects bad
-/// data the same way and with the same message shape. Each method returns the
-/// cleaned value, so it reads as an assignment rather than an if-block:
-/// <c>Name = Guard.Text(name, 3, 50, nameof(name));</c>
-/// </summary>
+// The one place input invariants are spelled out, so every entity rejects bad
+// data the same way and with the same message shape. Each method returns the
+// cleaned value, so it reads as an assignment rather than an if-block:
+// Name = Guard.Text(name, 3, 50, nameof(name));
 internal static class Guard
 {
     public static string Text(string? value, int minLength, int maxLength, string paramName)
@@ -21,7 +19,7 @@ internal static class Guard
         return trimmed;
     }
 
-    /// <summary>Blank becomes <c>null</c> — an absent optional value has one representation, not two.</summary>
+    // Blank becomes null — an absent optional value has one representation, not two.
     public static string? OptionalText(string? value, int maxLength, string paramName)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -95,7 +93,7 @@ internal static class Guard
         return value;
     }
 
-    /// <summary>Zero or more, and expressible in the <c>decimal(18,2)</c> the money columns use.</summary>
+    // Zero or more, and expressible in the decimal(18,2) the money columns use.
     public static decimal Money(decimal value, string paramName)
     {
         if (value < 0)
@@ -123,10 +121,8 @@ internal static class Guard
         return value;
     }
 
-    /// <summary>
-    /// Npgsql refuses to write a non-UTC <see cref="DateTime"/> to a <c>timestamptz</c>,
-    /// so every stored instant is normalised on the way in rather than at the boundary.
-    /// </summary>
+    // Npgsql refuses to write a non-UTC DateTime to a timestamptz,
+    // so every stored instant is normalised on the way in rather than at the boundary.
     public static DateTime Utc(DateTime value) => value.Kind switch
     {
         DateTimeKind.Utc => value,

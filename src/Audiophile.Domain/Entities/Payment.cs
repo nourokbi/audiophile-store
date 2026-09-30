@@ -3,11 +3,9 @@ using Audiophile.Domain.Enums;
 
 namespace Audiophile.Domain.Entities;
 
-/// <summary>
-/// The payment for an order. Created by <see cref="Order.StartPayment"/> so
-/// <see cref="Amount"/> always equals the order's total. Knows nothing about
-/// any one gateway: the provider's identifiers are stored as opaque strings.
-/// </summary>
+// The payment for an order. Created by Order.StartPayment so
+// Amount always equals the order's total. Knows nothing about
+// any one gateway: the provider's identifiers are stored as opaque strings.
 public sealed class Payment
 {
     private static readonly Dictionary<PaymentStatus, PaymentStatus[]> AllowedTransitions = new()
@@ -38,22 +36,22 @@ public sealed class Payment
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; private set; } = DateTime.UtcNow;
 
-    /// <summary>Which gateway handled it, e.g. "paymob". Null for cash on delivery.</summary>
+    // Which gateway handled it, e.g. "fawaterak". Null for cash on delivery.
     public string? Provider { get; private set; }
 
-    /// <summary>The gateway's id for the checkout session (Paymob: the intention id).</summary>
+    // The gateway's id for the checkout session (Fawaterak: the invoice key).
     public string? ProviderReference { get; private set; }
 
-    /// <summary>The gateway's order id (Paymob: <c>intention_order_id</c> / <c>order.id</c>).</summary>
+    // The gateway's order id (Fawaterak: the invoice id).
     public string? ProviderOrderId { get; private set; }
 
-    /// <summary>The gateway's transaction id. Refunds and voids are issued against this.</summary>
+    // The gateway's transaction id. Refunds and voids are issued against this.
     public string? ProviderTransactionId { get; private set; }
 
-    /// <summary>The hosted checkout page. Kept so a retried order request can return the same link.</summary>
+    // The hosted checkout page. Kept so a retried order request can return the same link.
     public string? CheckoutUrl { get; private set; }
 
-    /// <summary>For cash methods: the code the customer quotes at an Aman / Fawry outlet.</summary>
+    // For cash methods: the code the customer quotes at an Aman / Fawry outlet.
     public string? PaymentCode { get; private set; }
 
     public Order Order { get; private set; } = null!;
@@ -62,10 +60,10 @@ public sealed class Payment
     public bool IsSettled => Status is PaymentStatus.Succeeded or PaymentStatus.PartiallyRefunded or PaymentStatus.Refunded;
     public decimal RefundableAmount => IsSettled ? Amount - RefundedAmount : 0m;
 
-    /// <summary>Amount in the smallest currency unit (piasters), which is what gateways expect.</summary>
+    // Amount in the smallest currency unit (piasters), which is what gateways expect.
     public long AmountInMinorUnits => (long)(Amount * 100);
 
-    /// <summary>Records the checkout session the customer is sent to.</summary>
+    // Records the checkout session the customer is sent to.
     public void LinkToProvider(
         string provider, string providerReference, string? providerOrderId, string checkoutUrl, string? paymentCode = null)
     {
@@ -83,10 +81,8 @@ public sealed class Payment
         Touch();
     }
 
-    /// <summary>
-    /// The gateway reported a transaction that is still open, e.g. a kiosk
-    /// reference was issued and the customer has not paid yet. Status stays Pending.
-    /// </summary>
+    // The gateway reported a transaction that is still open, e.g. a kiosk
+    // reference was issued and the customer has not paid yet. Status stays Pending.
     public void RecordPendingTransaction(string transactionId)
     {
         if (Status != PaymentStatus.Pending)
@@ -96,10 +92,8 @@ public sealed class Payment
         Touch();
     }
 
-    /// <summary>
-    /// Returns <c>false</c> when the payment had already succeeded, so a webhook
-    /// delivered twice is told "nothing to do" rather than throwing.
-    /// </summary>
+    // Returns false when the payment had already succeeded, so a webhook
+    // delivered twice is told "nothing to do" rather than throwing.
     public bool MarkSucceeded(string transactionId)
     {
         if (!TryTransitionTo(PaymentStatus.Succeeded))
@@ -121,7 +115,7 @@ public sealed class Payment
         return true;
     }
 
-    /// <summary>Full or partial. Total refunds can never exceed what was taken.</summary>
+    // Full or partial. Total refunds can never exceed what was taken.
     public void RecordRefund(decimal amount)
     {
         Guard.PositiveMoney(amount, nameof(amount));
@@ -135,7 +129,7 @@ public sealed class Payment
         RefundedAmount = refundedAfter;
     }
 
-    /// <summary>Cancels a successful payment before it settles. Only valid with no refunds yet.</summary>
+    // Cancels a successful payment before it settles. Only valid with no refunds yet.
     public void MarkVoided() => TryTransitionTo(PaymentStatus.Voided);
 
     private bool TryTransitionTo(PaymentStatus next)

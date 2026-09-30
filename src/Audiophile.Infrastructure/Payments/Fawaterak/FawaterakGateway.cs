@@ -13,11 +13,9 @@ using Polly.Timeout;
 
 namespace Audiophile.Infrastructure.Payments.Fawaterak;
 
-/// <summary>
-/// The Fawaterak adapter. Fawaterak calls a payment an "invoice": we create one per
-/// order, send the customer to its hosted page, and learn the result from a signed
-/// webhook. Nothing outside this folder knows Fawaterak's field names.
-/// </summary>
+// The Fawaterak adapter. Fawaterak calls a payment an "invoice": we create one per
+// order, send the customer to its hosted page, and learn the result from a signed
+// webhook. Nothing outside this folder knows Fawaterak's field names.
 public sealed class FawaterakGateway(
     HttpClient http,
     IOptions<FawaterakOptions> options,
@@ -226,7 +224,7 @@ public sealed class FawaterakGateway(
         return GatewayCallback.Rejected;
     }
 
-    /// <summary>Webhooks arrive as JSON when the URL contains "_json", otherwise as form fields.</summary>
+    // Webhooks arrive as JSON when the URL contains "_json", otherwise as form fields.
     private static JsonDocument? ToJson(string rawBody)
     {
         try
@@ -242,7 +240,7 @@ public sealed class FawaterakGateway(
         }
     }
 
-    /// <summary>pay_load is our { order_id } object, echoed back either as an object or as a JSON string.</summary>
+    // pay_load is our { order_id } object, echoed back either as an object or as a JSON string.
     private static string? OrderIdFromPayload(JsonElement element)
     {
         if (!element.TryGetProperty("pay_load", out var payload))
@@ -272,7 +270,7 @@ public sealed class FawaterakGateway(
         return data;
     }
 
-    /// <summary>Same failure translation as the Paymob adapter: a clear "no", or "outcome unknown".</summary>
+    // Turns every failure into one of two answers: a clear "no" (GatewayException) or "outcome unknown" (GatewayTimeoutException).
     private async Task<JsonDocument> SendAsync(HttpRequestMessage message, string operation, CancellationToken ct)
     {
         message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Options.ApiKey);
@@ -350,7 +348,7 @@ public sealed class FawaterakGateway(
 
     private static string Money(long minor) => (minor / 100m).ToString("0.00", CultureInfo.InvariantCulture);
 
-    /// <summary>+201012345678 → 01012345678, the local format Fawaterak expects.</summary>
+    // +201012345678 → 01012345678, the local format Fawaterak expects.
     private static string LocalPhone(string phone)
     {
         var digits = new string(phone.Where(char.IsDigit).ToArray());

@@ -9,11 +9,9 @@ namespace Audiophile.API.Controllers;
 [Route("orders")]
 public sealed class OrdersController(OrderService orders) : ControllerBase
 {
-    /// <summary>
-    /// Places an order. For card, wallet and kiosk the response carries
-    /// payment.checkoutUrl: send the customer there. Sending the same
-    /// Idempotency-Key again returns the original order (200) instead of a new one (201).
-    /// </summary>
+    // Places an order. For card, wallet and kiosk the response carries
+    // payment.checkoutUrl: send the customer there. Sending the same
+    // Idempotency-Key again returns the original order (200) instead of a new one (201).
     [HttpPost]
     public async Task<IActionResult> Place(
         PlaceOrderRequest request,
@@ -41,7 +39,7 @@ public sealed class OrdersController(OrderService orders) : ControllerBase
     // The three below are back-office operations. Without auth in this slice they
     // are open; in the real project they sit behind [Authorize(Roles = Roles.Admin)].
 
-    /// <summary>Full refund with an empty body, partial with { "amount": 500.00 }.</summary>
+    // Full refund with an empty body, partial with { "amount": 500.00 }.
     [HttpPost("{id:guid}/refund")]
     public async Task<IActionResult> Refund(Guid id, RefundRequest? request, CancellationToken ct) =>
         Ok(await orders.RefundAsync(id, request?.Amount, ct));
@@ -50,12 +48,12 @@ public sealed class OrdersController(OrderService orders) : ControllerBase
     public async Task<IActionResult> Void(Guid id, CancellationToken ct) =>
         Ok(await orders.VoidAsync(id, ct));
 
-    /// <summary>The gateway notifications stored for this order (support / audit view).</summary>
+    // The gateway notifications stored for this order (support / audit view).
     [HttpGet("{id:guid}/payment/events")]
     public async Task<IActionResult> Events(Guid id, CancellationToken ct) =>
         Ok(await orders.GetPaymentEventsAsync(id, ct));
 
-    /// <summary>Asks the gateway for the real status. Use when a webhook seems to be missing.</summary>
+    // Asks the gateway for the real status. Use when a webhook seems to be missing.
     [HttpPost("{id:guid}/payment/sync")]
     public async Task<IActionResult> Sync(Guid id, CancellationToken ct) =>
         Ok(await orders.SyncWithGatewayAsync(id, ct));

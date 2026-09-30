@@ -9,10 +9,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Audiophile.Tests;
 
-/// <summary>
-/// The webhook's business rules, run against a real (in-memory SQLite) database
-/// so the unique index that blocks duplicate events is part of what is tested.
-/// </summary>
+// The webhook's business rules, run against a real (in-memory SQLite) database
+// so the unique index that blocks duplicate events is part of what is tested.
 public sealed class PaymentResultApplierTests : IDisposable
 {
     private const string Provider = "fawaterak";

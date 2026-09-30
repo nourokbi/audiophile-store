@@ -2,11 +2,9 @@ using Audiophile.Domain.Common;
 
 namespace Audiophile.Domain.Entities;
 
-/// <summary>
-/// The cart aggregate. Lines are reached only through this type, which is what
-/// keeps the one-line-per-product rule true — the same rule the unique
-/// (CartId, ProductId) index enforces in the database.
-/// </summary>
+// The cart aggregate. Lines are reached only through this type, which is what
+// keeps the one-line-per-product rule true — the same rule the unique
+// (CartId, ProductId) index enforces in the database.
 public sealed class Cart
 {
     private readonly List<CartItem> _cartItems = [];
@@ -25,7 +23,7 @@ public sealed class Cart
     public bool IsEmpty => _cartItems.Count == 0;
     public int TotalQuantity => _cartItems.Sum(i => i.Quantity);
 
-    /// <summary>Adding a product already in the cart tops up that line rather than creating a second one.</summary>
+    // Adding a product already in the cart tops up that line rather than creating a second one.
     public CartItem AddItem(Guid productId, int quantity)
     {
         Guard.NotEmpty(productId, nameof(productId));
@@ -43,7 +41,7 @@ public sealed class Cart
         return item;
     }
 
-    /// <summary>M4-16 — set a line's quantity outright. To get to zero, call <see cref="RemoveItem"/>.</summary>
+    // M4-16 — set a line's quantity outright. To get to zero, call RemoveItem.
     public void SetItemQuantity(Guid productId, int quantity)
     {
         var item = FindItem(productId)
@@ -52,10 +50,8 @@ public sealed class Cart
         item.SetQuantity(quantity);
     }
 
-    /// <summary>
-    /// Throws when the product is not in the cart, so the API answers 404 rather
-    /// than a 204 that pretends something was deleted.
-    /// </summary>
+    // Throws when the product is not in the cart, so the API answers 404 rather
+    // than a 204 that pretends something was deleted.
     public void RemoveItem(Guid productId)
     {
         var item = FindItem(productId)
@@ -64,7 +60,7 @@ public sealed class Cart
         _cartItems.Remove(item);
     }
 
-    /// <summary>M4-08 and M4-16 — emptied wholesale after checkout, or on request.</summary>
+    // M4-08 and M4-16 — emptied wholesale after checkout, or on request.
     public void Clear() => _cartItems.Clear();
 
     public CartItem? FindItem(Guid productId) => _cartItems.SingleOrDefault(i => i.ProductId == productId);

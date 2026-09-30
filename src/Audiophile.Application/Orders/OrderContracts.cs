@@ -8,7 +8,7 @@ public sealed record PlaceOrderItem(Guid ProductId, int Quantity);
 public sealed record ShippingRequest(
     string FullName, string Phone, string Street, string City, string Country, string? PostalCode);
 
-/// <summary>Only product ids and quantities. Prices are always read from the catalogue.</summary>
+// Only product ids and quantities. Prices are always read from the catalogue.
 public sealed record PlaceOrderRequest(
     IReadOnlyList<PlaceOrderItem> Items, PaymentMethod PaymentMethod, ShippingRequest Shipping);
 

@@ -12,11 +12,9 @@ public sealed class FawaterakController(
 {
     private const string Provider = "fawaterak";
 
-    /// <summary>
-    /// Fawaterak's server-to-server notification. "_json" in the path makes
-    /// Fawaterak send JSON; the plain path is kept for the dashboard's default setting.
-    /// The only thing allowed to mark an order paid.
-    /// </summary>
+    // Fawaterak's server-to-server notification. "_json" in the path makes
+    // Fawaterak send JSON; the plain path is kept for the dashboard's default setting.
+    // The only thing allowed to mark an order paid.
     [HttpPost("webhook_json")]
     [HttpPost("webhook")]
     public async Task<IActionResult> Webhook(CancellationToken ct)
@@ -41,12 +39,10 @@ public sealed class FawaterakController(
         return Ok(new { outcome = outcome.ToString() });
     }
 
-    /// <summary>
-    /// Where the customer's browser lands after paying (success, fail and pending all
-    /// come here). Forwards to My orders, which shows our own record of the order:
-    /// Fawaterak's redirect is not signed, so "result" only picks the wording while
-    /// the page waits for the webhook, and never changes the order.
-    /// </summary>
+    // Where the customer's browser lands after paying (success, fail and pending all
+    // come here). Forwards to My orders, which shows our own record of the order:
+    // Fawaterak's redirect is not signed, so "result" only picks the wording while
+    // the page waits for the webhook, and never changes the order.
     [HttpGet("return")]
     public IActionResult Return([FromQuery] Guid orderId, [FromQuery] string? result)
     {

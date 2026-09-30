@@ -48,7 +48,7 @@ public sealed record CheckoutSession(
 
 public sealed record GatewayOperationResult(bool Success, string? TransactionId, string? Message);
 
-/// <summary>A transaction as the gateway describes it, already translated to our terms.</summary>
+// A transaction as the gateway describes it, already translated to our terms.
 public sealed record GatewayTransaction(
     string TransactionId,
     string? ProviderOrderId,

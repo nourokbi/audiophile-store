@@ -4,7 +4,7 @@ namespace Audiophile.Application.Orders;
 
 internal static class OrderStock
 {
-    /// <summary>Cancels the order and puts its units back. Requires items and products loaded.</summary>
+    // Cancels the order and puts its units back. Requires items and products loaded.
     public static void CancelAndRelease(Order order)
     {
         order.Cancel();
@@ -13,7 +13,7 @@ internal static class OrderStock
     }
 }
 
-/// <summary>M4-17: the shipping fee is a written rule, not a magic number.</summary>
+// M4-17: the shipping fee is a written rule, not a magic number.
 public static class ShippingPolicy
 {
     public const decimal FlatFee = 50m;

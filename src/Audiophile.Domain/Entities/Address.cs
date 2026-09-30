@@ -69,7 +69,7 @@ public sealed class Address
 
     public void Reactivate() => IsActive = true;
 
-    /// Copies the address into the frozen form an order carries.
+    // Copies the address into the frozen form an order carries.
     public ShippingDetails ToShippingDetails() =>
         new(FullAddressName, Phone, Street, City, Country, PostalCode);
 }

@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Audiophile.Infrastructure.Payments;
 
-/// <summary>Every few minutes, closes unpaid gateway orders whose payment window has passed.</summary>
+// Every few minutes, closes unpaid gateway orders whose payment window has passed.
 public sealed class PaymentExpiryWorker(IServiceScopeFactory scopes, ILogger<PaymentExpiryWorker> logger)
     : BackgroundService
 {

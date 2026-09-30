@@ -3,16 +3,12 @@ using Microsoft.AspNetCore.Identity;
 
 namespace Audiophile.Domain.Entities;
 
-/// <summary>
-/// The account aggregate. Identity owns the credentials — email, password hash,
-/// phone, lockout, stamps — and, since D-02, the roles as well. What is added
-/// here is the shop's own view of a customer: their display name, their
-/// addresses, and the sessions they hold.
-/// </summary>
-/// <remarks>
-/// Keyed on <see cref="Guid"/> rather than Identity's default <c>string</c>, so
-/// every <c>UserId</c> foreign key in the model is the same type as this key.
-/// </remarks>
+// The account aggregate. Identity owns the credentials — email, password hash,
+// phone, lockout, stamps — and, since D-02, the roles as well. What is added
+// here is the shop's own view of a customer: their display name, their
+// addresses, and the sessions they hold.
+// Keyed on Guid rather than Identity's default string, so
+// every UserId foreign key in the model is the same type as this key.
 public class User : IdentityUser<Guid>
 {
     public const int NameMinLength = 3;
@@ -48,11 +44,9 @@ public class User : IdentityUser<Guid>
     public IReadOnlyCollection<Order> Orders => _orders.AsReadOnly();
     public IReadOnlyCollection<RefreshToken> RefreshTokens => _refreshTokens.AsReadOnly();
 
-    /// <summary>
-    /// The only way a user comes into existence. Role assignment is a separate
-    /// step now that Identity owns roles: hand the result to
-    /// <c>UserManager.CreateAsync</c>, then <c>AddToRoleAsync</c>.
-    /// </summary>
+    // The only way a user comes into existence. Role assignment is a separate
+    // step now that Identity owns roles: hand the result to
+    // UserManager.CreateAsync, then AddToRoleAsync.
     public static User Create(string name, string email) => new(name, email);
 
     public void UpdateName(string newName) =>
@@ -70,7 +64,7 @@ public class User : IdentityUser<Guid>
     public void SetPhone(string? phone) =>
         PhoneNumber = phone is null ? null : Guard.Phone(phone, nameof(phone));
 
-    /// <summary>Requires <see cref="Addresses"/> to have been loaded.</summary>
+    // Requires Addresses to have been loaded.
     public Address AddAddress(
         string fullAddressName,
         string street,
@@ -84,10 +78,8 @@ public class User : IdentityUser<Guid>
         return address;
     }
 
-    /// <summary>
-    /// Soft-deletes: orders snapshot their shipping address, but a row that is
-    /// still referenced anywhere is safer deactivated than deleted.
-    /// </summary>
+    // Soft-deletes: orders snapshot their shipping address, but a row that is
+    // still referenced anywhere is safer deactivated than deleted.
     public void RemoveAddress(Guid addressId)
     {
         var address = FindAddress(addressId)
@@ -99,7 +91,7 @@ public class User : IdentityUser<Guid>
     public Address? FindAddress(Guid addressId) =>
         _addresses.SingleOrDefault(a => a.Id == addressId && a.IsActive);
 
-    /// <summary>Requires <see cref="RefreshTokens"/> to have been loaded.</summary>
+    // Requires RefreshTokens to have been loaded.
     public RefreshToken IssueRefreshToken(string token, DateTime expiresAt)
     {
         var refreshToken = new RefreshToken(Id, token, expiresAt);
@@ -107,7 +99,7 @@ public class User : IdentityUser<Guid>
         return refreshToken;
     }
 
-    /// <summary>Logout, and the blunt instrument for "this account may be compromised".</summary>
+    // Logout, and the blunt instrument for "this account may be compromised".
     public void RevokeAllRefreshTokens()
     {
         foreach (var token in _refreshTokens)

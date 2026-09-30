@@ -3,11 +3,9 @@ using Audiophile.Domain.ValueObjects;
 
 namespace Audiophile.Domain.Entities;
 
-/// <summary>
-/// One line of a placed order. Created only by <see cref="Order.Place"/>, from an
-/// already-validated <see cref="OrderLine"/>, and immutable afterwards — this row
-/// is the record of what was bought, not a working copy.
-/// </summary>
+// One line of a placed order. Created only by Order.Place, from an
+// already-validated OrderLine, and immutable afterwards — this row
+// is the record of what was bought, not a working copy.
 public sealed class OrderItem
 {
     private OrderItem() { } // EF Core
@@ -39,6 +37,6 @@ public sealed class OrderItem
     public Order Order { get; private set; } = null!;
     public Product Product { get; private set; } = null!;
 
-    /// <summary>Derived, not stored — a persisted copy is one more thing that can drift.</summary>
+    // Derived, not stored — a persisted copy is one more thing that can drift.
     public decimal LineTotal => UnitPrice * Quantity;
 }

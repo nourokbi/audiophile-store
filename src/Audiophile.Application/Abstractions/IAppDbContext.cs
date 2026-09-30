@@ -3,10 +3,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Audiophile.Application.Abstractions;
 
-/// <summary>
-/// What the use cases need from persistence. Infrastructure's AppDbContext
-/// implements it, so Application never references Infrastructure.
-/// </summary>
+// What the use cases need from persistence. Infrastructure's AppDbContext
+// implements it, so Application never references Infrastructure.
 public interface IAppDbContext
 {
     DbSet<Product> Products { get; }

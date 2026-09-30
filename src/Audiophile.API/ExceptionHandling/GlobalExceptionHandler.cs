@@ -4,11 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Audiophile.API.ExceptionHandling;
 
-/// <summary>
-/// M1-05: every error leaves as RFC 7807 ProblemDetails, never a stack trace.
-/// Domain rules throw ArgumentException (bad input) or InvalidOperationException
-/// (not allowed in the current state); use cases throw the AppException types.
-/// </summary>
+// M1-05: every error leaves as RFC 7807 ProblemDetails, never a stack trace.
+// Domain rules throw ArgumentException (bad input) or InvalidOperationException
+// (not allowed in the current state); use cases throw the AppException types.
 public sealed class GlobalExceptionHandler(IProblemDetailsService problemDetails, ILogger<GlobalExceptionHandler> logger)
     : IExceptionHandler
 {

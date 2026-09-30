@@ -4,16 +4,14 @@ using Audiophile.Domain.ValueObjects;
 
 namespace Audiophile.Domain.Entities;
 
-/// <summary>
-/// The order aggregate. Totals are derived from the lines at placement and never
-/// assigned from outside, and status only moves along the transitions declared
-/// below (M4-15), so an order cannot be talked into an impossible shape.
-/// </summary>
+// The order aggregate. Totals are derived from the lines at placement and never
+// assigned from outside, and status only moves along the transitions declared
+// below (M4-15), so an order cannot be talked into an impossible shape.
 public sealed class Order
 {
     public const int IdempotencyKeyMaxLength = 128;
 
-    /// <summary>The state machine, written once. Everything else asks this table.</summary>
+    // The state machine, written once. Everything else asks this table.
     private static readonly Dictionary<OrderStatus, OrderStatus[]> AllowedTransitions = new()
     {
         [OrderStatus.Pending] = [OrderStatus.Confirmed, OrderStatus.Cancelled],
@@ -99,10 +97,10 @@ public sealed class Order
 
     public bool HasShipped => Status is OrderStatus.Shipped or OrderStatus.Delivered;
 
-    /// <summary>M4-14 — the customer's "can I still cancel this?".</summary>
+    // M4-14 — the customer's "can I still cancel this?".
     public bool CanBeCancelled => CanTransitionTo(OrderStatus.Cancelled);
 
-    /// <summary>M4-02 — the only way an order comes into existence.</summary>
+    // M4-02 — the only way an order comes into existence.
     public static Order Place(
         Guid userId,
         PaymentMethod paymentMethod,
@@ -115,10 +113,8 @@ public sealed class Order
 
     public bool CanTransitionTo(OrderStatus next) => AllowedTransitions[Status].Contains(next);
 
-    /// <summary>
-    /// Re-declaring the status an order already holds is a no-op rather than an
-    /// error, because payment gateways deliver the same event more than once (M4-11).
-    /// </summary>
+    // Re-declaring the status an order already holds is a no-op rather than an
+    // error, because payment gateways deliver the same event more than once (M4-11).
     public void TransitionTo(OrderStatus next)
     {
         Guard.Defined(next, nameof(next));
@@ -143,10 +139,8 @@ public sealed class Order
 
     public void Cancel() => TransitionTo(OrderStatus.Cancelled);
 
-    /// <summary>
-    /// Creates the payment record for this order. The amount comes from the order,
-    /// never from a caller, so the two can never disagree.
-    /// </summary>
+    // Creates the payment record for this order. The amount comes from the order,
+    // never from a caller, so the two can never disagree.
     public Payment StartPayment()
     {
         if (Payment is not null)

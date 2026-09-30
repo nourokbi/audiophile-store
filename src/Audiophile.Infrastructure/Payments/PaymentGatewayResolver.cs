@@ -4,10 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Audiophile.Infrastructure.Payments;
 
-/// <summary>
-/// Gateways are registered as keyed services under their names ("paymob",
-/// "fawaterak"). "Payments:Provider" in configuration picks the default.
-/// </summary>
+// Gateways are registered as keyed services under their names (e.g. "fawaterak").
+// "Payments:Provider" in configuration picks the default.
 public sealed class PaymentGatewayResolver(IServiceProvider services, IConfiguration configuration)
     : IPaymentGatewayResolver
 {

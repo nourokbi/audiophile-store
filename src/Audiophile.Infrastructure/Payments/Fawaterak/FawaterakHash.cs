@@ -3,12 +3,10 @@ using System.Text;
 
 namespace Audiophile.Infrastructure.Payments.Fawaterak;
 
-/// <summary>
-/// Fawaterak's webhook signature: HMAC-SHA256 over a query-string-shaped message,
-/// keyed with the vendor key, hex encoded. Two message shapes, per the docs:
-/// paid/failed use the invoice id, key and method; expired Fawry/Aman codes use
-/// the reference id and method.
-/// </summary>
+// Fawaterak's webhook signature: HMAC-SHA256 over a query-string-shaped message,
+// keyed with the vendor key, hex encoded. Two message shapes, per the docs:
+// paid/failed use the invoice id, key and method; expired Fawry/Aman codes use
+// the reference id and method.
 public static class FawaterakHash
 {
     public static string ForInvoice(string invoiceId, string invoiceKey, string paymentMethod, string vendorKey) =>
@@ -23,7 +21,7 @@ public static class FawaterakHash
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    /// <summary>Constant-time comparison.</summary>
+    // Constant-time comparison.
     public static bool Matches(string expectedHex, string? receivedHex) =>
         !string.IsNullOrEmpty(receivedHex)
         && CryptographicOperations.FixedTimeEquals(
