@@ -117,7 +117,7 @@ public sealed class Order
 
     /// <summary>
     /// Re-declaring the status an order already holds is a no-op rather than an
-    /// error, because Stripe delivers the same event more than once (M4-11).
+    /// error, because payment gateways deliver the same event more than once (M4-11).
     /// </summary>
     public void TransitionTo(OrderStatus next)
     {
