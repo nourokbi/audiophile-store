@@ -53,6 +53,9 @@ public sealed class Payment
     /// <summary>The hosted checkout page. Kept so a retried order request can return the same link.</summary>
     public string? CheckoutUrl { get; private set; }
 
+    /// <summary>For cash methods: the code the customer quotes at an Aman / Fawry outlet.</summary>
+    public string? PaymentCode { get; private set; }
+
     public Order Order { get; private set; } = null!;
 
     public bool UsesGateway => PaymentMethod != PaymentMethod.CashOnDelivery;
@@ -63,7 +66,8 @@ public sealed class Payment
     public long AmountInMinorUnits => (long)(Amount * 100);
 
     /// <summary>Records the checkout session the customer is sent to.</summary>
-    public void LinkToProvider(string provider, string providerReference, string? providerOrderId, string checkoutUrl)
+    public void LinkToProvider(
+        string provider, string providerReference, string? providerOrderId, string checkoutUrl, string? paymentCode = null)
     {
         if (!UsesGateway)
             throw new InvalidOperationException($"A {PaymentMethod} payment does not go through a gateway.");
@@ -75,6 +79,7 @@ public sealed class Payment
         ProviderReference = Guard.Text(providerReference, 1, 255, nameof(providerReference));
         ProviderOrderId = Guard.OptionalText(providerOrderId, 255, nameof(providerOrderId));
         CheckoutUrl = Guard.Text(checkoutUrl, 1, 2048, nameof(checkoutUrl));
+        PaymentCode = Guard.OptionalText(paymentCode, 100, nameof(paymentCode));
         Touch();
     }
 

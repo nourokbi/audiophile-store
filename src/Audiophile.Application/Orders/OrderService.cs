@@ -12,23 +12,19 @@ namespace Audiophile.Application.Orders;
 
 public sealed class OrderService(
     IAppDbContext db,
-    IPaymentGateway gateway,
+    IPaymentGatewayResolver gateways,
     PaymentResultApplier applier,
     ILogger<OrderService> logger)
 {
     public const string Currency = "EGP";
 
-    /// <summary>How long a customer has to finish paying before the order is released.</summary>
     public static TimeSpan PaymentWindow(PaymentMethod method) => method switch
     {
         PaymentMethod.Kiosk => TimeSpan.FromHours(48),   // they have to walk to an outlet
         _ => TimeSpan.FromMinutes(30),
     };
 
-    /// <summary>
-    /// M4-02. Places the order, reserves stock, and opens a checkout at the gateway.
-    /// Sending the same idempotency key again returns the first result and creates nothing.
-    /// </summary>
+
     public async Task<PlaceOrderResult> PlaceOrderAsync(
         Guid userId, PlaceOrderRequest request, string idempotencyKey, CancellationToken ct)
     {
@@ -40,7 +36,6 @@ public sealed class OrderService(
         if (request.Items is not { Count: > 0 })
             throw new ArgumentException("An order needs at least one item.", nameof(request));
 
-        // M4-07: prices and stock come from the database, never from the client.
         var productIds = request.Items.Select(i => i.ProductId).Distinct().ToList();
         var products = await db.Products.Where(p => productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct);
 
@@ -77,8 +72,10 @@ public sealed class OrderService(
 
         try
         {
+            var gateway = gateways.Default;
             var session = await gateway.CreateCheckoutAsync(BuildCheckoutRequest(order, payment), ct);
-            payment.LinkToProvider(gateway.Name, session.ProviderReference, session.ProviderOrderId, session.CheckoutUrl);
+            payment.LinkToProvider(
+                gateway.Name, session.ProviderReference, session.ProviderOrderId, session.CheckoutUrl, session.PaymentCode);
             await db.SaveChangesAsync(ct);
         }
         catch (Exception ex) when (ex is GatewayException or GatewayTimeoutException)
@@ -100,6 +97,22 @@ public sealed class OrderService(
         var order = await LoadOrders().FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId, ct)
             ?? throw new NotFoundException($"Order {orderId} was not found.");
         return OrderDto.From(order);
+    }
+
+    /// <summary>
+    /// Everything the gateway told us about this order's payment, oldest first: the
+    /// audit trail support reads when a customer says "I paid but…".
+    /// </summary>
+    public async Task<IReadOnlyList<PaymentEventDto>> GetPaymentEventsAsync(Guid orderId, CancellationToken ct)
+    {
+        var paymentId = await db.Payments.Where(p => p.OrderId == orderId).Select(p => (Guid?)p.Id).FirstOrDefaultAsync(ct)
+            ?? throw new NotFoundException($"Order {orderId} has no payment.");
+
+        var events = await db.PaymentEvents.AsNoTracking().Where(e => e.PaymentId == paymentId).ToListAsync(ct);
+        return events
+            .OrderBy(e => e.ReceivedAt)
+            .Select(e => new PaymentEventDto(e.ReceivedAt, e.Provider, e.EventType, e.ExternalId, e.RawPayload))
+            .ToList();
     }
 
     public async Task<IReadOnlyList<OrderDto>> ListOrdersAsync(Guid userId, CancellationToken ct)
@@ -127,7 +140,7 @@ public sealed class OrderService(
 
         // No automatic retry. If this times out, the refund may already have happened
         // at the gateway; retrying blindly could refund the customer twice.
-        var result = await gateway.RefundAsync(payment.ProviderTransactionId, (long)(refundAmount * 100), ct);
+        var result = await gateways.Get(payment.Provider!).RefundAsync(payment.ProviderTransactionId, (long)(refundAmount * 100), ct);
         if (!result.Success)
             throw new GatewayException($"The gateway refused the refund: {result.Message}");
 
@@ -154,7 +167,7 @@ public sealed class OrderService(
         if (!order.CanBeCancelled)
             throw new ConflictException($"An order that is {order.Status} cannot be voided.");
 
-        var result = await gateway.VoidAsync(payment.ProviderTransactionId, ct);
+        var result = await gateways.Get(payment.Provider!).VoidAsync(payment.ProviderTransactionId, ct);
         if (!result.Success)
             throw new GatewayException($"The gateway refused the void: {result.Message}");
 
@@ -176,7 +189,7 @@ public sealed class OrderService(
         if (payment.Provider is null)
             throw new ConflictException("This payment never reached the gateway.");
 
-        var transactions = await gateway.FindTransactionsAsync(payment.ProviderTransactionId, payment.ProviderOrderId, ct);
+        var transactions = await gateways.Get(payment.Provider).FindTransactionsAsync(payment.ProviderTransactionId, payment.ProviderOrderId, ct);
         foreach (var tx in transactions.Where(t => !t.IsChildTransaction))
             await applier.ApplyAsync(payment.Provider, "inquiry", tx, JsonSerializer.Serialize(tx), ct);
 

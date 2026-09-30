@@ -13,4 +13,7 @@
     <Project Path="src/Audiophile.Domain/Audiophile.Domain.csproj" />
     <Project Path="src/Audiophile.Infrastructure/Audiophile.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Audiophile.Tests/Audiophile.Tests.csproj" />
+  </Folder>
 </Solution>

@@ -480,3 +480,8 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Local SQLite database for the payment slice
+*.db
+*.db-shm
+*.db-wal

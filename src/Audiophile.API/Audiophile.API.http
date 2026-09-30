@@ -1,6 +1,88 @@
-@Audiophile.API_HostAddress = http://localhost:5040
+### Audiophile payment slice — click "Send Request" above each block (VS Code REST Client or Visual Studio).
+@base = http://localhost:5040
 
-GET {{Audiophile.API_HostAddress}}/weatherforecast/
-Accept: application/json
+### 1. Catalogue — copy a product id into @productId below
+GET {{base}}/products
 
 ###
+@productId = PASTE-A-PRODUCT-ID
+
+### 2. Card order → response.payment.checkoutUrl opens Fawaterak's hosted page
+#    Test card (always succeeds): 5123450000000008 · "Fawaterak test" · 12/26 · CVV 100
+#    Test card (always fails):    4222 0000 0672 4235 · 12/26 · CVV 123
+POST {{base}}/orders
+Content-Type: application/json
+Idempotency-Key: demo-card-001
+
+{
+  "items": [ { "productId": "{{productId}}", "quantity": 1 } ],
+  "paymentMethod": "Card",
+  "shipping": {
+    "fullName": "Mona Hassan",
+    "phone": "+201000000000",
+    "street": "12 Tahrir Street",
+    "city": "Cairo",
+    "country": "Egypt",
+    "postalCode": null
+  }
+}
+
+### 3. Same request, same Idempotency-Key → 200 with the same order, no second invoice
+POST {{base}}/orders
+Content-Type: application/json
+Idempotency-Key: demo-card-001
+
+{
+  "items": [ { "productId": "{{productId}}", "quantity": 1 } ],
+  "paymentMethod": "Card",
+  "shipping": { "fullName": "Mona Hassan", "phone": "+201000000000", "street": "12 Tahrir Street", "city": "Cairo", "country": "Egypt", "postalCode": null }
+}
+
+### 4. Fawry / cash outlet ("Kiosk") → the hosted page shows the code to pay in cash
+POST {{base}}/orders
+Content-Type: application/json
+Idempotency-Key: demo-fawry-001
+
+{
+  "items": [ { "productId": "{{productId}}", "quantity": 1 } ],
+  "paymentMethod": "Kiosk",
+  "shipping": { "fullName": "Mona Hassan", "phone": "+201000000000", "street": "12 Tahrir Street", "city": "Cairo", "country": "Egypt", "postalCode": null }
+}
+
+### 5. Cash on delivery — confirmed immediately, no gateway
+POST {{base}}/orders
+Content-Type: application/json
+Idempotency-Key: demo-cod-001
+
+{
+  "items": [ { "productId": "{{productId}}", "quantity": 1 } ],
+  "paymentMethod": "CashOnDelivery",
+  "shipping": { "fullName": "Mona Hassan", "phone": "+201000000000", "street": "12 Tahrir Street", "city": "Cairo", "country": "Egypt", "postalCode": null }
+}
+
+### 6. My orders
+GET {{base}}/orders
+
+###
+@orderId = PASTE-AN-ORDER-ID
+
+### 7. One order — watch Pending → Confirmed when the webhook lands
+GET {{base}}/orders/{{orderId}}
+
+### 8. Webhook missed? Ask Fawaterak directly (getInvoiceData)
+POST {{base}}/orders/{{orderId}}/payment/sync
+
+### 9. What the gateway told us about this order (audit trail)
+GET {{base}}/orders/{{orderId}}/payment/events
+
+### 10. Refund — Fawaterak has no public refund API, so this explains to use the dashboard
+POST {{base}}/orders/{{orderId}}/refund
+Content-Type: application/json
+
+{}
+
+### 11. A forged webhook is rejected with 401
+POST {{base}}/payments/fawaterak/webhook_json
+Content-Type: application/json
+
+{ "hashKey": "forged", "invoice_id": 1, "invoice_key": "x", "payment_method": "Card", "invoice_status": "paid" }

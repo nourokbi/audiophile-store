@@ -5,6 +5,11 @@ Backend for the Audiophile e-commerce store. ASP.NET Core 10, PostgreSQL, Clean 
 This is a rebuild of an earlier single-project API, restructured into layers and built
 feature by feature. See [`docs/build-plan.md`](docs/build-plan.md) for the scope and the order of work.
 
+> **Payment slice:** a time-boxed branch that jumps ahead to checkout. Fawaterak (card, wallet,
+> Fawry / Aman) with HMAC-verified webhooks, amount confirmation, status sync and expiry, a small
+> storefront, on SQLite with a demo user. Setup, design decisions and known gaps:
+> [`docs/fawaterak-integration.md`](docs/fawaterak-integration.md).
+
 ## Layout
 
 ```

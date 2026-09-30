@@ -16,6 +16,9 @@ public sealed record PlaceOrderResult(OrderDto Order, bool Created);
 
 public sealed record RefundRequest(decimal? Amount);
 
+public sealed record PaymentEventDto(
+    DateTime ReceivedAt, string Provider, string EventType, string ExternalId, string RawPayload);
+
 public sealed record OrderItemDto(Guid ProductId, string ProductName, int Quantity, decimal UnitPrice, decimal LineTotal);
 
 public sealed record PaymentDto(
@@ -25,7 +28,8 @@ public sealed record PaymentDto(
     string? Provider,
     string? ProviderOrderId,
     string? ProviderTransactionId,
-    string? CheckoutUrl);
+    string? CheckoutUrl,
+    string? PaymentCode);
 
 public sealed record OrderDto(
     Guid Id,
@@ -51,6 +55,8 @@ public sealed record OrderDto(
             .ToList(),
         order.Payment is { } p
             ? new PaymentDto(p.Status, p.Amount, p.RefundedAmount, p.Provider, p.ProviderOrderId,
-                p.ProviderTransactionId, p.Status == PaymentStatus.Pending ? p.CheckoutUrl : null)
+                p.ProviderTransactionId,
+                p.Status == PaymentStatus.Pending ? p.CheckoutUrl : null,
+                p.Status == PaymentStatus.Pending ? p.PaymentCode : null)
             : null);
 }
