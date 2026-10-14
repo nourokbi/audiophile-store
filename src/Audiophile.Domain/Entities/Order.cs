@@ -82,7 +82,6 @@ public sealed class Order
     public string ShippingCity { get; private set; } = null!;
     public string ShippingCountry { get; private set; } = null!;
     public string? ShippingPostalCode { get; private set; }
-
     public decimal SubTotal { get; private set; }
     public decimal DiscountAmount { get; private set; }
     public decimal ShippingFee { get; private set; }

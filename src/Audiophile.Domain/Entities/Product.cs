@@ -13,7 +13,8 @@ public sealed class Product
     public const int FeaturesMaxLength = 4000;
 
     // Case-insensitive: "Headphone Unit" and "headphone unit" are one box entry, not two.
-    private readonly Dictionary<string, int> _inTheBox = new(StringComparer.OrdinalIgnoreCase);
+    // Not readonly: EF Core maps this field to the jsonb "InTheBox" column and sets it when loading.
+    private Dictionary<string, int> _inTheBox = new(StringComparer.OrdinalIgnoreCase);
 
     private Product() { } // EF Core
 
@@ -93,6 +94,9 @@ public sealed class Product
     }
 
     public void Restock(int quantity) => Stock += Guard.AtLeast(quantity, 1, nameof(quantity));
+
+    // An admin's stock count after counting the shelf. Still never negative.
+    public void CorrectStock(int count) => Stock = Guard.AtLeast(count, 0, nameof(count));
 
     // Called inside the checkout transaction. Refusing here rather than clamping
     // to zero is what lets the loser of a race become a 409 (M4-06).

@@ -1,0 +1,22 @@
+# Local development services. Start with:  docker compose up -d
+# The API itself still runs with `dotnet run` for now; it joins this file in roadmap Phase 7.
+services:
+  postgres:
+    image: postgres:17-alpine          # same major version as Neon's default
+    container_name: audiophile-postgres
+    environment:
+      POSTGRES_DB: audiophile
+      POSTGRES_USER: audiophile
+      POSTGRES_PASSWORD: audiophile    # local only; production uses Neon
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U audiophile -d audiophile"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:

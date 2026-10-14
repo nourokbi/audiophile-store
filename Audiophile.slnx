@@ -1,11 +1,18 @@
 <Solution>
   <Folder Name="/Solution Items/">
-    <File Path="docs/audiophile-analysis.html" />
-    <File Path="docs/audiophile-guide.html" />
-    <File Path="docs/build-plan.html" />
+    <File Path="docker-compose.yml" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/docs/">
+    <File Path="docs/api.md" />
     <File Path="docs/build-plan.md" />
-    <File Path="docs/phase-1-board.html" />
-    <File Path="docs/phase-1-tasks.md" />
+    <File Path="docs/changelog.md" />
+    <File Path="docs/database.md" />
+    <File Path="docs/diagrams.md" />
+    <File Path="docs/fawaterak-integration.md" />
+    <File Path="docs/project-overview.md" />
+    <File Path="docs/roadmap.md" />
+    <File Path="docs/use-cases.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Audiophile.API/Audiophile.API.csproj" />
