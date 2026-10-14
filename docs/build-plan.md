@@ -1,5 +1,8 @@
 # Audiophile API — scope and build plan
 
+> **Superseded (2026-10-14) by [`roadmap.md`](roadmap.md)** for the order and size of the work.
+> The requirement notes and the decision log below still apply.
+
 Derived from a line-by-line review of the previous single-project implementation
 (`audiophile`, commit `3db368f`). Requirements are grouped by the milestone that
 delivers them, not by module, so you only ever hold one milestone in your head.
@@ -146,7 +149,7 @@ on a solo project with a single consumer is ceremony, and a shallow talking poin
 **Phase 0.** Two hours, before a line of Phase 1. All of it compounds, and none of it
 is retrofittable — a commit history cannot be rewritten into existence later.
 
-Task-level breakdown: **`docs/phase-0-tasks.md`**. That is where to start.
+Task-level breakdown: see Phase 0 in [`roadmap.md`](roadmap.md).
 
 | ID | Requirement |
 |---|---|
@@ -222,7 +225,7 @@ visible to-do list. Final shape is specified in M6-07.
 **Phase 1.** Move the existing code into the four layers with **no behaviour change**.
 Nothing new is added; if an endpoint responded 404 before, it responds 404 after.
 
-Task-level breakdown: **`docs/phase-1-tasks.md`**. That is where to start.
+Task-level breakdown: see Phase 1 in [`roadmap.md`](roadmap.md).
 
 | ID | Requirement |
 |---|---|
