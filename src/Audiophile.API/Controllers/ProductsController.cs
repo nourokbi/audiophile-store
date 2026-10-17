@@ -1,21 +1,46 @@
-using Audiophile.Application.Abstractions;
+using Audiophile.Application.Common;
+using Audiophile.Application.Products;
+using Audiophile.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace Audiophile.API.Controllers;
 
+// Browsing is open to everyone; changing the catalogue is for admins.
 [ApiController]
 [Route("products")]
-public sealed class ProductsController(IAppDbContext db) : ControllerBase
+public sealed class ProductsController(ProductService products) : ControllerBase
 {
+    // GET /products?search=xx&category=Headphones&minPrice=100&maxPrice=5000&page=1&pageSize=12
     [HttpGet]
-    public async Task<IActionResult> List(CancellationToken ct)
-    {
-        var products = await db.Products
-            .Where(p => p.IsActive)
-            .Select(p => new { p.Id, p.Name, p.Price, p.Stock, p.Category })
-            .ToListAsync(ct);
+    public async Task<IActionResult> List(
+        string? search, ProductCategory? category, decimal? minPrice, decimal? maxPrice,
+        CancellationToken ct, int page = 1, int pageSize = ProductQuery.DefaultPageSize) =>
+        Ok(await products.ListAsync(new ProductQuery(search, category, minPrice, maxPrice, page, pageSize), ct));
 
-        return Ok(products.OrderBy(p => p.Name));
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> Get(Guid id, CancellationToken ct) =>
+        Ok(await products.GetAsync(id, ct));
+
+    [Authorize(Roles = Roles.Admin)]
+    [HttpPost]
+    public async Task<IActionResult> Create(ProductRequest request, CancellationToken ct)
+    {
+        var product = await products.CreateAsync(request, ct);
+        return CreatedAtAction(nameof(Get), new { id = product.Id }, product);
+    }
+
+    [Authorize(Roles = Roles.Admin)]
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, ProductRequest request, CancellationToken ct) =>
+        Ok(await products.UpdateAsync(id, request, ct));
+
+    // Takes the product off sale; past orders keep pointing at it.
+    [Authorize(Roles = Roles.Admin)]
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)
+    {
+        await products.DeactivateAsync(id, ct);
+        return NoContent();
     }
 }

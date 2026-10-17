@@ -8,6 +8,9 @@ public sealed class NotFoundException(string message) : AppException(message);  
 
 public sealed class ConflictException(string message) : AppException(message);   // 409
 
+// Wrong credentials, or a refresh token that is unknown, expired or revoked.
+public sealed class UnauthorizedException(string message) : AppException(message); // 401
+
 // The gateway answered with an error. Safe to show the customer a retry.
 public sealed class GatewayException(string message) : AppException(message);    // 502
 

@@ -16,6 +16,7 @@ public sealed class GlobalExceptionHandler(IProblemDetailsService problemDetails
         {
             NotFoundException => (StatusCodes.Status404NotFound, "Not found"),
             ConflictException or InvalidOperationException => (StatusCodes.Status409Conflict, "Conflict"),
+            UnauthorizedException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
             ArgumentException => (StatusCodes.Status400BadRequest, "Invalid request"),
             GatewayTimeoutException => (StatusCodes.Status504GatewayTimeout, "Payment gateway timeout"),
             GatewayException => (StatusCodes.Status502BadGateway, "Payment gateway error"),

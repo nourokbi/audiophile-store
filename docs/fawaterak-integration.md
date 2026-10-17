@@ -2,7 +2,7 @@
 
 Checkout through [Fawaterak](https://fawaterak-api.readme.io) (Egypt): card, mobile wallet and
 cash-outlet codes (Fawry; Aman when enabled on the account), plus cash on delivery with no
-gateway. Runs on SQLite with a seeded demo customer in place of authentication.
+gateway. Currently **switched off** in code while checkout is rebuilt (see roadmap Phase 2).
 
 ## The flow
 
@@ -51,7 +51,6 @@ Safety nets: `POST /orders/{id}/payment/sync` asks Fawaterak directly, and an ex
 | Timeouts, GET-only retries, circuit breaker | `src/Audiophile.Infrastructure/DependencyInjection.cs` |
 | Expiry job | `src/Audiophile.Infrastructure/Payments/PaymentExpiryWorker.cs` |
 | Webhook + return endpoints | `src/Audiophile.API/Controllers/FawaterakController.cs` |
-| Shop and My orders pages | `src/Audiophile.API/wwwroot/` |
 
 ## Running it
 
@@ -85,6 +84,8 @@ The ngrok inspector (`http://127.0.0.1:4040`) shows every webhook and our respon
 
 ## Known gaps
 
-- No authentication: every request acts as the seeded demo customer; refund/sync/events are open.
-- `EnsureCreated` instead of migrations; SQLite instead of PostgreSQL; no concurrency token on stock.
+- The payment code is switched off (`// PAYMENT GATEWAY (off)`) until roadmap Phase 2 makes the gateway pluggable.
+- The return URL still points at the removed `/orders.html` page; Phase 2 points it at the React client's orders page.
+- The sync and events endpoints must be admin-only when they come back.
+- No concurrency token on stock yet (roadmap Phase 1).
 - Wallet and Fawry can't be paid in staging; Aman isn't enabled on the staging account.
