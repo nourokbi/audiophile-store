@@ -8,7 +8,8 @@ and a React client.
 [`docs/roadmap.md`](docs/roadmap.md) (the plan) · [`docs/use-cases.md`](docs/use-cases.md) ·
 [`docs/diagrams.md`](docs/diagrams.md) (architecture, ERD, state machines) ·
 [`docs/database.md`](docs/database.md) (PostgreSQL, Neon, migrations) ·
-[`docs/api.md`](docs/api.md) (every endpoint) · [`docs/changelog.md`](docs/changelog.md) (what changed).
+[`docs/api.md`](docs/api.md) (every endpoint) · [`docs/checkout-flow.md`](docs/checkout-flow.md) (follow one order through the code) ·
+[`docs/changelog.md`](docs/changelog.md) (what changed).
 
 This is a rebuild of an earlier single-project API ([`nourokbi/audiophile`](https://github.com/nourokbi/audiophile)),
 restructured into layers. The decision log is in [`docs/build-plan.md`](docs/build-plan.md); the payment

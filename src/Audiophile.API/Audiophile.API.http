@@ -1,41 +1,37 @@
-### Audiophile API — click "Send request" above each block (Visual Studio or VS Code REST Client).
-### Start with 1 (register) or 2 (login): the requests after them use the token they return.
+### Click Send request above each block, starting with register or login because the others use the token they return
 @base = http://localhost:5040
-# XX59 Headphones (4,499 EGP), seeded by the first migration.
+# XX59 Headphones, seeded by the first migration
 @productId = 4ae5911a-421b-4565-b75f-53809c3da182
-# Send 2 (login) first: the other requests use its token, {{login.response.body.$.accessToken}}.
-# (Not a top-level @token variable: Visual Studio evaluates those before every request, and one
-# that points at a response fails with HTTP0012 until that response exists.)
+# Response values are written inside each request because Visual Studio evaluates top level variables before every request
 
 
 ############################## Auth
 
-### 1. Register a customer (201). Change the email to register another one.
+### Register a customer, change the email to register another one
 # @name register
 POST {{base}}/auth/register
 Content-Type: application/json
 
 { "name": "Mona Hassan", "email": "mona@example.com", "password": "password-123" }
 
-### 2. Log in. For the admin, use Admin:Email / Admin:Password from `dotnet user-secrets list`.
+### Log in, for the admin use Admin:Email and Admin:Password from dotnet user-secrets list
 # @name login
 POST {{base}}/auth/login
 Content-Type: application/json
 
 { "email": "mona@example.com", "password": "password-123" }
 
-### 3. Who am I?
+### Who am I
 GET {{base}}/auth/me
 Authorization: Bearer {{login.response.body.$.accessToken}}
 
-### 4. New token pair. Send it twice: the second use of the same refresh token is
-#    treated as theft and ends every session (log in again with 2 afterwards).
+### New token pair, sending it twice is treated as theft and ends every session
 POST {{base}}/auth/refresh
 Content-Type: application/json
 
 { "refreshToken": "{{login.response.body.$.refreshToken}}" }
 
-### 5. Log out this session
+### Log out this session
 POST {{base}}/auth/logout
 Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
@@ -45,13 +41,13 @@ Content-Type: application/json
 
 ############################## Catalogue
 
-### 6. Browse: every filter is optional
+### Browse the catalogue, every filter is optional
 GET {{base}}/products?category=Headphones&minPrice=1000&page=1&pageSize=12
 
-### 7. One product
+### One product
 GET {{base}}/products/{{productId}}
 
-### 8. Add a product (admin only: log in as the admin in 2 first, otherwise 403)
+### Add a product, admin only so log in as the admin first or get 403
 POST {{base}}/products
 Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
@@ -70,7 +66,7 @@ Content-Type: application/json
 
 ############################## Addresses
 
-### 9. Save an address
+### Save an address
 # @name address
 POST {{base}}/addresses
 Authorization: Bearer {{login.response.body.$.accessToken}}
@@ -78,30 +74,29 @@ Content-Type: application/json
 
 { "fullAddressName": "Mona Hassan", "street": "12 Tahrir Street", "city": "Cairo", "country": "Egypt", "phone": "+201000000000", "postalCode": null }
 
-### 10. My addresses
+### My addresses
 GET {{base}}/addresses
 Authorization: Bearer {{login.response.body.$.accessToken}}
 
 
 ############################## Cart
 
-### 11. Add to cart
+### Add to cart
 POST {{base}}/cart/items
 Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 
 { "productId": "{{productId}}", "quantity": 1 }
 
-### 12. My cart
+### My cart
 GET {{base}}/cart
 Authorization: Bearer {{login.response.body.$.accessToken}}
 
 
 ############################## Orders
-# Orders are placed from the cart (add something in 11 first) and a saved address (9).
-# The full card-payment journey with Fawaterak is in checkout-flow.http.
+# Orders come from the cart and a saved address, the card payment journey is in checkout-flow.http
 
-### 13. Cash on delivery — confirmed immediately. A new Idempotency-Key on every send.
+### Cash on delivery is confirmed at once, with a new Idempotency-Key on every send
 # @name codOrder
 POST {{base}}/orders
 Authorization: Bearer {{login.response.body.$.accessToken}}
@@ -110,7 +105,7 @@ Idempotency-Key: cod-{{$timestamp}}
 
 { "addressId": "{{address.response.body.$.id}}", "paymentMethod": "CashOnDelivery" }
 
-### 14. Resend with the SAME Idempotency-Key as 13 → 200, the same order, nothing new
+### The same Idempotency-Key again returns 200 with the same order
 POST {{base}}/orders
 Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
@@ -118,9 +113,9 @@ Idempotency-Key: {{codOrder.request.headers.Idempotency-Key}}
 
 { "addressId": "{{address.response.body.$.id}}", "paymentMethod": "CashOnDelivery" }
 
-### 15. My orders
+### My orders
 GET {{base}}/orders
 Authorization: Bearer {{login.response.body.$.accessToken}}
 
-### 16. Health
+### Health
 GET {{base}}/health

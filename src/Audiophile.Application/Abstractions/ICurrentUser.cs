@@ -1,9 +1,8 @@
 namespace Audiophile.Application.Abstractions;
 
-// The signed-in user of the current request. The API implements it from the JWT,
-// so use cases never touch HttpContext.
+// The signed in user of the current request, read from the JWT by the API
 public interface ICurrentUser
 {
-    // Throws when nobody is signed in; only call it behind [Authorize].
+    // Throws when nobody is signed in, so only use it behind Authorize
     Guid Id { get; }
 }

@@ -1,11 +1,11 @@
 using Audiophile.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Audiophile.Application.Abstractions;
 
-// What the use cases need from persistence. Infrastructure's AppDbContext
-// implements it, so Application never references Infrastructure.
+// What the services need from the database, implemented by AppDbContext in Infrastructure
 public interface IAppDbContext
 {
     DbSet<User> Users { get; }
@@ -17,8 +17,11 @@ public interface IAppDbContext
     DbSet<Payment> Payments { get; }
     DbSet<PaymentEvent> PaymentEvents { get; }
 
-    // For the few use cases that need an explicit transaction (e.g. create a user and give it a role).
+    // For the few places that need an explicit transaction
     DatabaseFacade Database { get; }
+
+    // Cleared before a retry so the second attempt reads fresh rows
+    ChangeTracker ChangeTracker { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

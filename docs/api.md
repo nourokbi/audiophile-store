@@ -86,6 +86,7 @@ the cart increases that line. Quantity per line is 1–100. Shipping is 50 EGP, 
 | POST | `/orders` + header `Idempotency-Key` | **201** new order · **200** same key seen before | 400 · 404 address · 409 empty cart / stock / product no longer sold · 502 / 504 gateway |
 | GET | `/orders` | 200 my orders, newest first | 401 |
 | GET | `/orders/{id}` | 200 | 404 |
+| POST | `/orders/{id}/cancel` | 200 the cancelled order, stock returned | 404 · 409 already cancelled, shipped, or a paid card order (contact support) |
 | GET | `/orders/{id}/payment/events` | 200 what Fawaterak sent about this order | 🛡 admin · 404 |
 | POST | `/orders/{id}/payment/sync` | 200 the order after asking Fawaterak | 🛡 admin · 404 · 409 not a gateway order |
 
@@ -94,7 +95,8 @@ the cart increases that line. Quantity per line is 1–100. Shipping is 50 EGP, 
 - `CashOnDelivery` is `Confirmed` at once. `Card` stays `Pending` and the response carries
   `payment.checkoutUrl` (Fawaterak's payment page) until the webhook confirms it.
 - Prices are read from the database, never from the request.
-- The full journey, step by step, is in `src/Audiophile.API/checkout-flow.http`.
+- Two checkouts for the last unit at the same moment: one gets the order, the other a 409 (`xmin` plus one retry).
+- The full journey, step by step, is in `src/Audiophile.API/checkout-flow.http`; `docs/checkout-flow.md` follows it through the code.
 
 ## Other
 

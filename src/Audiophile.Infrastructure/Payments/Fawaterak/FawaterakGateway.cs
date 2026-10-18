@@ -1,10 +1,11 @@
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Audiophile.Application.Common;
 using Audiophile.Application.Payments;
-using Microsoft.AspNetCore.WebUtilities;
+using Audiophile.Domain.Entities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly.CircuitBreaker;
@@ -12,298 +13,209 @@ using Polly.Timeout;
 
 namespace Audiophile.Infrastructure.Payments.Fawaterak;
 
-// Everything that talks to Fawaterak. Fawaterak calls a payment an "invoice": we
-// create one per order, send the customer to its hosted page, and learn the result
-// from a signed webhook. Nothing outside this folder knows Fawaterak's field names.
+// Every HTTP call to Fawaterak, which calls a payment an invoice
 public sealed class FawaterakGateway(
     HttpClient http,
     IOptions<FawaterakOptions> options,
     ILogger<FawaterakGateway> logger) : IFawaterakGateway
 {
-    private FawaterakOptions Options => options.Value;
+    private const string Currency = "EGP";
 
-    // ---------------------------------------------------------------- checkout
+    private FawaterakOptions Settings => options.Value;
 
-    // FLOW 4: called by OrderService.PlaceOrderAsync (step 2j). Turns our CheckoutRequest into
-    // Fawaterak's JSON, POSTs it to invoiceInitPay, and reads back the invoice id and the
-    // hosted payment URL (data.payment_data.redirectTo).
-    public async Task<CheckoutSession> CreateCheckoutAsync(CheckoutRequest request, CancellationToken ct)
+    public async Task<FawaterakCheckout> CreateInvoiceAsync(Order order, string customerEmail, CancellationToken ct)
     {
-        EnsureConfigured();
-        var orderId = request.MerchantReference;
-        var publicBase = Options.PublicBaseUrl.TrimEnd('/');
-        string ReturnUrl(string result) => $"{publicBase}/payments/fawaterak/return?orderId={orderId}&result={result}";
+        EnsureApiKey();
+        if (string.IsNullOrWhiteSpace(Settings.PublicBaseUrl))
+            throw new GatewayException("Set Fawaterak:PublicBaseUrl to the ngrok address so Fawaterak can reach the webhook.");
+        if (Settings.CardPaymentMethodId <= 0)
+            throw new GatewayException("Set Fawaterak:CardPaymentMethodId from GET getPaymentmethods.");
 
-        var body = new Dictionary<string, object?>
-        {
-            ["payment_method_id"] = CardMethodId(),
-            ["cartTotal"] = Money(request.AmountMinor),     // Fawaterak takes pounds, not piasters
-            ["currency"] = request.Currency,
-            ["invoice_number"] = orderId,
-            ["customer"] = new
+        var publicUrl = Settings.PublicBaseUrl.TrimEnd('/');
+        var returnUrl = $"{publicUrl}/payments/fawaterak/return?orderId={order.Id}&result=";
+        var nameParts = order.ShippingFullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+
+        // Each product goes as one line priced at its line total, and shipping as its own line, so the lines add up to the cart total
+        var cartItems = order.OrderItems
+            .Select(i => new
             {
-                first_name = request.Customer.FirstName,
-                last_name = request.Customer.LastName,
-                email = request.Customer.Email,
-                phone = LocalPhone(request.Customer.Phone),
-                address = $"{request.Customer.Street}, {request.Customer.City}",
-            },
-            // One item per order line at quantity 1, so the items always add up to cartTotal.
-            ["cartItems"] = request.Items.Select(i => new
-            {
-                name = i.Quantity == 1 ? i.Name : $"{i.Quantity} x {i.Name}",
-                price = Money(i.UnitAmountMinor * i.Quantity),
+                name = i.Quantity == 1 ? i.ProductName : $"{i.Quantity} x {i.ProductName}",
+                price = FormatAmount(i.LineTotal),
                 quantity = "1",
-            }),
-            ["redirectionUrls"] = new
+            })
+            .ToList();
+        if (order.ShippingFee > 0)
+            cartItems.Add(new { name = "Shipping", price = FormatAmount(order.ShippingFee), quantity = "1" });
+
+        var body = new
+        {
+            payment_method_id = Settings.CardPaymentMethodId,
+            cartTotal = FormatAmount(order.TotalAmount),
+            currency = Currency,
+            invoice_number = order.Id.ToString(),
+            customer = new
             {
-                successUrl = ReturnUrl("success"),
-                failUrl = ReturnUrl("fail"),
-                pendingUrl = ReturnUrl("pending"),
-                // "_json" in the path tells Fawaterak to send JSON, not form data.
-                webhookUrl = $"{publicBase}/payments/fawaterak/webhook_json",
+                first_name = nameParts[0],
+                last_name = nameParts.Length > 1 ? nameParts[1] : nameParts[0],
+                email = customerEmail,
+                phone = LocalPhone(order.ShippingPhone),
+                address = $"{order.ShippingStreet}, {order.ShippingCity}",
             },
-            // Echoed back in the webhook as pay_load: how the webhook finds our order.
-            ["payLoad"] = new { order_id = orderId },
-            // Always answer with a hosted payment page URL (payment_data.redirectTo).
-            ["redirectOption"] = true,
-            ["lang"] = "en",
+            cartItems,
+            redirectionUrls = new
+            {
+                successUrl = returnUrl + "success",
+                failUrl = returnUrl + "fail",
+                pendingUrl = returnUrl + "pending",
+                webhookUrl = $"{publicUrl}/payments/fawaterak/webhook_json",
+            },
+            // Fawaterak sends this back in the webhook as pay_load, which is how the webhook finds our order
+            payLoad = new { order_id = order.Id.ToString() },
+            redirectOption = true,
+            lang = "en",
         };
 
-        using var message = new HttpRequestMessage(HttpMethod.Post, "invoiceInitPay") { Content = JsonContent.Create(body) };
-        using var doc = await SendAsync(message, "create invoice", ct);
-        var data = Data(doc.RootElement, "create invoice");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "invoiceInitPay") { Content = JsonContent.Create(body) };
+        var data = await SendAsync(request, "create invoice", ct);
 
-        var invoiceId = Str(data, "invoice_id") ?? throw new GatewayException("Fawaterak did not return an invoice id.");
-        var invoiceKey = Str(data, "invoice_key") ?? invoiceId;
+        var invoiceId = ReadString(data, "invoice_id")
+            ?? throw new GatewayException("Fawaterak did not return an invoice id.");
+        var paymentUrl = data.TryGetProperty("payment_data", out var paymentData) ? ReadString(paymentData, "redirectTo") : null;
+        if (paymentUrl is null)
+            throw new GatewayException("Fawaterak did not return a payment page URL.");
 
-        data.TryGetProperty("payment_data", out var paymentData);
-        var checkoutUrl = Str(paymentData, "redirectTo")
-                          ?? throw new GatewayException("Fawaterak did not return a payment page URL.");
-
-        logger.LogInformation("Fawaterak invoice {InvoiceId} created for order {OrderId}", invoiceId, orderId);
-        return new CheckoutSession(invoiceKey, invoiceId, checkoutUrl);
+        logger.LogInformation("Fawaterak invoice {InvoiceId} created for order {OrderId}", invoiceId, order.Id);
+        return new FawaterakCheckout(invoiceId, ReadString(data, "invoice_key") ?? invoiceId, paymentUrl);
     }
 
-    // ---------------------------------------------------------------- inquiry
-
-    // FLOW 7 (second half), and both safety nets: GET getInvoiceData/{invoiceId}.
-    // Fawaterak's own answer to "is this invoice paid, and for how much?".
-    public async Task<GatewayTransaction> GetInvoiceAsync(string invoiceId, CancellationToken ct)
+    public async Task<FawaterakInvoice> GetInvoiceAsync(string invoiceId, CancellationToken ct)
     {
-        EnsureConfigured();
-        using var message = new HttpRequestMessage(HttpMethod.Get, $"getInvoiceData/{Uri.EscapeDataString(invoiceId)}");
-        using var doc = await SendAsync(message, "invoice lookup", ct);
-        var data = Data(doc.RootElement, "invoice lookup");
+        EnsureApiKey();
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"getInvoiceData/{Uri.EscapeDataString(invoiceId)}");
+        var data = await SendAsync(request, "invoice lookup", ct);
 
-        var paid = Str(data, "paid") is "1" or "true";
-        var total = decimal.TryParse(Str(data, "total"), NumberStyles.Number, CultureInfo.InvariantCulture, out var t) ? t : 0m;
-
-        return new GatewayTransaction(
-            TransactionId: Str(data, "invoice_id") ?? invoiceId,
-            ProviderOrderId: Str(data, "invoice_id") ?? invoiceId,
-            MerchantReference: OrderIdFromPayload(data),
-            AmountMinor: (long)Math.Round(total * 100m),
-            Currency: Str(data, "currency") ?? "",
-            Success: paid,
-            Pending: !paid,
-            SourceType: Str(data, "payment_method"));
+        decimal.TryParse(ReadString(data, "total"), NumberStyles.Number, CultureInfo.InvariantCulture, out var total);
+        return new FawaterakInvoice(
+            InvoiceId: ReadString(data, "invoice_id") ?? invoiceId,
+            OrderId: ReadOrderId(data),
+            Total: total,
+            IsPaid: ReadString(data, "paid") is "1" or "true");
     }
 
-    // -------------------------------------------------------------- callbacks
-
-    // FLOW 7: called by FawaterakController.Webhook (FLOW 6). Recomputes the hashKey with our
-    // vendor key; if it matches, the webhook really came from Fawaterak. For "paid" it then
-    // calls GetInvoiceAsync, because the signature doesn't cover the amount.
-    public async Task<GatewayCallback> ParseWebhookAsync(string rawBody, CancellationToken ct)
+    public async Task<FawaterakInvoice?> ReadPaidInvoiceAsync(string webhookBody, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(Options.VendorKey))
+        var webhook = ParseWebhook(webhookBody);
+        var invoiceId = ReadString(webhook, "invoice_id") ?? "";
+
+        // Only a paid notice can change an order, failed attempts and refund notices are just acknowledged
+        var status = ReadString(webhook, "invoice_status");
+        if (!string.Equals(status, "paid", StringComparison.OrdinalIgnoreCase))
         {
-            logger.LogError("Fawaterak:VendorKey is not configured; rejecting every webhook");
-            return GatewayCallback.Rejected;
-        }
-
-        using var doc = ToJson(rawBody);
-        if (doc is null)
-            return GatewayCallback.Rejected;
-        var root = doc.RootElement;
-
-        // 1. Paid. The body says which invoice was paid but not how much, so after the
-        //    signature checks out we ask Fawaterak for the invoice and use its numbers.
-        if (string.Equals(Str(root, "invoice_status"), "paid", StringComparison.OrdinalIgnoreCase))
-        {
-            var invoiceId = Str(root, "invoice_id") ?? "";
-            var expected = FawaterakHash.ForInvoice(
-                invoiceId, Str(root, "invoice_key") ?? "", Str(root, "payment_method") ?? "", Options.VendorKey);
-            if (!FawaterakHash.Matches(expected, Str(root, "hashKey")))
-                return Reject("paid");
-
-            var confirmed = await GetInvoiceAsync(invoiceId, ct);
-            if (!confirmed.Success)
-            {
-                logger.LogWarning("Webhook says invoice {InvoiceId} is paid but Fawaterak's lookup disagrees", invoiceId);
-                return new GatewayCallback(true, "paid-unconfirmed", null);
-            }
-
-            return new GatewayCallback(true, "paid",
-                confirmed with { MerchantReference = confirmed.MerchantReference ?? OrderIdFromPayload(root) });
-        }
-
-        // 2. A failed attempt. Informational only: the customer can try again.
-        if (Str(root, "errorMessage") is { } error)
-        {
-            logger.LogInformation("Fawaterak payment attempt failed for invoice {InvoiceId}: {Error}",
-                Str(root, "invoice_id"), error);
-            return new GatewayCallback(true, "failed", null);
-        }
-
-        // 3. Refund notice. The documented body carries no signature, so it cannot be
-        //    trusted to change anything; log it for reconciliation.
-        if (Str(root, "transactionId") is not null && Str(root, "reason") is not null)
-        {
-            logger.LogWarning("Unsigned Fawaterak refund notice for transaction {TransactionId}, amount {Amount}. " +
-                              "Not applied automatically; reconcile against the dashboard.",
-                Str(root, "transactionId"), Str(root, "amount"));
-            return new GatewayCallback(true, "refund-notice", null);
-        }
-
-        return Reject("unknown");
-    }
-
-    // ---------------------------------------------------------------- helpers
-
-    private GatewayCallback Reject(string kind)
-    {
-        logger.LogWarning("Fawaterak {Kind} webhook failed signature verification", kind);
-        return GatewayCallback.Rejected;
-    }
-
-    // Webhooks arrive as JSON when the URL contains "_json", otherwise as form fields.
-    private static JsonDocument? ToJson(string rawBody)
-    {
-        try
-        {
-            return JsonDocument.Parse(rawBody);
-        }
-        catch (JsonException)
-        {
-            var form = QueryHelpers.ParseQuery(rawBody);
-            if (form.Count == 0)
-                return null;
-            return JsonSerializer.SerializeToDocument(form.ToDictionary(f => f.Key, f => f.Value.ToString()));
-        }
-    }
-
-    // pay_load is our { order_id } object, echoed back either as an object or as a JSON string.
-    private static string? OrderIdFromPayload(JsonElement element)
-    {
-        if (!element.TryGetProperty("pay_load", out var payload))
+            logger.LogInformation("Fawaterak webhook for invoice {InvoiceId} with status {Status} needs no action", invoiceId, status);
             return null;
-
-        if (payload.ValueKind == JsonValueKind.String)
-        {
-            try
-            {
-                using var inner = JsonDocument.Parse(payload.GetString() ?? "");
-                return Str(inner.RootElement, "order_id");
-            }
-            catch (JsonException)
-            {
-                return null;
-            }
         }
 
-        return payload.ValueKind == JsonValueKind.Object ? Str(payload, "order_id") : null;
+        var expectedHash = FawaterakHash.ForInvoice(
+            invoiceId, ReadString(webhook, "invoice_key") ?? "", ReadString(webhook, "payment_method") ?? "", Settings.VendorKey);
+        if (string.IsNullOrEmpty(Settings.VendorKey) || !FawaterakHash.Matches(expectedHash, ReadString(webhook, "hashKey")))
+        {
+            logger.LogWarning("Fawaterak webhook for invoice {InvoiceId} failed the signature check", invoiceId);
+            throw new UnauthorizedException("The webhook signature is not valid.");
+        }
+
+        // The signature does not cover the amount, so the amount comes from Fawaterak's own record of the invoice
+        var invoice = await GetInvoiceAsync(invoiceId, ct);
+        if (!invoice.IsPaid)
+        {
+            logger.LogWarning("The webhook says invoice {InvoiceId} is paid but Fawaterak's record says it is not", invoiceId);
+            return null;
+        }
+
+        return invoice with { OrderId = invoice.OrderId ?? ReadOrderId(webhook) };
     }
 
-    private static JsonElement Data(JsonElement root, string operation)
+    // Sends the request with the API key and returns the data part of a successful answer
+    private async Task<JsonElement> SendAsync(HttpRequestMessage request, string operation, CancellationToken ct)
     {
-        if (Str(root, "status") != "success" || !root.TryGetProperty("data", out var data))
-            throw new GatewayException(
-                $"Fawaterak refused the {operation} request: {Truncate(root.GetRawText(), 300)}");
-        return data;
-    }
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Settings.ApiKey);
 
-    // Turns every failure into one of two answers: a clear "no" (GatewayException) or "outcome unknown" (GatewayTimeoutException).
-    private async Task<JsonDocument> SendAsync(HttpRequestMessage message, string operation, CancellationToken ct)
-    {
-        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Options.ApiKey);
-
-        // Fawaterak rejects any request without a Content-Type header, GETs included
-        // ("The content-type field is required"). .NET only sends Content-Type along
-        // with a body, so GETs carry an empty JSON body to get the header out.
-        message.Content ??= new StringContent("", System.Text.Encoding.UTF8, "application/json");
+        // Fawaterak rejects requests without a Content-Type header, even GETs, so they get an empty JSON body
+        request.Content ??= new StringContent("", Encoding.UTF8, "application/json");
 
         HttpResponseMessage response;
         try
         {
-            response = await http.SendAsync(message, ct);
+            response = await http.SendAsync(request, ct);
         }
-        catch (Exception ex) when (ex is TimeoutRejectedException
-                                   || (ex is TaskCanceledException && !ct.IsCancellationRequested))
+        catch (Exception ex) when (ex is TimeoutRejectedException || (ex is TaskCanceledException && !ct.IsCancellationRequested))
         {
             logger.LogWarning(ex, "Fawaterak {Operation} timed out", operation);
             throw new GatewayTimeoutException(
-                $"Fawaterak did not answer the {operation} request in time. The outcome is unknown; " +
-                "check the payment status before trying again.");
+                $"Fawaterak did not answer the {operation} request in time, check the payment status before trying again.");
         }
-        catch (BrokenCircuitException ex)
+        catch (Exception ex) when (ex is HttpRequestException or BrokenCircuitException)
         {
-            throw new GatewayException($"Fawaterak is failing repeatedly; {operation} was not attempted. {ex.Message}");
-        }
-        catch (HttpRequestException ex)
-        {
-            logger.LogWarning(ex, "Fawaterak {Operation} could not be sent", operation);
+            logger.LogWarning(ex, "Could not reach Fawaterak for {Operation}", operation);
             throw new GatewayException($"Could not reach Fawaterak for {operation}.");
         }
 
         using (response)
         {
             var content = await response.Content.ReadAsStringAsync(ct);
-            if (!response.IsSuccessStatusCode)
+            var root = TryParseJson(content);
+
+            if (!response.IsSuccessStatusCode
+                || ReadString(root, "status") != "success"
+                || !root.TryGetProperty("data", out var data))
             {
                 logger.LogWarning("Fawaterak {Operation} failed with {Status}: {Body}",
                     operation, (int)response.StatusCode, Truncate(content, 1000));
                 throw new GatewayException(
-                    $"Fawaterak rejected the {operation} request ({(int)response.StatusCode}): {Truncate(content, 300)}");
+                    $"Fawaterak refused the {operation} request ({(int)response.StatusCode}): {Truncate(content, 300)}");
             }
 
-            try
-            {
-                return JsonDocument.Parse(content);
-            }
-            catch (JsonException)
-            {
-                throw new GatewayException($"Fawaterak returned an unreadable {operation} response.");
-            }
+            return data;
         }
     }
 
-    private void EnsureConfigured()
+    private void EnsureApiKey()
     {
-        if (string.IsNullOrWhiteSpace(Options.ApiKey))
-            throw new GatewayException("Fawaterak is not configured. Set Fawaterak:ApiKey with dotnet user-secrets.");
-        if (string.IsNullOrWhiteSpace(Options.PublicBaseUrl))
-            throw new GatewayException("Set Fawaterak:PublicBaseUrl to the ngrok address so Fawaterak can reach the webhook.");
+        if (string.IsNullOrWhiteSpace(Settings.ApiKey))
+            throw new GatewayException("Fawaterak is not configured, set Fawaterak:ApiKey with dotnet user-secrets.");
     }
 
-    private int CardMethodId() =>
-        Options.CardPaymentMethodId > 0
-            ? Options.CardPaymentMethodId
-            : throw new GatewayException("Set Fawaterak:CardPaymentMethodId (from GET getPaymentmethods).");
+    private static JsonElement ParseWebhook(string body) =>
+        TryParseJson(body) is { ValueKind: JsonValueKind.Object } webhook
+            ? webhook
+            : throw new ArgumentException("The webhook body is not a JSON object.");
 
-    private static string Money(long minor) => (minor / 100m).ToString("0.00", CultureInfo.InvariantCulture);
-
-    // +201012345678 → 01012345678, the local format Fawaterak expects.
-    private static string LocalPhone(string phone)
+    // Returns an element that stays valid after the parsed document is gone, or an undefined element for bad JSON
+    private static JsonElement TryParseJson(string json)
     {
-        var digits = new string(phone.Where(char.IsDigit).ToArray());
-        return digits.StartsWith("20") && digits.Length == 12 ? "0" + digits[2..] : digits;
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            return document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            return default;
+        }
     }
 
-    private static string Truncate(string value, int max) => value.Length <= max ? value : value[..max] + "…";
+    // Our order id comes back inside pay_load, either as an object or as a JSON string
+    private static Guid? ReadOrderId(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty("pay_load", out var payload))
+            return null;
 
-    private static string? Str(JsonElement element, string name)
+        if (payload.ValueKind == JsonValueKind.String)
+            payload = TryParseJson(payload.GetString() ?? "");
+
+        return Guid.TryParse(ReadString(payload, "order_id"), out var orderId) ? orderId : null;
+    }
+
+    private static string? ReadString(JsonElement element, string name)
     {
         if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(name, out var value))
             return null;
@@ -317,4 +229,17 @@ public sealed class FawaterakGateway(
             _ => null,
         };
     }
+
+    // Fawaterak takes amounts in pounds with two decimals
+    private static string FormatAmount(decimal amount) => amount.ToString("0.00", CultureInfo.InvariantCulture);
+
+    // Turns +201012345678 into 01012345678, the local format Fawaterak expects
+    private static string LocalPhone(string phone)
+    {
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+        return digits.StartsWith("20") && digits.Length == 12 ? "0" + digits[2..] : digits;
+    }
+
+    private static string Truncate(string value, int maxLength) =>
+        value.Length <= maxLength ? value : value[..maxLength] + "...";
 }

@@ -2,10 +2,7 @@ using Audiophile.Domain.Common;
 
 namespace Audiophile.Domain.Entities;
 
-// One notification received from a payment gateway, stored exactly as it arrived.
-// Two jobs: a unique (Provider, ExternalId) index makes a redelivered webhook a
-// no-op, and the raw payload is the audit trail support reads when a customer
-// says "I paid but my order is still pending".
+// One gateway notification stored as it arrived, so a repeated webhook is ignored and support can read what happened
 public sealed class PaymentEvent
 {
     private PaymentEvent() { } // EF Core
@@ -22,7 +19,7 @@ public sealed class PaymentEvent
     public Guid Id { get; private set; } = Guid.NewGuid();
     public string Provider { get; private set; } = null!;
 
-    // The gateway's id for this event plus its state, e.g. "3072989001:success".
+    // The invoice id plus its paid state, like 3072989001:success
     public string ExternalId { get; private set; } = null!;
 
     public string EventType { get; private set; } = null!;

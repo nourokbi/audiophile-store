@@ -5,8 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Audiophile.Application.Addresses;
 
-// A customer's saved shipping addresses. Every query is filtered by the caller's id,
-// so one customer can never read or change another's address: it is simply "not found".
+// A customer's saved addresses, every query is filtered by the customer so someone else's address is simply not found
 public sealed class AddressService(IAppDbContext db)
 {
     public async Task<IReadOnlyList<AddressDto>> ListAsync(Guid userId, CancellationToken ct)
@@ -39,8 +38,7 @@ public sealed class AddressService(IAppDbContext db)
         return AddressDto.From(address);
     }
 
-    // Soft delete: the row stays, so nothing that ever pointed at it breaks.
-    // Unlike the old repo, a missing address is a 404, not a 204 that pretends.
+    // Only deactivates the address so nothing that points at it breaks
     public async Task DeleteAsync(Guid userId, Guid addressId, CancellationToken ct)
     {
         var address = await FindAsync(userId, addressId, ct);

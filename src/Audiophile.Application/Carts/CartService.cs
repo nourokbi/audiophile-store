@@ -5,8 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Audiophile.Application.Carts;
 
-// The cart use cases. The rules about lines (one line per product, quantity limits)
-// live in the Cart entity; this class loads, checks stock, saves and returns the cart.
+// The customer's cart, the rules about its items live in the Cart entity
 public sealed class CartService(IAppDbContext db)
 {
     public async Task<CartDto> GetAsync(Guid userId, CancellationToken ct)
@@ -75,8 +74,7 @@ public sealed class CartService(IAppDbContext db)
         .Include(c => c.CartItems).ThenInclude(i => i.Product)
         .FirstOrDefaultAsync(c => c.UserId == userId, ct);
 
-    // A friendly early check so the customer hears "only 3 left" while shopping.
-    // It is not the final word: checkout decreases the stock and checks again.
+    // Tells the customer early that stock is short, checkout checks again when it decreases the stock
     private static void EnsureInStock(Product product, int quantity)
     {
         if (!product.IsAvailable(quantity))

@@ -3,8 +3,7 @@ using Audiophile.Domain.Enums;
 
 namespace Audiophile.Application.Products;
 
-// Catalogue filters. Every one is optional; page size is capped so one request
-// can never ask for the whole table.
+// Optional catalogue filters, the page size is capped so one request cannot ask for the whole table
 public sealed record ProductQuery(
     string? Search = null,
     ProductCategory? Category = null,
@@ -18,7 +17,7 @@ public sealed record ProductQuery(
   public const int MaxSearchLength = 100;
 }
 
-// Create and update share one shape: an update replaces every field.
+// Create and update share one shape and an update replaces every field
 public sealed record ProductRequest(
     string Name,
     string Description,
@@ -28,7 +27,7 @@ public sealed record ProductRequest(
     ProductCategory Category,
     string? ImageUrl,
     Dictionary<string, int>? InTheBox,
-    string? Slug = null);       // create only; made from the name when left out. An update never changes it.
+    string? Slug = null);       // used on create only and made from the name when left out
 
 public sealed record ProductDto(
     Guid Id,

@@ -1,8 +1,8 @@
 using Audiophile.Domain.Common;
-using Audiophile.Domain.ValueObjects;
 
 namespace Audiophile.Domain.Entities;
 
+// A saved shipping address, deleting one only deactivates it
 public sealed class Address
 {
     private Address() { } // EF Core
@@ -48,8 +48,7 @@ public sealed class Address
         if (!IsActive)
             throw new InvalidOperationException("A deactivated address cannot be edited.");
 
-        // Everything is validated before anything is assigned, so a rejected edit
-        // leaves the address exactly as it was rather than half-updated.
+        // Everything is validated before anything changes, so a rejected edit leaves the address as it was
         var name = Guard.Text(fullAddressName, 3, 100, nameof(fullAddressName));
         var newStreet = Guard.Text(street, 3, 200, nameof(street));
         var newCity = Guard.Text(city, 2, 100, nameof(city));
@@ -66,10 +65,4 @@ public sealed class Address
     }
 
     public void Deactivate() => IsActive = false;
-
-    public void Reactivate() => IsActive = true;
-
-    // Copies the address into the frozen form an order carries.
-    public ShippingDetails ToShippingDetails() =>
-        new(FullAddressName, Phone, Street, City, Country, PostalCode);
 }

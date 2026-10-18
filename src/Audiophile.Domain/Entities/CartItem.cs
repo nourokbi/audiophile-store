@@ -2,12 +2,10 @@ using Audiophile.Domain.Common;
 
 namespace Audiophile.Domain.Entities;
 
-// One line of a cart. Created and changed only by Cart — going
-// through the aggregate root is what stops two lines appearing for one product.
+// One product in a cart, created and changed only by Cart
 public sealed class CartItem
 {
-    // A sanity bound, not a stock check: stock is re-read and decremented at
-    // checkout (M4-07). It exists so a line quantity cannot be driven to overflow.
+    // An upper limit per product, the real stock check happens at checkout
     public const int MaxQuantity = 100;
 
     private CartItem() { } // EF Core
@@ -20,7 +18,7 @@ public sealed class CartItem
     }
 
     public Guid Id { get; private set; } = Guid.NewGuid();
-    public Guid CartId { get; private set; } // FK to Cart
+    public Guid CartId { get; private set; }
     public Guid ProductId { get; private set; }
     public int Quantity { get; private set; }
 

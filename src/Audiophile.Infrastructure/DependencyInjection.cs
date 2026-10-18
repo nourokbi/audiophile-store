@@ -20,8 +20,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        // PostgreSQL everywhere. Locally: the docker-compose container (appsettings.Development.json).
-        // In production: Neon, through the ConnectionStrings__Default environment variable.
+        // PostgreSQL locally and in production, read from ConnectionStrings Default
         var connectionString = configuration.GetConnectionString("Default");
         if (string.IsNullOrWhiteSpace(connectionString))
             throw new InvalidOperationException("ConnectionStrings:Default is not configured.");
@@ -33,22 +32,20 @@ public static class DependencyInjection
 
         services.Configure<FawaterakOptions>(configuration.GetSection(FawaterakOptions.SectionName));
 
-        // Fawaterak is the only gateway for now (Phase 2 makes it pluggable): OrderService and
-        // FawaterakController ask for IFawaterakGateway and get FawaterakGateway with a typed
-        // HttpClient whose base address is Fawaterak's API (staging or live, from config).
+        // A typed HttpClient pointed at Fawaterak's API, with timeouts and retries for lookups
         services.AddHttpClient<IFawaterakGateway, FawaterakGateway>((sp, client) =>
                 client.BaseAddress = new Uri(
                     sp.GetRequiredService<IOptions<FawaterakOptions>>().Value.BaseUrl.TrimEnd('/') + "/"))
             .AddStandardResilienceHandler(ConfigureGatewayResilience);
 
-        // Safety net 2: every 5 minutes, closes unpaid gateway orders (OrderService.ExpireStalePaymentsAsync).
+        // Cancels unpaid card orders every five minutes
         services.AddHostedService<PaymentExpiryWorker>();
         return services;
     }
 
     private static void AddIdentityAndJwt(IServiceCollection services, IConfiguration configuration)
     {
-        // Identity without its cookie sign-in: UserManager for passwords, lockout and roles.
+        // Identity without its cookie sign in, used for passwords, lockout and roles
         services.AddIdentityCore<User>(o =>
             {
                 o.User.RequireUniqueEmail = true;
@@ -62,7 +59,7 @@ public static class DependencyInjection
             .AddRoles<IdentityRole<Guid>>()
             .AddEntityFrameworkStores<AppDbContext>();
 
-        // Fails at startup, not at the first login, when the signing key is missing or weak.
+        // Fails at startup when the signing key is missing or too short
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
             .Validate(o => o.Key.Length >= JwtOptions.MinKeyLength,
@@ -76,16 +73,16 @@ public static class DependencyInjection
             {
                 var jwt = jwtOptions.Value;
 
-                // Keep the claim names exactly as JwtTokenService wrote them ("sub", "role").
+                // Keep the claim names exactly as JwtTokenService wrote them
                 bearer.MapInboundClaims = false;
                 bearer.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidIssuer = jwt.Issuer,
                     ValidAudience = jwt.Audience,
                     IssuerSigningKey = JwtTokenService.SigningKey(jwt),
-                    ClockSkew = TimeSpan.Zero,      // a 15-minute token means 15 minutes, not 20
+                    ClockSkew = TimeSpan.Zero,
                     NameClaimType = "name",
-                    RoleClaimType = JwtTokenService.RoleClaim,   // what [Authorize(Roles = ...)] checks
+                    RoleClaimType = JwtTokenService.RoleClaim,
                 };
             });
         services.AddAuthorization();
@@ -96,16 +93,10 @@ public static class DependencyInjection
         o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(20);
         o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(45);
 
-        // Retries only for GET (invoice lookups). Creating an invoice is never
-        // repeated automatically: after a timeout we cannot know
-        // whether the first attempt went through.
+        // Only lookups are retried, creating an invoice twice could charge the customer twice
         o.Retry.DisableForUnsafeHttpMethods();
 
-        // Stop calling Fawaterak for a while if half the recent calls fail, so an
-        // outage fails fast instead of tying up every request thread.
-        o.CircuitBreaker.FailureRatio = 0.5;
-        o.CircuitBreaker.MinimumThroughput = 10;
+        // Polly requires the circuit breaker window to be at least twice the attempt timeout
         o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
-        o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(30);
     }
 }

@@ -1,4 +1,4 @@
-using Audiophile.Application.Orders;
+using Audiophile.Domain.Common;
 using Audiophile.Domain.Entities;
 
 namespace Audiophile.Application.Carts;
@@ -10,15 +10,13 @@ public sealed record SetCartItemQuantityRequest(int Quantity);
 public sealed record CartItemDto(
     Guid ProductId, string ProductName, string? ImageUrl, decimal UnitPrice, int Quantity, decimal LineTotal);
 
-// Every cart endpoint returns the whole cart, so the frontend just replaces what it shows.
-// Prices are today's catalogue prices: the cart stores only products and quantities, and
-// checkout reads the prices again anyway.
+// Every cart endpoint returns the whole cart with today's catalogue prices, so the shop just replaces what it shows
 public sealed record CartDto(
     IReadOnlyList<CartItemDto> Items, int TotalQuantity, decimal SubTotal, decimal ShippingFee, decimal Total)
 {
     public static readonly CartDto Empty = new([], 0, 0m, 0m, 0m);
 
-    // Needs the items' products loaded.
+    // Needs the products of the items loaded
     public static CartDto From(Cart cart)
     {
         if (cart.IsEmpty)
@@ -31,7 +29,7 @@ public sealed record CartDto(
             .ToList();
 
         var subTotal = items.Sum(i => i.LineTotal);
-        var shippingFee = ShippingPolicy.FeeFor(subTotal);   // the same rule checkout uses
+        var shippingFee = ShippingPolicy.FeeFor(subTotal);
         return new CartDto(items, cart.TotalQuantity, subTotal, shippingFee, subTotal + shippingFee);
     }
 }

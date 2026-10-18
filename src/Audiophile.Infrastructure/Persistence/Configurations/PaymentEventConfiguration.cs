@@ -12,8 +12,7 @@ internal sealed class PaymentEventConfiguration : IEntityTypeConfiguration<Payme
         b.Property(e => e.ExternalId).HasMaxLength(255);
         b.Property(e => e.EventType).HasMaxLength(100);
 
-        // M4-11 / M5-05: the database, not an if-statement, guarantees each gateway
-        // event is applied at most once, even when two deliveries arrive together.
+        // The database guarantees each gateway event is applied once, even when two deliveries arrive together
         b.HasIndex(e => new { e.Provider, e.ExternalId }).IsUnique();
         b.HasIndex(e => e.PaymentId);
     }

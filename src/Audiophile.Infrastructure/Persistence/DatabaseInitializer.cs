@@ -8,11 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Audiophile.Infrastructure.Persistence;
 
-// Runs once at startup. Fixed data (roles, sample products) is seeded by HasData in
-// the entity configurations; this only does the two things HasData cannot:
-//   1. apply migrations, when "Database:MigrateOnStartup" is true (local development);
-//   2. create the admin account, because its password is a secret from configuration
-//      and has to be hashed by Identity, so it cannot be written into a migration.
+// Runs at startup, applies migrations when Database:MigrateOnStartup is true and creates the admin account from configuration
 public static class DatabaseInitializer
 {
     public static async Task InitialiseDatabaseAsync(this IServiceProvider services, CancellationToken ct = default)
@@ -53,7 +49,7 @@ public static class DatabaseInitializer
             Check(await users.AddToRoleAsync(admin, Roles.Admin), "give the admin account the Admin role");
     }
 
-    // Fail loudly at startup: a misconfigured admin should stop the app, not be discovered later.
+    // A misconfigured admin stops the app at startup instead of being discovered later
     private static void Check(IdentityResult result, string action)
     {
         if (!result.Succeeded)

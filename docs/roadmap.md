@@ -29,39 +29,30 @@ A finished, deployed project beats a bigger unfinished one on a CV.
 
 ## Where we are now (2026-10-18)
 
-`main` is at PR #3. A customer can sign up, fill a cart from the home page, check out, pay by card on
-Fawaterak (staging), and watch the order turn *Confirmed* when the webhook arrives. A real payment was
-made end to end through ngrok. 32 tests pass on PostgreSQL.
+**Phase 1 is done** (`v0.2.0`). A customer can sign up, fill a cart from the home page, check out, pay by card on
+Fawaterak (staging), watch the order turn *Confirmed* when the webhook arrives, and cancel an unpaid order.
+Two checkouts for the last unit give one order and one 409. 37 tests pass on PostgreSQL, in GitHub Actions on
+every push and pull request.
 
 | Phase | Status |
 |---|---|
 | 0 Save + GitHub | ✅ done (PR #1), except the Projects board |
-| 1 Checkout + concurrency | 🟡 checkout from the cart, `xmin` token and PostgreSQL tests done; **retry, tests, cancel, CI left** |
+| 1 Checkout + concurrency | ✅ done: checkout from the cart, `xmin` + one retry, cancel, order tests, CI |
 | 2 Pluggable payments | 🟡 Fawaterak is on (card only) and tested for real; **the pluggable design and fake-gateway tests left** |
 | 3 Login, roles, addresses | ✅ done |
-| 4 React client | 🟡 login, cart, checkout, orders, home catalogue done; **guest cart, httpOnly cookie, cancel button left** |
+| 4 React client | 🟡 login, cart, checkout, orders, home catalogue, cancel button done; **guest cart, httpOnly cookie left** |
 | 5 Admin dashboard | ⬜ not started |
 | 6 Caching + messaging | ⬜ not started |
 | 7 Docker, CI, deploy | ⬜ not started (AWS was considered; the VPS + Neon plan still stands) |
 
 ### Next up, in this order
 
-One branch and one PR each. Phase 1 is finished, and tagged `v0.2.0`, after step 4.
+One branch and one PR each.
 
-1. **`phase-1/concurrency`**: retry `PlaceOrderAsync` once on `DbUpdateConcurrencyException`
-   (`ChangeTracker.Clear()`, then run again; the second conflict is a 409). Test: stock 1, two customers check
-   out at once (`Task.WhenAll`) → exactly one 201 and one 409, stock 0.
-2. **`phase-1/cancel-order`**: `POST /orders/{id}/cancel` for the owner, using `CanBeCancelled` and
-   `OrderStock.CancelAndRelease`; a *Cancel order* button on the order page. Decide the rule for a card
-   order that's already paid (suggested: 409 "contact support", since Fawaterak has no refund API).
-3. **`phase-1/order-tests`**: HTTP tests through `ApiFactory`: checkout happy path (the cart is empty
-   afterwards), and "can't read another customer's order" → 404.
-4. **`phase-1/ci`**: GitHub Actions with a PostgreSQL service container (`ConnectionStrings__Tests`), plus the
-   client build; then branch protection on `main`. Merge, tag `v0.2.0`.
-5. **Phase 2**: `IPaymentGateway` + keyed services + resolver, one webhook route `POST /payments/{provider}/webhook`,
+1. **Phase 2**: `IPaymentGateway` + keyed services + resolver, one webhook route `POST /payments/{provider}/webhook`,
    `Payments:Enabled`, `FakePaymentGateway` tests. Optionally bring wallet or Fawry back as a second strategy.
-6. **Phase 4 leftovers**: guest cart (merged on login), refresh token in an httpOnly cookie.
-7. Then Phases 5 → 6 → 7.
+2. **Phase 4 leftovers**: guest cart (merged on login), refresh token in an httpOnly cookie.
+3. Then Phases 5 → 6 → 7.
 
 Dropped: `POST /orders/preview`. `GET /cart` already returns the totals the order will use.
 
@@ -152,24 +143,25 @@ before the phase that needs it, not all up front.
 
 **Done when** GitHub shows `main` with everything on it, the API runs against PostgreSQL, and there's a Phase 1 board.
 
-## Phase 1 — Checkout from the cart + stock concurrency · 4–5 days
+## Phase 1 — Checkout from the cart + stock concurrency · ✅ done 2026-10-18 (`v0.2.0`)
 
 Already done: PostgreSQL via `docker-compose.yml`, the `InitialCreate` migration, `jsonb` for `InTheBox`,
 `GET /products/{id}` and the paged, filtered `GET /products` (see Phase 3).
 
 - [x] Add a **concurrency token** on `Product`: PostgreSQL's `xmin` column, via `b.Property<uint>("Version").IsRowVersion()`
       (migration `AddProductConcurrencyToken`, 2026-10-18)
-- [ ] On `DbUpdateConcurrencyException`, retry once, then return 409 ← **next**
+- [x] On `DbUpdateConcurrencyException`, retry once, then return 409 (`OrderService.RetryOnStockConflictAsync`)
 - [x] **Checkout from the cart** (UC-06, 2026-10-18): `POST /orders` takes `{ addressId, paymentMethod }`, not items and not a typed
       address. It reads the cart and the saved address, re-reads prices, decreases stock, places the order and clears
       the cart, all in one `SaveChanges`
 - ~~`POST /orders/preview`~~ dropped: `GET /cart` already returns the same totals
-- [ ] `POST /orders/{id}/cancel` (UC-10): only while `CanBeCancelled`, and it restores stock
+- [x] `POST /orders/{id}/cancel` (UC-10): only while `CanBeCancelled`, it restores stock, and a paid card order is a 409 "contact support"
 - [x] Tests on **PostgreSQL** instead of SQLite: `TestDatabase` makes a fresh, migrated database per test on the
       local server (done 2026-10-18; Testcontainers can replace it later, once Docker works)
-- [ ] Tests: the **concurrency test** (it needs `xmin`, so PostgreSQL), a checkout happy path, and
-      "cannot read another customer's order" (`TestDatabase` and `ApiFactory` are ready for all three)
-- [ ] Add a minimal **GitHub Actions** workflow that runs `dotnet test` on every PR, then turn on branch protection
+- [x] Tests: the **concurrency test** (`StockConcurrencyTests` and `OrderApiTests`), a checkout happy path,
+      idempotency, cancel, and "cannot read another customer's order"
+- [x] **GitHub Actions** (`.github/workflows/ci.yml`): API tests against a PostgreSQL service container, plus the shop build
+- [ ] Branch protection on `main` (needs a public repo or GitHub Pro for a private one)
 
 **Done when** two parallel checkouts for the last unit produce one order and one 409, proven by a test running in CI.
 
@@ -223,7 +215,7 @@ chain, not every session) are a possible refinement; revoking everything is the 
 - [x] My orders page and an order progress page that polls until the webhook confirms (2026-10-18)
 - [x] Home page lists every product as a card with quantity + *Add to cart*, filtered by category (2026-10-18)
 - [ ] **Guest cart**: today you must log in before adding; keep a local cart and merge it into the server cart on login
-- [ ] *Cancel order* button on the order page (with Phase 1's cancel endpoint)
+- [x] *Cancel order* button on the order page (2026-10-18)
 - [ ] Fix the old lint errors (unused `React` imports in Home, Footer, Menu, Category, BestGear; an apostrophe in Footer)
 - [x] CORS policy in the API for the client origin (`Cors:AllowedOrigins`)
 - [x] Delete the old `wwwroot` demo storefront (removed 2026-10-15; it had no login)

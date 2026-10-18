@@ -5,8 +5,7 @@ using System.Text.Json;
 
 namespace Audiophile.Tests.Api;
 
-// Integration tests: real HTTP requests through the whole API, from routing and
-// [Authorize] down to the database. Each test gets a fresh app and database.
+// Real HTTP requests through the whole API down to the database, each test gets a fresh app and database
 public sealed class AuthApiTests
 {
     private const string Password = "password-123";
@@ -76,17 +75,17 @@ public sealed class AuthApiTests
         var client = factory.CreateClient();
         var first = (await RegisterAsync(client, "mona@example.com")).Refresh;
 
-        // A normal refresh: a new pair comes back.
+        // A normal refresh returns a new pair
         var rotated = await client.PostAsJsonAsync("/auth/refresh", new { refreshToken = first });
         Assert.Equal(HttpStatusCode.OK, rotated.StatusCode);
         var second = (await ReadAsync(rotated)).GetProperty("refreshToken").GetString();
         Assert.NotEqual(first, second);
 
-        // The first token again: someone kept a copy. Refused...
+        // The first token again means someone kept a copy, so it is refused
         var reused = await client.PostAsJsonAsync("/auth/refresh", new { refreshToken = first });
         Assert.Equal(HttpStatusCode.Unauthorized, reused.StatusCode);
 
-        // ...and the legitimate newer token is revoked with it.
+        // and the newer token is revoked with it
         var afterReuse = await client.PostAsJsonAsync("/auth/refresh", new { refreshToken = second });
         Assert.Equal(HttpStatusCode.Unauthorized, afterReuse.StatusCode);
     }

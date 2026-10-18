@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Audiophile.API.Controllers;
 
-// The signed-in customer's saved shipping addresses.
+// The signed in customer's saved shipping addresses
 [ApiController]
 [Authorize]
 [Route("addresses")]

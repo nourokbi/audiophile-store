@@ -63,7 +63,7 @@ flowchart LR
 flowchart TB
     API["<b>API</b><br/>Controllers · CurrentUser · rate limits · ExceptionHandler · Program.cs (DI)"]
     Infra["<b>Infrastructure</b><br/>AppDbContext + migrations (PostgreSQL) · Identity · JwtTokenService · FawaterakGateway · (Redis, RabbitMQ)"]
-    App["<b>Application</b><br/>AuthService · ProductService · AddressService · CartService · OrderService · PaymentResultApplier<br/>IAppDbContext · ICurrentUser · ITokenService · DTOs"]
+    App["<b>Application</b><br/>AuthService · ProductService · AddressService · CartService · OrderService · PaymentService · PaymentResultApplier<br/>IAppDbContext · ICurrentUser · ITokenService · DTOs"]
     Dom["<b>Domain</b><br/>Product · Cart · Order · Payment · User · Address<br/>state machines · Guard"]
 
     API --> App
@@ -154,7 +154,6 @@ erDiagram
         guid OrderId FK, UK
         string Status
         decimal Amount
-        decimal RefundedAmount
         string Provider "fawaterak, null for COD"
         string ProviderOrderId
         string ProviderTransactionId
@@ -204,7 +203,7 @@ stateDiagram-v2
     Cancelled --> [*]
 ```
 
-Every cancellation puts the stock back. The table lives in `Order.AllowedTransitions`.
+Every cancellation puts the stock back (`Order.Cancel`). The table lives in `Order.AllowedNextStatuses`.
 
 ## Payment status
 
@@ -212,15 +211,9 @@ Every cancellation puts the stock back. The table lives in `Order.AllowedTransit
 stateDiagram-v2
     [*] --> Pending : order placed
     Pending --> Succeeded : webhook / sync says paid
-    Pending --> Failed : expired or gateway error
-    Succeeded --> PartiallyRefunded
-    Succeeded --> Refunded
-    Succeeded --> Voided
-    PartiallyRefunded --> PartiallyRefunded : another partial refund
-    PartiallyRefunded --> Refunded
+    Pending --> Failed : order cancelled, expired or gateway error
+    Succeeded --> [*]
     Failed --> [*]
-    Refunded --> [*]
-    Voided --> [*]
 ```
 
 ## 6. Checkout and payment sequence

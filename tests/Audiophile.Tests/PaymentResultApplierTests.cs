@@ -1,18 +1,15 @@
 using Audiophile.Application.Payments;
 using Audiophile.Domain.Entities;
 using Audiophile.Domain.Enums;
-using Audiophile.Domain.ValueObjects;
 using Audiophile.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Audiophile.Tests;
 
-// The webhook's business rules, run against a real (PostgreSQL, one per test) database
-// so the unique index that blocks duplicate events is part of what is tested.
+// The webhook's business rules against a real database, so the unique index that blocks duplicate events is tested too
 public sealed class PaymentResultApplierTests : IDisposable
 {
-    private const string Provider = "fawaterak";
     private readonly TestDatabase _database = new();
 
     public void Dispose() => _database.Dispose();
@@ -20,9 +17,9 @@ public sealed class PaymentResultApplierTests : IDisposable
     [Fact]
     public async Task Successful_payment_confirms_the_order()
     {
-        var (db, orderId) = await SeedPendingOrderAsync(PaymentMethod.Card, price: 1000m);
+        var (orderId, total) = await SeedPendingOrderAsync(price: 1000m);
 
-        var outcome = await Apply(db, Tx(orderId, "5001", amountMinor: 100_000, success: true));
+        var outcome = await Apply(Invoice(orderId, "5001", total, isPaid: true));
 
         Assert.Equal(PaymentUpdateOutcome.Applied, outcome);
         var order = await Reload(orderId);
@@ -34,107 +31,91 @@ public sealed class PaymentResultApplierTests : IDisposable
     [Fact]
     public async Task Same_webhook_delivered_twice_confirms_once()
     {
-        var (db, orderId) = await SeedPendingOrderAsync(PaymentMethod.Card, price: 1000m);
-        var tx = Tx(orderId, "5001", amountMinor: 100_000, success: true);
+        var (orderId, total) = await SeedPendingOrderAsync(price: 1000m);
+        var invoice = Invoice(orderId, "5001", total, isPaid: true);
 
-        Assert.Equal(PaymentUpdateOutcome.Applied, await Apply(db, tx));
-        Assert.Equal(PaymentUpdateOutcome.Duplicate, await Apply(NewContext(), tx));
+        Assert.Equal(PaymentUpdateOutcome.Applied, await Apply(invoice));
+        Assert.Equal(PaymentUpdateOutcome.Duplicate, await Apply(invoice));
 
-        await using var check = NewContext();
-        Assert.Equal(1, await check.PaymentEvents.CountAsync());
+        await using var db = _database.NewContext();
+        Assert.Equal(1, await db.PaymentEvents.CountAsync());
     }
 
     [Fact]
     public async Task Wrong_amount_is_never_confirmed()
     {
-        var (db, orderId) = await SeedPendingOrderAsync(PaymentMethod.Card, price: 1000m);
+        var (orderId, total) = await SeedPendingOrderAsync(price: 1000m);
 
-        var outcome = await Apply(db, Tx(orderId, "5001", amountMinor: 100, success: true));
+        var outcome = await Apply(Invoice(orderId, "5001", total - 1m, isPaid: true));
 
         Assert.Equal(PaymentUpdateOutcome.AmountMismatch, outcome);
         Assert.Equal(OrderStatus.Pending, (await Reload(orderId)).Status);
     }
 
     [Fact]
-    public async Task Declined_attempt_leaves_the_order_open_for_another_try()
+    public async Task Unpaid_invoice_first_then_paid_confirms()
     {
-        var (db, orderId) = await SeedPendingOrderAsync(PaymentMethod.Card, price: 1000m);
+        var (orderId, total) = await SeedPendingOrderAsync(price: 900m);
 
-        Assert.Equal(PaymentUpdateOutcome.AttemptFailed,
-            await Apply(db, Tx(orderId, "5001", amountMinor: 100_000, success: false)));
-        Assert.Equal(PaymentUpdateOutcome.Applied,
-            await Apply(NewContext(), Tx(orderId, "5002", amountMinor: 100_000, success: true)));
+        // A sync while the customer is still on the payment page, then the paid webhook for the same invoice
+        Assert.Equal(PaymentUpdateOutcome.NotPaidYet, await Apply(Invoice(orderId, "7001", total, isPaid: false)));
+        Assert.Equal(OrderStatus.Pending, (await Reload(orderId)).Status);
 
+        Assert.Equal(PaymentUpdateOutcome.Applied, await Apply(Invoice(orderId, "7001", total, isPaid: true)));
         Assert.Equal(OrderStatus.Confirmed, (await Reload(orderId)).Status);
     }
 
     [Fact]
-    public async Task Unpaid_invoice_first_then_paid_confirms()
+    public async Task Payment_for_a_cancelled_order_needs_a_manual_refund()
     {
-        var (db, orderId) = await SeedPendingOrderAsync(PaymentMethod.Card, price: 900m);
+        var (orderId, total) = await SeedPendingOrderAsync(price: 1000m, cancelled: true);
 
-        // Same invoice twice: a sync while the customer is still on the payment page, then "paid".
-        Assert.Equal(PaymentUpdateOutcome.NotPaidYet,
-            await Apply(db, Tx(orderId, "7001", amountMinor: 90_000, success: false, pending: true)));
-        Assert.Equal(OrderStatus.Pending, (await Reload(orderId)).Status);
+        var outcome = await Apply(Invoice(orderId, "5001", total, isPaid: true));
 
-        Assert.Equal(PaymentUpdateOutcome.Applied,
-            await Apply(NewContext(), Tx(orderId, "7001", amountMinor: 90_000, success: true)));
-        Assert.Equal(OrderStatus.Confirmed, (await Reload(orderId)).Status);
+        Assert.Equal(PaymentUpdateOutcome.NeedsManualRefund, outcome);
+        Assert.Equal(OrderStatus.Cancelled, (await Reload(orderId)).Status);
     }
 
     [Fact]
     public async Task Event_for_an_unknown_order_is_stored_but_changes_nothing()
     {
-        var (db, _) = await SeedPendingOrderAsync(PaymentMethod.Card, price: 1000m);
+        await SeedPendingOrderAsync(price: 1000m);
 
-        var outcome = await Apply(db, Tx(Guid.NewGuid(), "9999", amountMinor: 100_000, success: true, providerOrderId: "none"));
+        var outcome = await Apply(Invoice(Guid.NewGuid(), "9999", 1000m, isPaid: true));
 
         Assert.Equal(PaymentUpdateOutcome.Unmatched, outcome);
-        await using var check = NewContext();
-        Assert.Equal(1, await check.PaymentEvents.CountAsync(e => e.PaymentId == null));
+        await using var db = _database.NewContext();
+        Assert.Equal(1, await db.PaymentEvents.CountAsync(e => e.PaymentId == null));
     }
 
-    // ------------------------------------------------------------- helpers
-
-    private AppDbContext NewContext() =>
-        _database.NewContext();
-
-    private async Task<(AppDbContext Db, Guid OrderId)> SeedPendingOrderAsync(PaymentMethod method, decimal price)
+    private async Task<(Guid OrderId, decimal Total)> SeedPendingOrderAsync(decimal price, bool cancelled = false)
     {
-        var db = NewContext();
+        await using var db = _database.NewContext();
 
         var user = User.Create("Mona Hassan", $"{Guid.NewGuid():N}@example.com");
-        var product = new Product("XX59 Headphones", "Enjoy your audio almost anywhere.", price, 10, ProductCategory.Headphones,
-            slug: "test-headphones");   // the seeded XX59 already owns "xx59-headphones"
-        product.DecreaseStock(1);
+        var order = OrderTests.PlaceOrder(user.Id, (OrderTests.Headphones(price, stock: 10), 1));
+        order.Payment!.LinkToProvider(IFawaterakGateway.Provider, "invoice-key", $"invoice-{order.Id:N}", "https://checkout.example/1");
+        if (cancelled)
+            order.Cancel();
 
-        var order = Order.Place(user.Id, method,
-            new ShippingDetails("Mona Hassan", "+201000000000", "12 Tahrir Street", "Cairo", "Egypt", null),
-            [OrderLine.FromProduct(product, 1)],
-            shippingFee: 0m, idempotencyKey: Guid.NewGuid().ToString());
-        order.StartPayment().LinkToProvider(Provider, "pi_test_1", $"po-{order.Id:N}", "https://checkout.example/1");
-
-        db.AddRange(user, product, order);
+        db.AddRange(user, order);
         await db.SaveChangesAsync();
-        return (NewContext(), order.Id);
+        return (order.Id, order.TotalAmount);
     }
 
-    private static async Task<PaymentUpdateOutcome> Apply(AppDbContext db, GatewayTransaction tx)
+    private async Task<PaymentUpdateOutcome> Apply(FawaterakInvoice invoice)
     {
-        await using (db)
-            return await new PaymentResultApplier(db, NullLogger<PaymentResultApplier>.Instance)
-                .ApplyAsync(Provider, "test", tx, "{}", CancellationToken.None);
+        await using var db = _database.NewContext();
+        return await new PaymentResultApplier(db, NullLogger<PaymentResultApplier>.Instance)
+            .ApplyAsync("test", invoice, "{}", CancellationToken.None);
     }
 
     private async Task<Order> Reload(Guid orderId)
     {
-        await using var db = NewContext();
+        await using var db = _database.NewContext();
         return await db.Orders.Include(o => o.Payment).SingleAsync(o => o.Id == orderId);
     }
 
-    private static GatewayTransaction Tx(
-        Guid orderId, string id, long amountMinor, bool success, bool pending = false, string? providerOrderId = null) =>
-        new(id, providerOrderId, orderId.ToString(), amountMinor, "EGP",
-            success, pending, SourceType: "card");
+    private static FawaterakInvoice Invoice(Guid orderId, string invoiceId, decimal total, bool isPaid) =>
+        new(invoiceId, orderId, total, isPaid);
 }

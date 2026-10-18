@@ -124,10 +124,6 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal>("DiscountAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<string>("IdempotencyKey")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -199,8 +195,6 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Orders", t =>
                         {
-                            t.HasCheckConstraint("CK_Order_DiscountAmount_Valid", "\"DiscountAmount\" >= 0 AND \"DiscountAmount\" <= \"SubTotal\"");
-
                             t.HasCheckConstraint("CK_Order_ShippingFee_NonNegative", "\"ShippingFee\" >= 0");
 
                             t.HasCheckConstraint("CK_Order_SubTotal_NonNegative", "\"SubTotal\" >= 0");
@@ -293,10 +287,6 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
-                    b.Property<decimal>("RefundedAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -315,8 +305,6 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                     b.ToTable("Payments", t =>
                         {
                             t.HasCheckConstraint("CK_Payment_Amount_Positive", "\"Amount\" > 0");
-
-                            t.HasCheckConstraint("CK_Payment_RefundedAmount_Valid", "\"RefundedAmount\" >= 0 AND \"RefundedAmount\" <= \"Amount\"");
                         });
                 });
 

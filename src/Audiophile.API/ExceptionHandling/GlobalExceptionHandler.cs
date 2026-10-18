@@ -5,9 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Audiophile.API.ExceptionHandling;
 
-// M1-05: every error leaves as RFC 7807 ProblemDetails, never a stack trace.
-// Domain rules throw ArgumentException (bad input) or InvalidOperationException
-// (not allowed in the current state); use cases throw the AppException types.
+// Turns every exception into a ProblemDetails answer with the matching status code and never a stack trace
 public sealed class GlobalExceptionHandler(IProblemDetailsService problemDetails, ILogger<GlobalExceptionHandler> logger)
     : IExceptionHandler
 {
@@ -37,7 +35,7 @@ public sealed class GlobalExceptionHandler(IProblemDetailsService problemDetails
       {
         Status = status,
         Title = title,
-        // Our own messages are written for the caller; a 500's is not.
+        // Our own messages are written for the caller but an unexpected error's message is not
         Detail = status == StatusCodes.Status500InternalServerError ? null : exception.Message,
       },
     });

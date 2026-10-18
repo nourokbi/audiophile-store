@@ -2,9 +2,7 @@ using Audiophile.Domain.Common;
 
 namespace Audiophile.Domain.Entities;
 
-// The cart aggregate. Lines are reached only through this type, which is what
-// keeps the one-line-per-product rule true — the same rule the unique
-// (CartId, ProductId) index enforces in the database.
+// A customer's cart, its items are changed only through this class so each product appears once
 public sealed class Cart
 {
     private readonly List<CartItem> _cartItems = [];
@@ -41,7 +39,7 @@ public sealed class Cart
         return item;
     }
 
-    // M4-16 — set a line's quantity outright. To get to zero, call RemoveItem.
+    // Sets the quantity of a product already in the cart, use RemoveItem to take it out
     public void SetItemQuantity(Guid productId, int quantity)
     {
         var item = FindItem(productId)
@@ -50,8 +48,6 @@ public sealed class Cart
         item.SetQuantity(quantity);
     }
 
-    // Throws when the product is not in the cart, so the API answers 404 rather
-    // than a 204 that pretends something was deleted.
     public void RemoveItem(Guid productId)
     {
         var item = FindItem(productId)
@@ -60,7 +56,6 @@ public sealed class Cart
         _cartItems.Remove(item);
     }
 
-    // M4-08 and M4-16 — emptied wholesale after checkout, or on request.
     public void Clear() => _cartItems.Clear();
 
     public CartItem? FindItem(Guid productId) => _cartItems.SingleOrDefault(i => i.ProductId == productId);

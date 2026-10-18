@@ -11,8 +11,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
   private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-  // Seed rows need fixed values: EF compares them with the model on every
-  // migration, so a Guid.NewGuid() or DateTime.UtcNow here would change each time.
+  // Seed rows need fixed values because EF compares them with the model on every migration
   private static readonly DateTime SeededAt = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
   public void Configure(EntityTypeBuilder<Product> b)
@@ -26,9 +25,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
     b.Property(p => p.Price).HasPrecision(18, 2);
     b.Property(p => p.Category).HasConversion<string>().HasMaxLength(30);
 
-    // "In the box" is a jsonb column, mapped to the private field so the public
-    // IReadOnlyDictionary stays read-only. Without the ValueComparer, EF would not
-    // notice an item added to the dictionary and would silently not save it.
+    // A jsonb column mapped to the private field, the value comparer lets EF notice changes inside the dictionary
     b.Ignore(p => p.InTheBox);
     b.Property<Dictionary<string, int>>("_inTheBox")
         .HasColumnName("InTheBox")
@@ -43,19 +40,17 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
                 v => v.OrderBy(kv => kv.Key).Aggregate(0, (hash, kv) => HashCode.Combine(hash, kv.Key, kv.Value)),
                 v => new Dictionary<string, int>(v, StringComparer.OrdinalIgnoreCase)));
 
-    // Optimistic concurrency: PostgreSQL's xmin system column, as a shadow property.
+    // PostgreSQL's xmin column detects two checkouts changing the same stock at once
     b.Property<uint>("Version").IsRowVersion();
 
-    // The domain already refuses these; the constraints stop a hand-written SQL update too.
+    // The entity already refuses these, the constraints also stop a hand written SQL update
     b.ToTable(t =>
     {
       t.HasCheckConstraint("CK_Product_Price_Positive", "\"Price\" > 0");
       t.HasCheckConstraint("CK_Product_Stock_NonNegative", "\"Stock\" >= 0");
     });
 
-    // The six products the React storefront shows (client/src/data/data.json): same names,
-    // slugs, text and box contents, so the shop's pages and the API describe the same things.
-    // Prices are in EGP. Anonymous objects because Product's setters are private.
+    // The six products of the React shop with prices in EGP, as anonymous objects because the setters are private
     b.HasData(
         Seed("b3c1a6e2-6f4d-4c1e-9a51-2f0f6f7c0a01", "xx99-mark-two-headphones", "XX99 Mark II Headphones",
             ProductCategory.Headphones, price: 2999m, stock: 25,
