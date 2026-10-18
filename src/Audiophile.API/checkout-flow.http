@@ -11,23 +11,24 @@
 @base = http://localhost:5040
 # XX59 Headphones (4,499 EGP), seeded by the first migration.
 @productId = 4ae5911a-421b-4565-b75f-53809c3da182
-# A new user on every run, so the cart starts empty.
-@email = buyer.{{$timestamp}}@example.com
-@customer = {{signUp.response.body.$.accessToken}}
+# Requests use earlier responses by name, e.g. {{signUp.response.body.$.accessToken}}.
+# They're written inside each request, not as @variables at the top: Visual Studio evaluates
+# top-level variables before EVERY request, so one that points at a response fails (HTTP0012)
+# until that response exists.
 
 
-############################## 1. Sign up (→ 201 with an access token)
+############################## 1. Sign up (→ 201 with an access token). A new email on every run.
 # @name signUp
 POST {{base}}/auth/register
 Content-Type: application/json
 
-{ "name": "Mona Hassan", "email": "{{email}}", "password": "password-123" }
+{ "name": "Mona Hassan", "email": "buyer.{{$timestamp}}@example.com", "password": "password-123" }
 
 
 ############################## 2. Save a shipping address (→ 201). The order copies it.
 # @name address
 POST {{base}}/addresses
-Authorization: Bearer {{customer}}
+Authorization: Bearer {{signUp.response.body.$.accessToken}}
 Content-Type: application/json
 
 { "fullAddressName": "Mona Hassan", "street": "12 Tahrir Street", "city": "Cairo", "country": "Egypt", "phone": "+201000000000", "postalCode": null }
@@ -35,7 +36,7 @@ Content-Type: application/json
 
 ############################## 3. Add to cart (→ 200, the cart with totals)
 POST {{base}}/cart/items
-Authorization: Bearer {{customer}}
+Authorization: Bearer {{signUp.response.body.$.accessToken}}
 Content-Type: application/json
 
 { "productId": "{{productId}}", "quantity": 1 }
@@ -43,7 +44,7 @@ Content-Type: application/json
 
 ############################## 4. Check the cart before paying
 GET {{base}}/cart
-Authorization: Bearer {{customer}}
+Authorization: Bearer {{signUp.response.body.$.accessToken}}
 
 
 ############################## 5. Place the order with Card (→ 201)
@@ -51,7 +52,7 @@ Authorization: Bearer {{customer}}
 # asks Fawaterak for an invoice, and returns payment.checkoutUrl. The cart is now empty.
 # @name order
 POST {{base}}/orders
-Authorization: Bearer {{customer}}
+Authorization: Bearer {{signUp.response.body.$.accessToken}}
 Content-Type: application/json
 Idempotency-Key: card-{{$timestamp}}
 
@@ -60,7 +61,7 @@ Idempotency-Key: card-{{$timestamp}}
 
 ############################## 6. Same Idempotency-Key again (→ 200, the SAME order, no second invoice)
 POST {{base}}/orders
-Authorization: Bearer {{customer}}
+Authorization: Bearer {{signUp.response.body.$.accessToken}}
 Content-Type: application/json
 Idempotency-Key: {{order.request.headers.Idempotency-Key}}
 
@@ -79,7 +80,7 @@ Idempotency-Key: {{order.request.headers.Idempotency-Key}}
 # With ngrok running, the webhook (FLOW 6 → 7 → 8) has already confirmed it.
 # Still "Pending"? The webhook didn't reach you: do step 10.
 GET {{base}}/orders/{{order.response.body.$.id}}
-Authorization: Bearer {{customer}}
+Authorization: Bearer {{signUp.response.body.$.accessToken}}
 
 
 ############################## 9. A forged webhook is refused (→ 401)
@@ -118,13 +119,13 @@ Authorization: Bearer {{admin.response.body.$.accessToken}}
 
 ### 10d. A customer can't use the support tools (→ 403)
 POST {{base}}/orders/{{order.response.body.$.id}}/payment/sync
-Authorization: Bearer {{customer}}
+Authorization: Bearer {{signUp.response.body.$.accessToken}}
 
 
 ############################## 11. Cash on delivery, for comparison (→ 201, Confirmed at once, no Fawaterak)
 # Add something to the cart first (step 3), otherwise → 409 "Your cart is empty."
 POST {{base}}/orders
-Authorization: Bearer {{customer}}
+Authorization: Bearer {{signUp.response.body.$.accessToken}}
 Content-Type: application/json
 Idempotency-Key: cod-{{$timestamp}}
 
@@ -133,4 +134,4 @@ Idempotency-Key: cod-{{$timestamp}}
 
 ############################## 12. My orders
 GET {{base}}/orders
-Authorization: Bearer {{customer}}
+Authorization: Bearer {{signUp.response.body.$.accessToken}}

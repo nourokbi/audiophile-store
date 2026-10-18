@@ -3,7 +3,9 @@
 @base = http://localhost:5040
 # XX59 Headphones (4,499 EGP), seeded by the first migration.
 @productId = 4ae5911a-421b-4565-b75f-53809c3da182
-@token = {{login.response.body.$.accessToken}}
+# Send 2 (login) first: the other requests use its token, {{login.response.body.$.accessToken}}.
+# (Not a top-level @token variable: Visual Studio evaluates those before every request, and one
+# that points at a response fails with HTTP0012 until that response exists.)
 
 
 ############################## Auth
@@ -24,7 +26,7 @@ Content-Type: application/json
 
 ### 3. Who am I?
 GET {{base}}/auth/me
-Authorization: Bearer {{token}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
 
 ### 4. New token pair. Send it twice: the second use of the same refresh token is
 #    treated as theft and ends every session (log in again with 2 afterwards).
@@ -35,7 +37,7 @@ Content-Type: application/json
 
 ### 5. Log out this session
 POST {{base}}/auth/logout
-Authorization: Bearer {{token}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 
 { "refreshToken": "{{login.response.body.$.refreshToken}}" }
@@ -51,7 +53,7 @@ GET {{base}}/products/{{productId}}
 
 ### 8. Add a product (admin only: log in as the admin in 2 first, otherwise 403)
 POST {{base}}/products
-Authorization: Bearer {{token}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 
 {
@@ -71,28 +73,28 @@ Content-Type: application/json
 ### 9. Save an address
 # @name address
 POST {{base}}/addresses
-Authorization: Bearer {{token}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 
 { "fullAddressName": "Mona Hassan", "street": "12 Tahrir Street", "city": "Cairo", "country": "Egypt", "phone": "+201000000000", "postalCode": null }
 
 ### 10. My addresses
 GET {{base}}/addresses
-Authorization: Bearer {{token}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
 
 
 ############################## Cart
 
 ### 11. Add to cart
 POST {{base}}/cart/items
-Authorization: Bearer {{token}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 
 { "productId": "{{productId}}", "quantity": 1 }
 
 ### 12. My cart
 GET {{base}}/cart
-Authorization: Bearer {{token}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
 
 
 ############################## Orders
@@ -102,7 +104,7 @@ Authorization: Bearer {{token}}
 ### 13. Cash on delivery — confirmed immediately. A new Idempotency-Key on every send.
 # @name codOrder
 POST {{base}}/orders
-Authorization: Bearer {{token}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 Idempotency-Key: cod-{{$timestamp}}
 
@@ -110,7 +112,7 @@ Idempotency-Key: cod-{{$timestamp}}
 
 ### 14. Resend with the SAME Idempotency-Key as 13 → 200, the same order, nothing new
 POST {{base}}/orders
-Authorization: Bearer {{token}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 Idempotency-Key: {{codOrder.request.headers.Idempotency-Key}}
 
@@ -118,7 +120,7 @@ Idempotency-Key: {{codOrder.request.headers.Idempotency-Key}}
 
 ### 15. My orders
 GET {{base}}/orders
-Authorization: Bearer {{token}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
 
 ### 16. Health
 GET {{base}}/health
