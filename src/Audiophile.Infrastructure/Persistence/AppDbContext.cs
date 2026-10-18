@@ -7,8 +7,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Audiophile.Infrastructure.Persistence;
 
-// PostgreSQL in every environment: Docker locally, Neon in production.
-// Identity's tables (AspNetUsers, AspNetRoles, …) come from IdentityDbContext.
+// The PostgreSQL database, Identity's tables come from IdentityDbContext
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<User, IdentityRole<Guid>, Guid>(options), IAppDbContext
 {
@@ -26,8 +25,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }
 
-    // Every instant we store is UTC. PostgreSQL's timestamptz refuses anything else,
-    // and the SQLite database the unit tests use hands dates back with no kind at all.
+    // Every stored time is UTC because PostgreSQL's timestamptz refuses anything else
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
         builder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();

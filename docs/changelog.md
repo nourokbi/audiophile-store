@@ -2,6 +2,44 @@
 
 What changed and why, newest first. Git history has the line-by-line detail; this file is the readable version.
 
+## 2026-10-18 — Phase 1 done (`v0.2.0`)
+
+### Added
+- **Retry on a stock conflict**: `OrderService.RetryOnStockConflictAsync` runs checkout (and cancel) once more on
+  `DbUpdateConcurrencyException`; a second conflict is a 409.
+- **`POST /orders/{id}/cancel`** for the order's owner, while the status allows it. A paid card order is a 409
+  "contact support", since refunds are done in the Fawaterak dashboard. *Cancel order* button on the order page.
+- Tests: `OrderApiTests` (checkout, idempotency, cancel, someone else's order is a 404, two checkouts for the
+  last unit) and `StockConcurrencyTests` (`xmin` refuses the second write). 37 tests.
+- **GitHub Actions** (`.github/workflows/ci.yml`): build and test the API against PostgreSQL, build the shop.
+- `docs/checkout-flow.md`: one order followed through the code.
+
+### Changed
+- Development tokens last longer (access token 7 days, refresh token 30 days, in `appsettings.Development.json`),
+  so you stay signed in while working. Production keeps 15 minutes and 14 days.
+
+## 2026-10-18 — Simpler code
+
+### Changed
+- `OrderService` only places and reads orders. Everything about the card payment (open the Fawaterak page,
+  sync, expiry, payment events) moved to a new `PaymentService`.
+- `Order.Place` takes the address and the cart's products directly: it copies the address, reserves the
+  stock, works out the shipping fee and creates the payment. `Order.Cancel` returns the stock and fails a
+  pending payment. `OrderLine`, `ShippingDetails` and `OrderStock` are gone.
+- `IFawaterakGateway` works with the `Order` itself: `CreateInvoiceAsync`, `GetInvoiceAsync` and
+  `ReadPaidInvoiceAsync` (a forged webhook throws, so it answers 401). Amounts stay in pounds, with no
+  piaster round trip.
+- A paid invoice for an order that was already cancelled is now reported as `NeedsManualRefund`
+  (before, it was silently `Ignored`).
+- Every code comment is one plain line, without FLOW, step or requirement labels.
+
+### Removed
+- Refund, void and discount code nobody used (Fawaterak has no refund API): `Payment.RecordRefund`,
+  `MarkVoided`, the `PartiallyRefunded`/`Refunded`/`Voided` statuses, and the `RefundedAmount` and
+  `DiscountAmount` columns (migration `RemoveDiscountAndRefundColumns`).
+- Unused domain methods (`User.UpdateName`, `UpdateEmail`, `SetPhone`, `RemoveAddress`, …), the
+  form-encoded webhook path, and the plain `/payments/fawaterak/webhook` route (invoices always use `webhook_json`).
+
 ## 2026-10-18 — The shop talks to the API (login → cart → pay → confirmed)
 
 ### Added (client)

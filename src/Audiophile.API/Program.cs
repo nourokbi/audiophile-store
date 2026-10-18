@@ -18,21 +18,19 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);   // database, Identity, JWT
+builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddRateLimitPolicies();
 
-// The React client runs on another origin (Vite: http://localhost:5173). Origins come
-// from configuration, so production lists the real domain without a code change.
+// The allowed shop origins come from configuration, so production adds its domain without a code change
 builder.Services.AddCors(o => o.AddDefaultPolicy(policy => policy
     .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
     .AllowAnyHeader()
     .AllowAnyMethod()));
 
-// Hosting platforms put a proxy in front of the app. Trusting its X-Forwarded-For is what
-// gives the rate limiter the client's IP rather than the proxy's (M1-11).
+// Trusts the hosting proxy's forwarded headers so the rate limiter sees the client's address
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -42,7 +40,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 
 var app = builder.Build();
 
-// Applies migrations when Database:MigrateOnStartup is true, and creates the admin account.
+// Applies migrations when configured and creates the admin account
 await app.Services.InitialiseDatabaseAsync();
 
 app.UseForwardedHeaders();
@@ -53,8 +51,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-// No HTTPS redirect: in development the gateway reaches us through an HTTPS tunnel
-// that forwards to plain http://localhost, and a redirect would break the webhook.
+// No HTTPS redirect because the ngrok tunnel forwards to plain http and a redirect would break the webhook
 
 app.UseCors();
 app.UseAuthentication();

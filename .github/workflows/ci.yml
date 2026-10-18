@@ -1,0 +1,69 @@
+# Builds and tests the API against a real PostgreSQL and builds the shop on every push and pull request
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    name: API build and tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: audiophile
+          POSTGRES_PASSWORD: audiophile
+          POSTGRES_DB: audiophile
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U audiophile"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Each test creates and deletes its own database on this server
+      ConnectionStrings__Tests: Host=localhost;Port=5432;Username=audiophile;Password=audiophile;Database=postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore Audiophile.slnx
+
+      - name: Build
+        run: dotnet build Audiophile.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test Audiophile.slnx --no-build --configuration Release
+
+  client:
+    name: Shop build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build

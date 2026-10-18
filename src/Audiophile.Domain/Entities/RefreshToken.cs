@@ -2,9 +2,7 @@ using Audiophile.Domain.Common;
 
 namespace Audiophile.Domain.Entities;
 
-// One issued refresh token. Part of the User aggregate — issued
-// by User.IssueRefreshToken so a token can never end up attached
-// to nobody.
+// One refresh token of a user, created by User.IssueRefreshToken and stored as a hash
 public sealed class RefreshToken
 {
     private RefreshToken() { } // EF Core
@@ -33,10 +31,9 @@ public sealed class RefreshToken
     public bool IsRevoked => RevokedAt is not null;
     public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
 
-    // The only question callers should ask. Revoked and expired are one answer, not two checks to remember.
     public bool IsActive => !IsRevoked && !IsExpired;
 
-    // Idempotent: revoking twice is not an error, it is the same outcome.
+    // Revoking twice is the same as revoking once
     public void Revoke()
     {
         if (IsRevoked)

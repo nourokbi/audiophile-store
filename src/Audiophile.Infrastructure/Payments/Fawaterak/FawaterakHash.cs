@@ -3,23 +3,20 @@ using System.Text;
 
 namespace Audiophile.Infrastructure.Payments.Fawaterak;
 
-// Fawaterak's webhook signature: HMAC-SHA256 over a query-string-shaped message
-// (invoice id, invoice key, payment method), keyed with the vendor key, hex encoded.
+// Fawaterak's webhook signature, an HMAC SHA256 of the invoice id, invoice key and payment method keyed with the vendor key
 public static class FawaterakHash
 {
-    public static string ForInvoice(string invoiceId, string invoiceKey, string paymentMethod, string vendorKey) =>
-        Sign($"InvoiceId={invoiceId}&InvoiceKey={invoiceKey}&PaymentMethod={paymentMethod}", vendorKey);
-
-    public static string Sign(string message, string key)
+    public static string ForInvoice(string invoiceId, string invoiceKey, string paymentMethod, string vendorKey)
     {
-        var hash = HMACSHA256.HashData(Encoding.UTF8.GetBytes(key), Encoding.UTF8.GetBytes(message));
+        var message = $"InvoiceId={invoiceId}&InvoiceKey={invoiceKey}&PaymentMethod={paymentMethod}";
+        var hash = HMACSHA256.HashData(Encoding.UTF8.GetBytes(vendorKey), Encoding.UTF8.GetBytes(message));
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    // Constant-time comparison.
-    public static bool Matches(string expectedHex, string? receivedHex) =>
-        !string.IsNullOrEmpty(receivedHex)
+    // Compares in constant time so the comparison does not leak how many characters matched
+    public static bool Matches(string expectedHash, string? receivedHash) =>
+        !string.IsNullOrEmpty(receivedHash)
         && CryptographicOperations.FixedTimeEquals(
-            Encoding.ASCII.GetBytes(expectedHex),
-            Encoding.ASCII.GetBytes(receivedHex.Trim().ToLowerInvariant()));
+            Encoding.ASCII.GetBytes(expectedHash),
+            Encoding.ASCII.GetBytes(receivedHash.Trim().ToLowerInvariant()));
 }

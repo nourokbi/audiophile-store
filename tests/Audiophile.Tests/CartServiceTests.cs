@@ -7,8 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Audiophile.Tests;
 
-// The cart use cases against a real (PostgreSQL, one per test) database. Each check reads the
-// cart back through a new DbContext, so it proves what was saved, not what was in memory.
+// The cart against a real database, each check reads the cart back through a new DbContext to prove what was saved
 public sealed class CartServiceTests : IDisposable
 {
     private readonly TestDatabase _database = new();
@@ -52,7 +51,7 @@ public sealed class CartServiceTests : IDisposable
         await SeedAsync();
         await Service().AddItemAsync(_userId, new AddCartItemRequest(_headphones.Id, 4), default);
 
-        // 4 already in the cart + 2 more = 6, but only 5 exist.
+        // Four already in the cart and two more make six, but only five exist
         await Assert.ThrowsAsync<ConflictException>(() =>
             Service().AddItemAsync(_userId, new AddCartItemRequest(_headphones.Id, 2), default));
 
@@ -107,7 +106,7 @@ public sealed class CartServiceTests : IDisposable
         Assert.Equal(0m, cart.Total);
     }
 
-    // A new service with a new DbContext each time, like a new HTTP request.
+    // A new service with a new DbContext each time, like a new HTTP request
     private CartService Service() => new(NewContext());
 
     private AppDbContext NewContext() =>

@@ -8,11 +8,10 @@ internal sealed class AddressConfiguration : IEntityTypeConfiguration<Address>
 {
     public void Configure(EntityTypeBuilder<Address> b)
     {
-        // Made in the constructor and added through User.AddAddress: without this, EF sees a
-        // key that is already set on an existing user's new address and tries an UPDATE.
+        // The id is made in the constructor, so EF must insert a new address instead of updating it
         b.Property(a => a.Id).ValueGeneratedNever();
 
-        // The same limits Address enforces with Guard.
+        // The same limits the Address entity checks
         b.Property(a => a.FullAddressName).HasMaxLength(100);
         b.Property(a => a.Street).HasMaxLength(200);
         b.Property(a => a.City).HasMaxLength(100);
@@ -23,7 +22,7 @@ internal sealed class AddressConfiguration : IEntityTypeConfiguration<Address>
         b.HasOne(a => a.User)
             .WithMany(u => u.Addresses)
             .HasForeignKey(a => a.UserId)
-            .OnDelete(DeleteBehavior.Cascade);   // user deleted → their addresses go too
+            .OnDelete(DeleteBehavior.Cascade);
 
         b.HasIndex(a => new { a.UserId, a.IsActive });
     }

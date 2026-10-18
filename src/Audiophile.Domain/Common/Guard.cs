@@ -1,9 +1,6 @@
 namespace Audiophile.Domain.Common;
 
-// The one place input invariants are spelled out, so every entity rejects bad
-// data the same way and with the same message shape. Each method returns the
-// cleaned value, so it reads as an assignment rather than an if-block:
-// Name = Guard.Text(name, 3, 50, nameof(name));
+// Input checks shared by every entity, each one returns the cleaned value so it reads as an assignment
 internal static class Guard
 {
     public static string Text(string? value, int minLength, int maxLength, string paramName)
@@ -19,7 +16,7 @@ internal static class Guard
         return trimmed;
     }
 
-    // Blank becomes null — an absent optional value has one representation, not two.
+    // A blank value becomes null
     public static string? OptionalText(string? value, int maxLength, string paramName)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -37,8 +34,7 @@ internal static class Guard
         var trimmed = Text(value, 3, 256, paramName);
         var at = trimmed.IndexOf('@');
 
-        // Deliberately loose. The only address that is provably deliverable is one
-        // you have sent mail to; anything stricter here rejects valid addresses.
+        // Deliberately loose because stricter rules reject real addresses
         if (at <= 0 || at != trimmed.LastIndexOf('@') || at == trimmed.Length - 1 || trimmed.Any(char.IsWhiteSpace))
             throw new ArgumentException($"{paramName} is not a valid email address.", paramName);
 
@@ -93,7 +89,7 @@ internal static class Guard
         return value;
     }
 
-    // Zero or more, and expressible in the decimal(18,2) the money columns use.
+    // Zero or more with at most two decimal places, like the money columns
     public static decimal Money(decimal value, string paramName)
     {
         if (value < 0)
@@ -121,8 +117,7 @@ internal static class Guard
         return value;
     }
 
-    // Npgsql refuses to write a non-UTC DateTime to a timestamptz,
-    // so every stored instant is normalised on the way in rather than at the boundary.
+    // PostgreSQL only accepts UTC times, so every stored time is converted on the way in
     public static DateTime Utc(DateTime value) => value.Kind switch
     {
         DateTimeKind.Utc => value,

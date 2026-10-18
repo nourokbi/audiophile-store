@@ -3,7 +3,7 @@ using Audiophile.Application.Common;
 
 namespace Audiophile.API.Auth;
 
-// Reads the signed-in user's id from the JWT's "sub" claim.
+// Reads the signed in user's id from the JWT's sub claim
 internal sealed class CurrentUser(IHttpContextAccessor accessor) : ICurrentUser
 {
     public Guid Id =>

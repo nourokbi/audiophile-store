@@ -8,10 +8,10 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
 {
     public void Configure(EntityTypeBuilder<RefreshToken> b)
     {
-        // Added through User.IssueRefreshToken to an already-saved user; see AddressConfiguration.
+        // The id is made in the constructor, so EF must insert a new token instead of updating it
         b.Property(t => t.Id).ValueGeneratedNever();
 
-        // Holds the SHA-256 hash of the token, never the token itself.
+        // Holds the hash of the token, never the token itself
         b.Property(t => t.Token).HasMaxLength(128);
         b.HasIndex(t => t.Token).IsUnique();
 

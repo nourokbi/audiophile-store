@@ -1,35 +1,27 @@
 using Audiophile.Domain.Common;
-using Audiophile.Domain.ValueObjects;
 
 namespace Audiophile.Domain.Entities;
 
-// One line of a placed order. Created only by Order.Place, from an
-// already-validated OrderLine, and immutable afterwards — this row
-// is the record of what was bought, not a working copy.
+// One product of an order, with its name and price copied at the moment it was bought
 public sealed class OrderItem
 {
     private OrderItem() { } // EF Core
 
-    internal OrderItem(Guid orderId, OrderLine line)
+    internal OrderItem(Guid orderId, Product product, int quantity)
     {
-        ArgumentNullException.ThrowIfNull(line);
-
-        // The line validated its own quantity, price and name on the way in;
-        // repeating those checks here would be two places to keep in step.
-        OrderId = Guard.NotEmpty(orderId, nameof(orderId));
-        ProductId = line.ProductId;
-        Quantity = line.Quantity;
-        UnitPrice = line.UnitPrice;
-        ProductName = line.ProductName;
-        ProductImageUrl = line.ProductImageUrl;
+        OrderId = orderId;
+        Product = product;
+        ProductId = product.Id;
+        Quantity = Guard.Between(quantity, 1, CartItem.MaxQuantity, nameof(quantity));
+        UnitPrice = product.Price;
+        ProductName = product.Name;
+        ProductImageUrl = product.ImageUrl ?? string.Empty;
     }
 
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid OrderId { get; private set; }
     public Guid ProductId { get; private set; }
     public int Quantity { get; private set; }
-
-    // These 3 are snapshots — frozen at purchase time, never change
     public decimal UnitPrice { get; private set; }
     public string ProductName { get; private set; } = string.Empty;
     public string ProductImageUrl { get; private set; } = string.Empty;
@@ -37,6 +29,5 @@ public sealed class OrderItem
     public Order Order { get; private set; } = null!;
     public Product Product { get; private set; } = null!;
 
-    // Derived, not stored — a persisted copy is one more thing that can drift.
     public decimal LineTotal => UnitPrice * Quantity;
 }

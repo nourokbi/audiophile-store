@@ -92,9 +92,9 @@ Paymob, by changing `Infrastructure` only. The business rules never move.
 | Pattern | Where | Why it is there |
 |---|---|---|
 | **Aggregate root** (DDD) | `Cart` owns `CartItem`; `Order` owns `OrderItem` and `Payment` | Rules like "one line per product" can't be bypassed, because only the root can change its children |
-| **State machine** | `Order.AllowedTransitions`, `Payment.AllowedTransitions` | Illegal moves (e.g. Delivered → Pending) are impossible, not just discouraged |
-| **Factory method** | `Order.Place(...)`, `User.Create(...)`, `OrderLine.FromProduct(...)` | One controlled way to create a valid object |
-| **Value object** | `ShippingDetails`, `OrderLine` | Immutable snapshots: editing an address never rewrites an old order |
+| **State machine** | `Order.AllowedNextStatuses`; `Payment` only moves Pending → Succeeded or Failed | Illegal moves (e.g. Delivered → Pending) are impossible, not just discouraged |
+| **Factory method** | `Order.Place(...)`, `User.Create(...)` | One controlled way to create a valid object |
+| **Snapshot** | `Order.Shipping*`, `OrderItem.UnitPrice` / `ProductName` | Copied at purchase: editing an address or a price never rewrites an old order |
 | **Guard clauses** | `Domain/Common/Guard.cs` | Every entity validates input the same way |
 | **Adapter** | `FawaterakGateway` | Translates Fawaterak's HTTP API into our own types |
 | **Strategy** *(to restore)* | `IPaymentGateway` + resolver | Plug in any gateway; see roadmap Phase 2 |

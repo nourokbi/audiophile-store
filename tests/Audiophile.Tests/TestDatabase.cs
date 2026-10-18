@@ -5,16 +5,7 @@ using Npgsql;
 
 namespace Audiophile.Tests;
 
-// A real PostgreSQL database for one test: created from the real migrations, deleted when
-// the test ends. Every test gets its own, so tests can run in parallel without seeing
-// each other's rows. PostgreSQL (not SQLite) because the app relies on PostgreSQL-only
-// features: xmin for stock concurrency, jsonb for "in the box".
-//
-// The server comes from, first match wins:
-//   1. ConnectionStrings__Tests environment variable (CI)
-//   2. ConnectionStrings:Tests in the API's user-secrets
-//   3. ConnectionStrings:Default in the API's user-secrets (your local PostgreSQL)
-// Only the server and login are used; the database name is always a new one.
+// A new PostgreSQL database per test built from the real migrations and deleted afterwards, the server comes from ConnectionStrings Tests or Default
 public sealed class TestDatabase : IDisposable
 {
     private static readonly string ServerConnectionString = FindServer();
@@ -27,7 +18,7 @@ public sealed class TestDatabase : IDisposable
         }.ConnectionString;
 
         using var db = NewContext();
-        db.Database.Migrate();          // creates the database, the tables and the seed data
+        db.Database.Migrate();
     }
 
     public string ConnectionString { get; }

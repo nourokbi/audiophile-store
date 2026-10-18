@@ -1,6 +1,7 @@
 using Audiophile.Application.Abstractions;
 using Audiophile.Application.Common;
 using Audiophile.Application.Orders;
+using Audiophile.Application.Payments;
 using Audiophile.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,12 +11,9 @@ namespace Audiophile.API.Controllers;
 [ApiController]
 [Authorize]
 [Route("orders")]
-public sealed class OrdersController(OrderService _ordersService, ICurrentUser currentUser) : ControllerBase
+public sealed class OrdersController(OrderService _ordersService, PaymentService _paymentsService, ICurrentUser currentUser) : ControllerBase
 {
-  // FLOW 1: places an order from the signed-in user's cart (→ OrderService.PlaceOrderAsync).
-  // CashOnDelivery is confirmed at once. For Card the response carries
-  // payment.checkoutUrl: send the customer there. Sending the same
-  // Idempotency-Key again returns the original order (200) instead of a new one (201).
+  // Places an order from the cart, a card order's response carries the payment page link in payment.checkoutUrl
   [HttpPost]
   public async Task<IActionResult> Place(
       PlaceOrderRequest request,
@@ -40,19 +38,20 @@ public sealed class OrdersController(OrderService _ordersService, ICurrentUser c
   public async Task<IActionResult> Get(Guid id, CancellationToken ct) =>
       Ok(await _ordersService.GetOrderAsync(currentUser.Id, id, ct));
 
-  // The two below are support tools, so admin only: they work on any customer's order.
-  // Refunds are made in the Fawaterak dashboard: Fawaterak has no public refund API.
+  // The customer cancels their own order, which returns the stock, but a paid card order needs support for the refund
+  [HttpPost("{id:guid}/cancel")]
+  public async Task<IActionResult> Cancel(Guid id, CancellationToken ct) =>
+      Ok(await _ordersService.CancelOrderAsync(currentUser.Id, id, ct));
 
-  // The Fawaterak notifications stored for this order (support / audit view).
+  // The Fawaterak notifications stored for any order, a support tool for admins
   [HttpGet("{id:guid}/payment/events")]
   [Authorize(Roles = Roles.Admin)]
   public async Task<IActionResult> Events(Guid id, CancellationToken ct) =>
-      Ok(await _ordersService.GetPaymentEventsAsync(id, ct));
+      Ok(await _paymentsService.GetPaymentEventsAsync(id, ct));
 
-  // Asks Fawaterak for the real status. Use when a webhook seems to be missing
-  // (locally: when ngrok isn't running, so Fawaterak can't reach the webhook).
+  // Asks Fawaterak for the real payment status when a webhook seems to be missing, for admins
   [HttpPost("{id:guid}/payment/sync")]
   [Authorize(Roles = Roles.Admin)]
   public async Task<IActionResult> Sync(Guid id, CancellationToken ct) =>
-      Ok(await _ordersService.SyncWithGatewayAsync(id, ct));
+      Ok(await _paymentsService.SyncWithGatewayAsync(id, ct));
 }

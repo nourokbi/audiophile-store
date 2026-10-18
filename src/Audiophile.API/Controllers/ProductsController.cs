@@ -6,12 +6,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Audiophile.API.Controllers;
 
-// Browsing is open to everyone; changing the catalogue is for admins.
+// Browsing is open to everyone and changing the catalogue is for admins
 [ApiController]
 [Route("products")]
 public sealed class ProductsController(ProductService _productsService) : ControllerBase
 {
-  // GET /products?search=xx&category=Headphones&minPrice=100&maxPrice=5000&page=1&pageSize=12
+  // Lists products with optional search, category, price range and paging
   [HttpGet]
   public async Task<IActionResult> List(
       string? search, ProductCategory? category, decimal? minPrice, decimal? maxPrice,
@@ -35,7 +35,7 @@ public sealed class ProductsController(ProductService _productsService) : Contro
   public async Task<IActionResult> Update(Guid id, ProductRequest request, CancellationToken ct) =>
       Ok(await _productsService.UpdateAsync(id, request, ct));
 
-  // Takes the product off sale; past orders keep pointing at it.
+  // Takes the product off sale while past orders keep pointing at it
   [Authorize(Roles = Roles.Admin)]
   [HttpDelete("{id:guid}")]
   public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)

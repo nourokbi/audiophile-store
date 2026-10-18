@@ -5,8 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Audiophile.Infrastructure.Persistence.Configurations;
 
-// Identity's AspNetRoles table. The roles are fixed data, so they are seeded here
-// and exist from the first migration on.
+// Seeds the Admin and Customer roles into Identity's roles table
 internal sealed class RoleConfiguration : IEntityTypeConfiguration<IdentityRole<Guid>>
 {
     public void Configure(EntityTypeBuilder<IdentityRole<Guid>> b)
@@ -16,7 +15,7 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<IdentityRole<
             Role("1b6c8f43-4d1e-4f0a-9a7e-1d1b0a000002", Roles.Customer));
     }
 
-    // The concurrency stamp is normally random; a seed has to be the same every build.
+    // A seed needs a fixed concurrency stamp instead of a random one
     private static IdentityRole<Guid> Role(string id, string name) => new()
     {
         Id = Guid.Parse(id),

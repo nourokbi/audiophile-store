@@ -13,6 +13,6 @@ internal sealed class CartConfiguration : IEntityTypeConfiguration<Cart>
         b.HasMany(c => c.CartItems)
             .WithOne(i => i.Cart)
             .HasForeignKey(i => i.CartId)
-            .OnDelete(DeleteBehavior.Cascade);   // cart deleted → its lines go too
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

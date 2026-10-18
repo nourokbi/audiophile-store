@@ -2,7 +2,7 @@ using Audiophile.Domain.Entities;
 
 namespace Audiophile.Application.Addresses;
 
-// Field rules (lengths, phone format) live in the Address entity; a bad value is a 400.
+// The field rules live in the Address entity and a bad value is answered with 400
 public sealed record AddressRequest(
     string FullAddressName, string Street, string City, string Country, string Phone, string? PostalCode);
 

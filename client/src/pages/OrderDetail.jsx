@@ -27,6 +27,8 @@ const OrderDetail = () => {
 	const [order, setOrder] = React.useState(null);
 	const [error, setError] = React.useState('');
 	const [timedOut, setTimedOut] = React.useState(false);
+	const [cancelling, setCancelling] = React.useState(false);
+	const [cancelError, setCancelError] = React.useState('');
 
 	const waitingForPayment =
 		order?.status === 'Pending' && order.paymentMethod === 'Card' && order.payment?.status === 'Pending';
@@ -83,6 +85,23 @@ const OrderDetail = () => {
 
 	const cancelled = order.status === 'Cancelled';
 	const currentStep = STEPS.findIndex((s) => s.status === order.status);
+
+	// The same rule as the API, a paid card order is cancelled by support because it needs a refund
+	const canCancel =
+		['Pending', 'Confirmed', 'Processing'].includes(order.status) && order.payment?.status !== 'Succeeded';
+
+	const cancelOrder = async () => {
+		if (!window.confirm('Cancel this order? Its items go back into stock.')) return;
+		setCancelling(true);
+		setCancelError('');
+		try {
+			setOrder(await api(`/orders/${id}/cancel`, { method: 'POST' }));
+		} catch (e) {
+			setCancelError(e.message);
+		} finally {
+			setCancelling(false);
+		}
+	};
 
 	return (
 		<Shell>
@@ -141,7 +160,16 @@ const OrderDetail = () => {
 					Order #{shortId(order.id)} · {order.paymentMethod === 'Card' ? 'Card (Fawaterak)' : 'Cash on delivery'} · placed{' '}
 					{new Date(order.createdAt).toLocaleString()}
 				</p>
-				<div className='flex gap-4'>
+				<div className='flex xs:flex-col md:flex-row gap-4'>
+					{canCancel && (
+						<button
+							className='btn border border-black text-black bg-white hover:bg-black hover:text-white disabled:opacity-50'
+							onClick={cancelOrder}
+							disabled={cancelling}
+						>
+							{cancelling ? 'Cancelling…' : 'Cancel order'}
+						</button>
+					)}
 					<Link to='/orders'>
 						<button className='btn bg-stone hover:bg-black/70'>My orders</button>
 					</Link>
@@ -150,6 +178,7 @@ const OrderDetail = () => {
 					</Link>
 				</div>
 			</div>
+			{cancelError && <p className='mt-4 text-[14px] font-bold text-red-600'>{cancelError}</p>}
 		</Shell>
 	);
 };

@@ -3,9 +3,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Audiophile.Tests.Api;
 
-// Boots the real API in memory: the same Program.cs, controllers, auth and services.
-// Only the connection string changes: it points at a fresh PostgreSQL database for this
-// test (TestDatabase), already migrated, so startup can create the admin account in it.
+// Runs the real API in memory against a fresh test database
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
     public const string AdminEmail = "admin@test.local";
@@ -24,7 +22,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     protected override void Dispose(bool disposing)
     {
-        base.Dispose(disposing);        // stop the app first, so nothing is still connected
+        base.Dispose(disposing);
         if (disposing)
             _database.Dispose();
     }

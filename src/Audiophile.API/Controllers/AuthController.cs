@@ -7,9 +7,7 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Audiophile.API.Controllers;
 
-// Sign up, sign in, keep the session alive, sign out.
-// The access token goes in "Authorization: Bearer <token>"; the refresh token is
-// only ever sent to /auth/refresh and /auth/logout.
+// Sign up, sign in, keep the session alive and sign out
 [ApiController]
 [Route("auth")]
 public sealed class AuthController(AuthService auth, ICurrentUser currentUser) : ControllerBase
@@ -27,13 +25,13 @@ public sealed class AuthController(AuthService auth, ICurrentUser currentUser) :
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct) =>
         Ok(await auth.LoginAsync(request, ct));
 
-    // Trades a refresh token for a new access token AND a new refresh token; the old one stops working.
+    // Trades a refresh token for a new pair of tokens and the old one stops working
     [HttpPost("refresh")]
     [EnableRateLimiting(RateLimitPolicies.Login)]
     public async Task<IActionResult> Refresh(RefreshRequest request, CancellationToken ct) =>
         Ok(await auth.RefreshAsync(request, ct));
 
-    // Only ever ends the caller's own session.
+    // Only ends the caller's own session
     [Authorize]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(RefreshRequest request, CancellationToken ct)

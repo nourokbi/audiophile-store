@@ -40,7 +40,7 @@ start without one, so a missing setting fails at deploy time, not on the first r
 
 PostgreSQL-specific details worth knowing:
 - `Products.InTheBox` is a `jsonb` column.
-- Check constraints back up the domain rules (`Price > 0`, `Stock >= 0`, quantity 1–100, refunds ≤ amount).
+- Check constraints back up the domain rules (`Price > 0`, `Stock >= 0`, quantity 1–100, amounts ≥ 0).
 - Money is `numeric(18,2)`; dates are `timestamp with time zone`, always UTC.
 
 ## Local: a PostgreSQL install (what this machine uses)

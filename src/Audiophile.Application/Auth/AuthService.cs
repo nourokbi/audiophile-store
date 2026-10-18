@@ -7,25 +7,22 @@ using Microsoft.Extensions.Logging;
 
 namespace Audiophile.Application.Auth;
 
-// Register, log in, refresh and log out. ASP.NET Core Identity's UserManager owns
-// passwords, lockout and roles (D-01, D-02); this class owns the session tokens.
+// Register, log in, refresh and log out, Identity's UserManager owns passwords and roles and this class owns the tokens
 public sealed class AuthService(
     UserManager<User> users,
     IAppDbContext db,
     ITokenService tokens,
     ILogger<AuthService> logger)
 {
-    // One message for "no such email" and "wrong password", so the login form
-    // cannot be used to find out who has an account.
+    // One message for an unknown email and a wrong password, so nobody can find out who has an account
     private const string InvalidCredentials = "Invalid email or password.";
     private const string InvalidSession = "Your session has expired. Please log in again.";
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct)
     {
-        var user = User.Create(request.Name, request.Email);   // checks name and email; comes with an empty cart
+        var user = User.Create(request.Name, request.Email);
 
-        // Creating the user and giving it a role are two saves; the transaction makes
-        // them one, so a failure cannot leave an account without a role.
+        // Creating the user and giving it a role happen in one transaction, so no account is left without a role
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
         var created = await users.CreateAsync(user, request.Password);
@@ -34,7 +31,7 @@ public sealed class AuthService(
             if (created.Errors.Any(e => e.Code is "DuplicateEmail" or "DuplicateUserName"))
                 throw new ConflictException("An account with this email already exists.");
 
-            // Password rules (length, digits, …), written by Identity for people to read.
+            // Identity's password rule messages are written for people to read
             throw new ArgumentException(string.Join(" ", created.Errors.Select(e => e.Description)));
         }
 
@@ -55,7 +52,7 @@ public sealed class AuthService(
 
         if (!await users.CheckPasswordAsync(user, request.Password))
         {
-            // Counts towards lockout: 5 wrong passwords lock the account for 5 minutes.
+            // Five wrong passwords lock the account for five minutes
             await users.AccessFailedAsync(user);
             throw new UnauthorizedException(InvalidCredentials);
         }
@@ -64,7 +61,7 @@ public sealed class AuthService(
         return await StartSessionAsync(user, await users.GetRolesAsync(user), ct);
     }
 
-    // Rotation: every refresh token works once. Trading it in revokes it and issues a new pair.
+    // Every refresh token works once, trading it in revokes it and issues a new pair
     public async Task<AuthResponse> RefreshAsync(RefreshRequest request, CancellationToken ct)
     {
         var hash = tokens.HashRefreshToken(request.RefreshToken);
@@ -73,8 +70,7 @@ public sealed class AuthService(
 
         if (stored.IsRevoked)
         {
-            // Reuse detection: this token was already traded in, so two parties hold a copy
-            // and one of them is not the user. End every session this user has.
+            // A revoked token used again means someone copied it, so every session of this user is ended
             var active = await db.RefreshTokens
                 .Where(t => t.UserId == stored.UserId && t.RevokedAt == null)
                 .ToListAsync(ct);
@@ -93,14 +89,13 @@ public sealed class AuthService(
         return await StartSessionAsync(stored.User, await users.GetRolesAsync(stored.User), ct);
     }
 
-    // Deletes the row rather than revoking it: a revoked token presented again means
-    // theft (see RefreshAsync), and logging out on purpose must not look like that.
+    // Deletes the token instead of revoking it, so a later reuse is not mistaken for theft
     public async Task LogoutAsync(Guid userId, RefreshRequest request, CancellationToken ct)
     {
         var hash = tokens.HashRefreshToken(request.RefreshToken);
         var stored = await db.RefreshTokens.FirstOrDefaultAsync(t => t.Token == hash && t.UserId == userId, ct);
         if (stored is null)
-            return;   // already gone: logging out twice is the same outcome
+            return;
 
         db.RefreshTokens.Remove(stored);
         await db.SaveChangesAsync(ct);

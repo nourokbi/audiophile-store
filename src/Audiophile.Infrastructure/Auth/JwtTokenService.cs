@@ -12,8 +12,7 @@ namespace Audiophile.Infrastructure.Auth;
 
 internal sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenService
 {
-    // Short claim names ("sub", "role") in the token. The API reads them back with
-    // MapInboundClaims = false, so what is written is exactly what is read.
+    // The API reads the short claim names back unchanged because MapInboundClaims is off
     public const string RoleClaim = "role";
 
     public AccessToken CreateAccessToken(User user, IEnumerable<string> roles)
@@ -47,13 +46,12 @@ internal sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenServ
 
     public NewRefreshToken CreateRefreshToken()
     {
-        // 64 random bytes: unguessable, and URL-safe so it can travel in a cookie later.
+        // Random bytes encoded URL safe, so the token can travel in a cookie later
         var token = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(64));
         return new NewRefreshToken(token, HashRefreshToken(token), DateTime.UtcNow.AddDays(options.Value.RefreshTokenDays));
     }
 
-    // A plain SHA-256 is enough here (unlike passwords): the token is 512 random bits,
-    // so there is nothing to brute-force.
+    // A plain SHA256 is enough because a long random token cannot be guessed
     public string HashRefreshToken(string refreshToken) =>
         Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)));
 

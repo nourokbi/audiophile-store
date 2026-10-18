@@ -3,13 +3,11 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Audiophile.API.RateLimiting;
 
-// Limits on the endpoints worth guessing at. Counted per client IP, which is only the
-// real IP because UseForwardedHeaders runs first (see Program.cs).
-// In memory for now: with two or more API instances this moves to Redis (roadmap Phase 6).
+// Per address limits on the login and register endpoints, kept in memory for now
 public static class RateLimitPolicies
 {
-    public const string Login = "login";        // login and refresh: 10 a minute
-    public const string Register = "register";  // new accounts: 5 an hour
+    public const string Login = "login";        // ten a minute for login and refresh
+    public const string Register = "register";  // five new accounts an hour
 
     public static IServiceCollection AddRateLimitPolicies(this IServiceCollection services) =>
         services.AddRateLimiter(o =>

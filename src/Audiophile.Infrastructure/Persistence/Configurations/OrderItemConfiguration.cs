@@ -1,5 +1,4 @@
 using Audiophile.Domain.Entities;
-using Audiophile.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -10,13 +9,13 @@ internal sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderIte
     public void Configure(EntityTypeBuilder<OrderItem> b)
     {
         b.Property(i => i.UnitPrice).HasPrecision(18, 2);
-        b.Property(i => i.ProductName).HasMaxLength(OrderLine.MaxProductNameLength);
+        b.Property(i => i.ProductName).HasMaxLength(Product.NameMaxLength);
         b.Property(i => i.ProductImageUrl).HasMaxLength(2048);
 
         b.HasOne(i => i.Product)
             .WithMany()
             .HasForeignKey(i => i.ProductId)
-            .OnDelete(DeleteBehavior.Restrict);  // a product that was sold cannot be deleted; deactivate it
+            .OnDelete(DeleteBehavior.Restrict);  // a sold product is deactivated, never deleted
 
         b.ToTable("OrderItems", t =>
         {

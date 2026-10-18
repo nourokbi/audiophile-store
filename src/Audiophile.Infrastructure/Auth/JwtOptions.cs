@@ -1,12 +1,11 @@
 namespace Audiophile.Infrastructure.Auth;
 
-// The "Jwt" section. Key is a secret: user-secrets locally, an environment
-// variable (Jwt__Key) in production. Never appsettings.json.
+// The Jwt settings, the key is a secret kept in user secrets or the Jwt__Key environment variable
 public sealed class JwtOptions
 {
     public const string SectionName = "Jwt";
 
-    // HMAC-SHA256 needs a key of at least 256 bits; anything shorter fails at sign time.
+    // HMAC SHA256 needs a key of at least 256 bits
     public const int MinKeyLength = 32;
 
     public string Issuer { get; init; } = "audiophile-api";

@@ -5,8 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Audiophile.API.Controllers;
 
-// The signed-in customer's cart.
-// Each endpoint answers with the whole updated cart.
+// The signed in customer's cart, each endpoint answers with the whole updated cart
 [ApiController]
 [Authorize]
 [Route("cart")]

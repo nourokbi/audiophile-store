@@ -5,8 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Audiophile.Application.Products;
 
-// The catalogue: browsing for everyone, editing for admins. The rules about a
-// product's fields (lengths, positive price, stock never negative) live in Product.
+// The catalogue, browsing is for everyone and editing is for admins
 public sealed class ProductService(IAppDbContext db)
 {
   public async Task<PagedResult<ProductDto>> ListAsync(ProductQuery q, CancellationToken ct)
@@ -24,10 +23,7 @@ public sealed class ProductService(IAppDbContext db)
 
     if (!string.IsNullOrWhiteSpace(q.Search))
     {
-      // ToLower on both sides is case-insensitive on every database. Phase 7 can swap it
-      // for PostgreSQL full-text search if the catalogue ever grows large.
-      // => this is loaded using LIKE '%term%' which is slow on large tables. We can add a full-text index in the future if needed.
-      // or add Elastic Search engine
+      // A simple case insensitive LIKE search, a full text index can replace it if the catalogue grows
       var term = q.Search.Trim().ToLower();
       query = query.Where(p => p.Name.ToLower().Contains(term) || p.Description.ToLower().Contains(term));
     }
@@ -56,7 +52,7 @@ public sealed class ProductService(IAppDbContext db)
   {
     var product = new Product(r.Name, r.Description, r.Price, r.Stock, r.Category, r.Features, r.ImageUrl, r.Slug);
 
-    // The slug is the product's URL, so two products can't share one (a unique index backs this up).
+    // The slug is the product's address in the shop, so two products cannot share one
     if (await db.Products.AnyAsync(p => p.Slug == product.Slug, ct))
       throw new ConflictException($"Another product already uses the address '{product.Slug}'.");
 
@@ -82,7 +78,7 @@ public sealed class ProductService(IAppDbContext db)
     return ProductDto.From(product);
   }
 
-  // Deactivates rather than deletes: past orders still point at this product.
+  // Deactivates instead of deleting because past orders still point at the product
   public async Task DeactivateAsync(Guid id, CancellationToken ct)
   {
     var product = await FindActiveAsync(id, ct, tracked: true);

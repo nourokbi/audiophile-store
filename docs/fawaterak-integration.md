@@ -2,9 +2,8 @@
 
 Checkout through [Fawaterak](https://fawaterak-api.readme.io) (Egypt): **card only**, plus cash on
 delivery with no gateway. Wallet and Fawry/Aman codes were removed on 2026-10-18 to keep the flow small
-(Phase 2 can add them back as new strategies). Switched back on 2026-10-18, with checkout now placed from the cart. To follow the code, read the
-`FLOW 1`…`FLOW 9` comments, starting at the top of `OrderService.cs`; to try it, send the requests in
-`src/Audiophile.API/checkout-flow.http`.
+(Phase 2 can add them back as new strategies). Switched back on 2026-10-18, with checkout now placed from the cart. To follow the code step by step,
+read [`checkout-flow.md`](checkout-flow.md); to try it, send the requests in `src/Audiophile.API/checkout-flow.http`.
 
 ## The flow
 
@@ -43,14 +42,16 @@ Safety nets: `POST /orders/{id}/payment/sync` asks Fawaterak directly, and an ex
 
 | Concern | File |
 |---|---|
-| Payment state machine | `src/Audiophile.Domain/Entities/Payment.cs` |
+| Order rules: place (reserves stock, creates the payment), confirm, cancel (returns stock) | `src/Audiophile.Domain/Entities/Order.cs` |
+| Payment: Pending → Succeeded or Failed | `src/Audiophile.Domain/Entities/Payment.cs` |
 | Webhook audit log + de-duplication | `src/Audiophile.Domain/Entities/PaymentEvent.cs` |
 | Gateway interface (Fawaterak only) | `src/Audiophile.Application/Payments/IFawaterakGateway.cs` |
-| Checkout, refund, void, sync, expiry | `src/Audiophile.Application/Orders/OrderService.cs` |
+| Placing and reading orders | `src/Audiophile.Application/Orders/OrderService.cs` |
+| Open the Fawaterak page, sync, expiry, payment events | `src/Audiophile.Application/Payments/PaymentService.cs` |
 | The one place a gateway report changes state | `src/Audiophile.Application/Payments/PaymentResultApplier.cs` |
 | Fawaterak adapter | `src/Audiophile.Infrastructure/Payments/Fawaterak/FawaterakGateway.cs` |
 | Webhook signature | `src/Audiophile.Infrastructure/Payments/Fawaterak/FawaterakHash.cs` |
-| Timeouts, GET-only retries, circuit breaker | `src/Audiophile.Infrastructure/DependencyInjection.cs` |
+| Timeouts and GET-only retries | `src/Audiophile.Infrastructure/DependencyInjection.cs` |
 | Expiry job | `src/Audiophile.Infrastructure/Payments/PaymentExpiryWorker.cs` |
 | Webhook + return endpoints | `src/Audiophile.API/Controllers/FawaterakController.cs` |
 
