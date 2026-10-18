@@ -54,23 +54,6 @@ public class FawaterakGatewayTests
     }
 
     [Fact]
-    public async Task Expired_aman_code_with_valid_hash_is_reported_as_not_paid()
-    {
-        var hash = FawaterakHash.ForExpiredReference("778586510", "Aman", VendorKey);
-        var body = $$"""
-            {"hashKey":"{{hash}}","referenceId":"778586510","status":"EXPIRED","paymentMethod":"Aman",
-             "pay_load":"{\"order_id\":\"{{OrderId}}\"}","transactionId":28180,"transactionKey":"Asbv2zmnFfdUOOe"}
-            """;
-
-        var callback = await CreateGateway(new StubHandler("{}")).ParseWebhookAsync(body, CancellationToken.None);
-
-        Assert.True(callback.IsAuthentic);
-        Assert.False(callback.Transaction!.Success);
-        Assert.False(callback.Transaction.Pending);
-        Assert.Equal(OrderId, callback.Transaction.MerchantReference);   // pay_load arrived as a JSON string
-    }
-
-    [Fact]
     public async Task Unsigned_refund_notice_is_acknowledged_but_not_applied()
     {
         const string body = """

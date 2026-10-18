@@ -3,22 +3,19 @@ using Audiophile.Domain.Entities;
 using Audiophile.Domain.Enums;
 using Audiophile.Domain.ValueObjects;
 using Audiophile.Infrastructure.Persistence;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Audiophile.Tests;
 
-// The webhook's business rules, run against a real (in-memory SQLite) database
+// The webhook's business rules, run against a real (PostgreSQL, one per test) database
 // so the unique index that blocks duplicate events is part of what is tested.
 public sealed class PaymentResultApplierTests : IDisposable
 {
     private const string Provider = "fawaterak";
-    private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    private readonly TestDatabase _database = new();
 
-    public PaymentResultApplierTests() => _connection.Open();
-
-    public void Dispose() => _connection.Dispose();
+    public void Dispose() => _database.Dispose();
 
     [Fact]
     public async Task Successful_payment_confirms_the_order()
@@ -72,12 +69,12 @@ public sealed class PaymentResultApplierTests : IDisposable
     }
 
     [Fact]
-    public async Task Kiosk_reference_first_then_cash_payment_confirms()
+    public async Task Unpaid_invoice_first_then_paid_confirms()
     {
-        var (db, orderId) = await SeedPendingOrderAsync(PaymentMethod.Kiosk, price: 900m);
+        var (db, orderId) = await SeedPendingOrderAsync(PaymentMethod.Card, price: 900m);
 
-        // Same transaction id twice: first "reference issued", then "paid".
-        Assert.Equal(PaymentUpdateOutcome.Applied,
+        // Same invoice twice: a sync while the customer is still on the payment page, then "paid".
+        Assert.Equal(PaymentUpdateOutcome.NotPaidYet,
             await Apply(db, Tx(orderId, "7001", amountMinor: 90_000, success: false, pending: true)));
         Assert.Equal(OrderStatus.Pending, (await Reload(orderId)).Status);
 
@@ -101,15 +98,15 @@ public sealed class PaymentResultApplierTests : IDisposable
     // ------------------------------------------------------------- helpers
 
     private AppDbContext NewContext() =>
-        new(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options);
+        _database.NewContext();
 
     private async Task<(AppDbContext Db, Guid OrderId)> SeedPendingOrderAsync(PaymentMethod method, decimal price)
     {
         var db = NewContext();
-        await db.Database.EnsureCreatedAsync();
 
         var user = User.Create("Mona Hassan", $"{Guid.NewGuid():N}@example.com");
-        var product = new Product("XX59 Headphones", "Enjoy your audio almost anywhere.", price, 10, ProductCategory.Headphones);
+        var product = new Product("XX59 Headphones", "Enjoy your audio almost anywhere.", price, 10, ProductCategory.Headphones,
+            slug: "test-headphones");   // the seeded XX59 already owns "xx59-headphones"
         product.DecreaseStock(1);
 
         var order = Order.Place(user.Id, method,

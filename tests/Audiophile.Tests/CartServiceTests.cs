@@ -3,23 +3,20 @@ using Audiophile.Application.Common;
 using Audiophile.Domain.Entities;
 using Audiophile.Domain.Enums;
 using Audiophile.Infrastructure.Persistence;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace Audiophile.Tests;
 
-// The cart use cases against a real (in-memory SQLite) database. Each check reads the
+// The cart use cases against a real (PostgreSQL, one per test) database. Each check reads the
 // cart back through a new DbContext, so it proves what was saved, not what was in memory.
 public sealed class CartServiceTests : IDisposable
 {
-    private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    private readonly TestDatabase _database = new();
     private Guid _userId;
     private Product _headphones = null!;   // 1,000 EGP, 5 in stock
     private Product _speaker = null!;      // 4,500 EGP, 10 in stock
 
-    public CartServiceTests() => _connection.Open();
-
-    public void Dispose() => _connection.Dispose();
+    public void Dispose() => _database.Dispose();
 
     [Fact]
     public async Task Adding_the_same_product_twice_tops_up_one_line()
@@ -114,16 +111,17 @@ public sealed class CartServiceTests : IDisposable
     private CartService Service() => new(NewContext());
 
     private AppDbContext NewContext() =>
-        new(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options);
+        _database.NewContext();
 
     private async Task SeedAsync()
     {
         await using var db = NewContext();
-        await db.Database.EnsureCreatedAsync();
 
         var user = User.Create("Mona Hassan", $"{Guid.NewGuid():N}@example.com");   // comes with an empty cart
-        _headphones = new Product("XX59 Headphones", "Enjoy your audio almost anywhere.", 1_000m, 5, ProductCategory.Headphones);
-        _speaker = new Product("ZX9 Speaker", "Upgrade your sound system with the ZX9.", 4_500m, 10, ProductCategory.Speakers);
+        _headphones = new Product("XX59 Headphones", "Enjoy your audio almost anywhere.", 1_000m, 5, ProductCategory.Headphones,
+            slug: "test-headphones");   // the seeded XX59 already owns "xx59-headphones"
+        _speaker = new Product("ZX9 Speaker", "Upgrade your sound system with the ZX9.", 4_500m, 10, ProductCategory.Speakers,
+            slug: "test-speaker");
 
         db.AddRange(user, _headphones, _speaker);
         await db.SaveChangesAsync();
