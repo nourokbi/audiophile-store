@@ -1,6 +1,6 @@
 # Roadmap
 
-The plan from where the project is today (updated 2026-10-15) to a deployed, full-stack store.
+The plan from where the project is today (updated 2026-10-18) to a deployed, full-stack store.
 It replaces the long phase list in `build-plan.md` with a shorter one. The decisions recorded
 there still apply.
 
@@ -24,6 +24,46 @@ A finished, deployed project beats a bigger unfinished one on a CV.
 > **Why no MediatR?** It now needs a commercial licence for many uses, and `CartService` /
 > `OrderService` are already one class per feature with clear use-case methods. You can still
 > talk about CQRS: reads use `AsNoTracking` projections and writes go through the aggregates.
+
+---
+
+## Where we are now (2026-10-18)
+
+`main` is at PR #3. A customer can sign up, fill a cart from the home page, check out, pay by card on
+Fawaterak (staging), and watch the order turn *Confirmed* when the webhook arrives. A real payment was
+made end to end through ngrok. 32 tests pass on PostgreSQL.
+
+| Phase | Status |
+|---|---|
+| 0 Save + GitHub | ✅ done (PR #1), except the Projects board |
+| 1 Checkout + concurrency | 🟡 checkout from the cart, `xmin` token and PostgreSQL tests done; **retry, tests, cancel, CI left** |
+| 2 Pluggable payments | 🟡 Fawaterak is on (card only) and tested for real; **the pluggable design and fake-gateway tests left** |
+| 3 Login, roles, addresses | ✅ done |
+| 4 React client | 🟡 login, cart, checkout, orders, home catalogue done; **guest cart, httpOnly cookie, cancel button left** |
+| 5 Admin dashboard | ⬜ not started |
+| 6 Caching + messaging | ⬜ not started |
+| 7 Docker, CI, deploy | ⬜ not started (AWS was considered; the VPS + Neon plan still stands) |
+
+### Next up, in this order
+
+One branch and one PR each. Phase 1 is finished, and tagged `v0.2.0`, after step 4.
+
+1. **`phase-1/concurrency`**: retry `PlaceOrderAsync` once on `DbUpdateConcurrencyException`
+   (`ChangeTracker.Clear()`, then run again; the second conflict is a 409). Test: stock 1, two customers check
+   out at once (`Task.WhenAll`) → exactly one 201 and one 409, stock 0.
+2. **`phase-1/cancel-order`**: `POST /orders/{id}/cancel` for the owner, using `CanBeCancelled` and
+   `OrderStock.CancelAndRelease`; a *Cancel order* button on the order page. Decide the rule for a card
+   order that's already paid (suggested: 409 "contact support", since Fawaterak has no refund API).
+3. **`phase-1/order-tests`**: HTTP tests through `ApiFactory`: checkout happy path (the cart is empty
+   afterwards), and "can't read another customer's order" → 404.
+4. **`phase-1/ci`**: GitHub Actions with a PostgreSQL service container (`ConnectionStrings__Tests`), plus the
+   client build; then branch protection on `main`. Merge, tag `v0.2.0`.
+5. **Phase 2**: `IPaymentGateway` + keyed services + resolver, one webhook route `POST /payments/{provider}/webhook`,
+   `Payments:Enabled`, `FakePaymentGateway` tests. Optionally bring wallet or Fawry back as a second strategy.
+6. **Phase 4 leftovers**: guest cart (merged on login), refresh token in an httpOnly cookie.
+7. Then Phases 5 → 6 → 7.
+
+Dropped: `POST /orders/preview`. `GET /cart` already returns the totals the order will use.
 
 ---
 
@@ -95,20 +135,20 @@ before the phase that needs it, not all up front.
 
 ---
 
-## Phase 0 — Save the work, put it on GitHub · ½ day  ← **start here**
+## Phase 0 — Save the work, put it on GitHub · ✅ done 2026-10-17 (PR #1, `017aefc`)
 
-- [ ] Rename the local branch to match GitHub's default: `git branch -m master main`
-- [ ] `git switch -c phase-0/baseline`, then commit in three steps, so each commit tells one story:
+- [x] Rename the local branch to match GitHub's default: `git branch -m master main`
+- [x] `git switch -c phase-0/baseline`, then commit in three steps, so each commit tells one story:
   1. the backend: `feat: port auth, addresses and product admin from the original API; move to PostgreSQL`
      (cart, PostgreSQL + migration, Identity/JWT, the split EF configurations, the tests, the gateway switched off)
   2. `client/`: `feat(client): add React storefront`
   3. the docs: `docs: overview, use cases, diagrams, database, roadmap`
-- [ ] Create the GitHub repo and push: `gh repo create audiophile-store --private --source . --push`
+- [x] Create the GitHub repo and push: `gh repo create audiophile-store --private --source . --push`
   (`nourokbi/audiophile` is already taken by the original; archive that one on GitHub once this one is public)
-- [ ] Open a PR `phase-0/baseline → main`, review it, merge it
-- [ ] Delete the old merged branch: `git branch -d feature/paymob-integration`
-- [ ] Get Docker Desktop running, then `docker compose up -d` and `dotnet run`: the first real start on PostgreSQL
-- [ ] Create the Projects board and issues for Phase 1
+- [x] Open a PR `phase-0/baseline → main`, review it, merge it
+- [x] Delete the old merged branch: `git branch -d feature/paymob-integration`
+- [x] First real start on PostgreSQL (the local PostgreSQL 18 service; Docker Desktop still to fix, needed in Phase 7)
+- [ ] Create the Projects board and issues for Phase 1 (optional; one PR per step works too)
 
 **Done when** GitHub shows `main` with everything on it, the API runs against PostgreSQL, and there's a Phase 1 board.
 
@@ -117,17 +157,18 @@ before the phase that needs it, not all up front.
 Already done: PostgreSQL via `docker-compose.yml`, the `InitialCreate` migration, `jsonb` for `InTheBox`,
 `GET /products/{id}` and the paged, filtered `GET /products` (see Phase 3).
 
-- [ ] Add a **concurrency token** on `Product`: PostgreSQL's `xmin` column, via `b.Property<uint>("Version").IsRowVersion()`.
-      On `DbUpdateConcurrencyException`, retry once, then return 409. Add a migration for it
-- [ ] **Checkout from the cart** (UC-06): `POST /orders` takes `{ addressId, paymentMethod }`, not items and not a typed
+- [x] Add a **concurrency token** on `Product`: PostgreSQL's `xmin` column, via `b.Property<uint>("Version").IsRowVersion()`
+      (migration `AddProductConcurrencyToken`, 2026-10-18)
+- [ ] On `DbUpdateConcurrencyException`, retry once, then return 409 ← **next**
+- [x] **Checkout from the cart** (UC-06, 2026-10-18): `POST /orders` takes `{ addressId, paymentMethod }`, not items and not a typed
       address. It reads the cart and the saved address, re-reads prices, decreases stock, places the order and clears
       the cart, all in one `SaveChanges`
-- [ ] `POST /orders/preview`: totals without saving
+- ~~`POST /orders/preview`~~ dropped: `GET /cart` already returns the same totals
 - [ ] `POST /orders/{id}/cancel` (UC-10): only while `CanBeCancelled`, and it restores stock
 - [x] Tests on **PostgreSQL** instead of SQLite: `TestDatabase` makes a fresh, migrated database per test on the
       local server (done 2026-10-18; Testcontainers can replace it later, once Docker works)
 - [ ] Tests: the **concurrency test** (it needs `xmin`, so PostgreSQL), a checkout happy path, and
-      "cannot read another customer's order"
+      "cannot read another customer's order" (`TestDatabase` and `ApiFactory` are ready for all three)
 - [ ] Add a minimal **GitHub Actions** workflow that runs `dotnet test` on every PR, then turn on branch protection
 
 **Done when** two parallel checkouts for the last unit produce one order and one 409, proven by a test running in CI.
@@ -141,11 +182,12 @@ already wrote most of it before; see `git show 8d972e7:src/Audiophile.Applicatio
 - [ ] `FawaterakGateway : IPaymentGateway`, registered as a **keyed service** `"fawaterak"`
 - [ ] `IPaymentGatewayResolver` picks the gateway for a payment method from config (`Payments:Methods:Card = fawaterak`)
 - [ ] One webhook route for all providers: `POST /payments/{provider}/webhook`
-- [ ] **Delete every `// PAYMENT GATEWAY (off)` block.** Turning payments on and off becomes configuration
-      (`Payments:Enabled`), not commented-out code
-- [ ] Re-enable `PaymentExpiryWorker` and the sync endpoint
+- [x] Every `// PAYMENT GATEWAY (off)` block is live again (2026-10-18). Still to add: a `Payments:Enabled`
+      setting, so turning payments off is configuration, not commented-out code
+- [x] `PaymentExpiryWorker` and the sync endpoint are back (sync and events are admin-only)
+- [x] Simplified to **card only** (wallet and kiosk removed, 2026-10-18); add them back as extra strategies
 - [ ] Tests with a `FakePaymentGateway`: success, decline, timeout, webhook twice, wrong amount
-- [ ] One real payment end to end through ngrok with the staging test card
+- [x] One real payment end to end through ngrok with the staging test card (2026-10-18)
 
 **Done when** card checkout works again and adding a second gateway would be one new class plus one config line.
 
@@ -179,6 +221,10 @@ chain, not every session) are a possible refinement; revoking everything is the 
 - [x] Checkout page: address → payment method → `POST /orders` with an `Idempotency-Key` →
       redirect to `checkoutUrl` (or straight to the order page for COD) (2026-10-18)
 - [x] My orders page and an order progress page that polls until the webhook confirms (2026-10-18)
+- [x] Home page lists every product as a card with quantity + *Add to cart*, filtered by category (2026-10-18)
+- [ ] **Guest cart**: today you must log in before adding; keep a local cart and merge it into the server cart on login
+- [ ] *Cancel order* button on the order page (with Phase 1's cancel endpoint)
+- [ ] Fix the old lint errors (unused `React` imports in Home, Footer, Menu, Category, BestGear; an apostrophe in Footer)
 - [x] CORS policy in the API for the client origin (`Cors:AllowedOrigins`)
 - [x] Delete the old `wwwroot` demo storefront (removed 2026-10-15; it had no login)
 
