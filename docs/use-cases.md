@@ -67,7 +67,7 @@ Status: ✅ done · 🟡 partly done · ❌ not started
 | UC-04 | Manage cart (add, change quantity, remove, clear) | Customer | ✅ API (uncommitted) | 0, 4 |
 | UC-05 | Manage shipping addresses | Customer | ✅ API · UI in Phase 4 | 4 |
 | UC-06 | Check out: turn the cart into an order | Customer | 🟡 not from cart yet | 1 |
-| UC-07 | Pay online (card, wallet, Fawry/Aman) | Customer | ⏸️ built, switched off | 2 |
+| UC-07 | Pay online by card (Fawaterak) | Customer | ✅ works (wallet, Fawry/Aman: Phase 2) | 2 |
 | UC-08 | Pay cash on delivery | Customer | ✅ | — |
 | UC-09 | View my orders and their status | Customer | ✅ API | 4 (UI) |
 | UC-10 | Cancel my order before it ships | Customer | 🟡 domain only | 1 |
@@ -137,7 +137,7 @@ must be true before, the normal path, and what can go wrong.
 **Alternatives**
 - 1a. Gateway down or times out → payment `Failed`, order `Cancelled`, stock released, **502/504**.
 - 3a. Card declined → the customer can try another card on the same page.
-- 3b. Customer never pays → UC-17 expires the order after 30 min (48 h for Fawry/Aman codes).
+- 3b. Customer never pays → UC-17 expires the order after 30 min.
 - 4a. Webhook lost → the admin presses *Sync* (UC-14), or UC-17 asks the gateway before expiring.
 
 ### UC-16 · Report a payment result (webhook)
@@ -155,7 +155,7 @@ must be true before, the normal path, and what can go wrong.
 **Alternatives**
 - 4a. Same event seen before → **200**, nothing changes (idempotent).
 - 5a. Paid amount ≠ order total → **not confirmed**, logged as critical.
-- 5b. Order was already expired but the customer paid at a Fawry kiosk → payment recorded,
+- 5b. Order was already expired but the customer finished paying anyway → payment recorded,
   order stays cancelled, flagged *needs manual refund*.
 
 ### UC-13 · Update order status

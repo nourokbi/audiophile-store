@@ -3,7 +3,7 @@ using Audiophile.Application.Auth;
 using Audiophile.Application.Carts;
 using Audiophile.Application.Orders;
 using Audiophile.Application.Products;
-// using Audiophile.Application.Payments;   // PAYMENT GATEWAY (off)
+using Audiophile.Application.Payments;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Audiophile.Application;
@@ -17,7 +17,7 @@ public static class DependencyInjection
         services.AddScoped<ProductService>();
         services.AddScoped<CartService>();
         services.AddScoped<OrderService>();
-        // services.AddScoped<PaymentResultApplier>();   // PAYMENT GATEWAY (off)
+        services.AddScoped<PaymentResultApplier>();
         return services;
     }
 }

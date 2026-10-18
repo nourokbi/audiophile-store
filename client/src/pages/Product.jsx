@@ -5,10 +5,21 @@ import BestGear from '../components/BestGear';
 import { useParams, Link } from 'react-router-dom';
 
 import data from '../data/data.json';
+import QuantityStepper from '../components/QuantityStepper';
+import { useCatalog } from '../context/CatalogContext';
+import { useAddToCart } from '../hooks/useAddToCart';
+import { formatPrice } from '../lib/format';
 
-const Product = (props) => {
+// Text and images come from data.json; id, price and stock from the API (matched on slug).
+const Product = () => {
 	const { slug } = useParams();
 	const [productData, setProductData] = React.useState(null);
+	const { bySlug, loading } = useCatalog();
+	const { addToCart, busy, notice } = useAddToCart();
+	const [quantity, setQuantity] = React.useState(1);
+
+	// A new product page starts again at 1.
+	React.useEffect(() => setQuantity(1), [slug]);
 
 	React.useEffect(() => {
 		const matchedProduct = data.find((product) => product.slug === slug);
@@ -19,14 +30,10 @@ const Product = (props) => {
 		return <h2>Loading...</h2>;
 	}
 
-	const handleAddToCart = () => {
-		const { image, name, price } = productData.cart;
-		const productToAdd = {
-			image,
-			name,
-			price,
-		};
-		props.addToCart(productToAdd);
+	const live = bySlug[slug]; // undefined until the API answers, or if it doesn't sell this product
+
+	const handleAddToCart = async () => {
+		if (await addToCart(live.id, quantity)) setQuantity(1);
 	};
 
 	const {
@@ -36,7 +43,6 @@ const Product = (props) => {
 		description,
 		features,
 		gallery,
-		price,
 		others,
 	} = productData;
 
@@ -122,32 +128,30 @@ const Product = (props) => {
 						{name}
 					</h2>
 					<p className='p text-black/50 xs:py-6 md:py-8'>{description}</p>
-					<h6 className='xs:mb-[31px] lg:mb-[47px]'>$ {price}</h6>
+					<h6 className='xs:mb-[31px] lg:mb-[47px]'>
+						{live ? formatPrice(live.price) : loading ? '…' : 'Not available'}
+						{live && live.stock > 0 && live.stock <= 5 && (
+							<span className='ml-4 text-[13px] text-cream tracking-[1px]'>Only {live.stock} left</span>
+						)}
+					</h6>
 					<div className='flex gap-4'>
-						<div className='w-[120px] flex justify-between bg-gray-light p-[15px] items-center'>
-							<div
-								onClick={props.decrease}
-								className='text-[14px] text-black/30 hover:text-cream font-bold tracking-[1px] cursor-pointer'
-							>
-								-
-							</div>
-							<div className='text-[14px] text-black font-bold tracking-[1px]'>
-								{props.quantityToAdd}
-							</div>
-							<div
-								onClick={props.increase}
-								className='text-[14px] text-black/30 hover:text-cream font-bold tracking-[1px] cursor-pointer'
-							>
-								+
-							</div>
-						</div>
+						<QuantityStepper
+							value={quantity}
+							onChange={setQuantity}
+							max={Math.max(1, live?.stock ?? 1)}
+							label={name}
+						/>
 						<button
 							onClick={handleAddToCart}
-							className='btn bg-cream hover:bg-cream-light transition-all duration-150 whitespace-nowrap'
+							disabled={!live || !live.inStock || busy}
+							className='btn bg-cream hover:bg-cream-light transition-all duration-150 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed'
 						>
-							Add to cart
+							{busy ? 'Adding…' : live && !live.inStock ? 'Out of stock' : 'Add to cart'}
 						</button>
 					</div>
+					{notice && (
+						<p className={`mt-4 text-[14px] font-bold ${notice.ok ? 'text-cream' : 'text-red-600'}`}>{notice.text}</p>
+					)}
 				</div>
 			</section>
 

@@ -1,0 +1,136 @@
+### The whole checkout journey, in order: sign up → address → cart → order → pay with Fawaterak → confirmed.
+### Send the requests top to bottom (Visual Studio, Rider or VS Code REST Client). Each one uses values
+### from the responses before it, so don't skip a step.
+###
+### Before you start:
+###   1. dotnet run --project src/Audiophile.API --launch-profile http
+###   2. Fawaterak staging secrets are set (dotnet user-secrets list: Fawaterak:ApiKey, VendorKey, *PaymentMethodId).
+###   3. For the REAL webhook (step 9): ngrok http 5040, and Fawaterak:PublicBaseUrl = the ngrok https URL.
+###      Without ngrok, Fawaterak can't reach localhost; use step 10 (sync) instead.
+
+@base = http://localhost:5040
+# XX59 Headphones (4,499 EGP), seeded by the first migration.
+@productId = 4ae5911a-421b-4565-b75f-53809c3da182
+# A new user on every run, so the cart starts empty.
+@email = buyer.{{$timestamp}}@example.com
+@customer = {{signUp.response.body.$.accessToken}}
+
+
+############################## 1. Sign up (→ 201 with an access token)
+# @name signUp
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{ "name": "Mona Hassan", "email": "{{email}}", "password": "password-123" }
+
+
+############################## 2. Save a shipping address (→ 201). The order copies it.
+# @name address
+POST {{base}}/addresses
+Authorization: Bearer {{customer}}
+Content-Type: application/json
+
+{ "fullAddressName": "Mona Hassan", "street": "12 Tahrir Street", "city": "Cairo", "country": "Egypt", "phone": "+201000000000", "postalCode": null }
+
+
+############################## 3. Add to cart (→ 200, the cart with totals)
+POST {{base}}/cart/items
+Authorization: Bearer {{customer}}
+Content-Type: application/json
+
+{ "productId": "{{productId}}", "quantity": 1 }
+
+
+############################## 4. Check the cart before paying
+GET {{base}}/cart
+Authorization: Bearer {{customer}}
+
+
+############################## 5. Place the order with Card (→ 201)
+# FLOW 1 → 2 → 3 → 4: the API turns the cart into a Pending order, reserves the stock,
+# asks Fawaterak for an invoice, and returns payment.checkoutUrl. The cart is now empty.
+# @name order
+POST {{base}}/orders
+Authorization: Bearer {{customer}}
+Content-Type: application/json
+Idempotency-Key: card-{{$timestamp}}
+
+{ "addressId": "{{address.response.body.$.id}}", "paymentMethod": "Card" }
+
+
+############################## 6. Same Idempotency-Key again (→ 200, the SAME order, no second invoice)
+POST {{base}}/orders
+Authorization: Bearer {{customer}}
+Content-Type: application/json
+Idempotency-Key: {{order.request.headers.Idempotency-Key}}
+
+{ "addressId": "{{address.response.body.$.id}}", "paymentMethod": "Card" }
+
+
+############################## 7. PAY (FLOW 5): open this URL in your browser
+# Copy payment.checkoutUrl from the response of step 5 and open it.
+# Staging test card: 5123450000000008 · expiry 12/26 · CVV 100 (any name).
+# After paying, Fawaterak redirects the browser to /payments/fawaterak/return (FLOW 9),
+# which forwards to the client's orders page. That page doesn't exist until Phase 4: a
+# "can't connect" page on localhost:5173 is expected. Check the order in step 8 instead.
+
+
+############################## 8. Is it paid? (→ status "Confirmed", payment.status "Succeeded")
+# With ngrok running, the webhook (FLOW 6 → 7 → 8) has already confirmed it.
+# Still "Pending"? The webhook didn't reach you: do step 10.
+GET {{base}}/orders/{{order.response.body.$.id}}
+Authorization: Bearer {{customer}}
+
+
+############################## 9. A forged webhook is refused (→ 401)
+# This is what an attacker would send to mark an order paid for free. The hashKey is
+# wrong, so FawaterakGateway.ParseWebhookAsync rejects it and nothing changes.
+# (The real webhook comes from Fawaterak itself, through ngrok, with a valid hashKey.)
+POST {{base}}/payments/fawaterak/webhook_json
+Content-Type: application/json
+
+{
+  "invoice_id": 123456,
+  "invoice_key": "fake",
+  "invoice_status": "paid",
+  "payment_method": "Card",
+  "pay_load": "{\"order_id\":\"{{order.response.body.$.id}}\"}",
+  "hashKey": "not-a-real-signature"
+}
+
+
+############################## 10. Safety net: ask Fawaterak directly (admin only)
+# For when the webhook never arrived (no ngrok). Runs the same FLOW 7 lookup + FLOW 8 as a webhook.
+# Log in as the admin first (Admin:Email / Admin:Password from `dotnet user-secrets list`).
+# @name admin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@audiophile.local", "password": "<Admin:Password from user-secrets>" }
+
+### 10b. Sync the order with Fawaterak (→ the order, Confirmed once Fawaterak says it's paid)
+POST {{base}}/orders/{{order.response.body.$.id}}/payment/sync
+Authorization: Bearer {{admin.response.body.$.accessToken}}
+
+### 10c. Every message Fawaterak sent about this order (the audit trail)
+GET {{base}}/orders/{{order.response.body.$.id}}/payment/events
+Authorization: Bearer {{admin.response.body.$.accessToken}}
+
+### 10d. A customer can't use the support tools (→ 403)
+POST {{base}}/orders/{{order.response.body.$.id}}/payment/sync
+Authorization: Bearer {{customer}}
+
+
+############################## 11. Cash on delivery, for comparison (→ 201, Confirmed at once, no Fawaterak)
+# Add something to the cart first (step 3), otherwise → 409 "Your cart is empty."
+POST {{base}}/orders
+Authorization: Bearer {{customer}}
+Content-Type: application/json
+Idempotency-Key: cod-{{$timestamp}}
+
+{ "addressId": "{{address.response.body.$.id}}", "paymentMethod": "CashOnDelivery" }
+
+
+############################## 12. My orders
+GET {{base}}/orders
+Authorization: Bearer {{customer}}

@@ -22,7 +22,8 @@ A full-stack e-commerce store for audio gear (headphones, speakers, earphones):
 
 - **Backend:** ASP.NET Core 10 Web API, Clean Architecture, EF Core.
 - **Frontend:** React 18 + Vite + Tailwind (`client/`).
-- **Payments:** Fawaterak (Egypt): card, mobile wallet, Fawry/Aman cash codes, plus cash on delivery.
+- **Payments:** Fawaterak (Egypt) for card, plus cash on delivery. Wallet and Fawry/Aman are planned as
+  extra strategies in Phase 2.
 
 The goal is a portfolio project that is **scalable, maintainable, functional and reliable**,
 with a system design you can explain end to end in an interview.

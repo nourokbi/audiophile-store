@@ -33,9 +33,8 @@ public sealed record CheckoutCustomer(
     string FirstName, string LastName, string Email, string Phone,
     string Street, string City, string Country);
 
-// ProviderReference = invoice_key, ProviderOrderId = invoice_id, PaymentCode = Aman/Fawry code.
-public sealed record CheckoutSession(
-    string ProviderReference, string? ProviderOrderId, string CheckoutUrl, string? PaymentCode = null);
+// ProviderReference = invoice_key, ProviderOrderId = invoice_id, CheckoutUrl = the hosted payment page.
+public sealed record CheckoutSession(string ProviderReference, string? ProviderOrderId, string CheckoutUrl);
 
 // A Fawaterak invoice or webhook, already translated to our terms.
 public sealed record GatewayTransaction(
@@ -46,7 +45,7 @@ public sealed record GatewayTransaction(
     string Currency,
     bool Success,
     bool Pending,
-    string? SourceType);       // "Card", "Fawry", "Aman"…
+    string? SourceType);       // e.g. "Card"
 
 public sealed record GatewayCallback(bool IsAuthentic, string EventType, GatewayTransaction? Transaction)
 {

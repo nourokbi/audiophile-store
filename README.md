@@ -61,6 +61,20 @@ dotnet run --launch-profile http          # http://localhost:5040
 ```
 
 No local PostgreSQL? Skip the connection-string secret and run `docker compose up -d` from the repo root instead.
+
+### The shop (React client), with card payments
+
+```bash
+# terminal 1: the API (above)
+# terminal 2: the shop on http://localhost:5173; it forwards /api and /payments to the API
+cd client && npm install && npm run dev
+# terminal 3: a public URL for the shop, so Fawaterak can reach the webhook
+ngrok http 5173 --url=https://<your-ngrok-domain>      # = Fawaterak:PublicBaseUrl
+```
+
+Open **http://localhost:5173**, create an account, add a product, check out with **Card**, and pay on
+Fawaterak's page with `5123 4500 0000 0008` · `12/26` · CVV `100`. You land on the order page, which turns
+*Confirmed* when the webhook arrives. Details in [`docs/fawaterak-integration.md`](docs/fawaterak-integration.md).
 Then open `src/Audiophile.API/Audiophile.API.http` and send the requests in order. Every endpoint is described in
 [`docs/api.md`](docs/api.md); production on Neon is in [`docs/database.md`](docs/database.md).
 
@@ -72,7 +86,8 @@ dotnet test
 
 Unit tests cover the domain rules and the use cases. The HTTP tests in `tests/Audiophile.Tests/Api`
 start the whole API in memory and call it like a client would (register, log in, refresh, admin-only
-endpoints). They use SQLite in place of PostgreSQL so they run without Docker.
+endpoints). Every test gets its own fresh PostgreSQL database on the server in `ConnectionStrings:Default`
+(`tests/Audiophile.Tests/TestDatabase.cs`), built from the real migrations and deleted afterwards.
 
 ## Migrations
 

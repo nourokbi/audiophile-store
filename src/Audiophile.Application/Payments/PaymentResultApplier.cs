@@ -10,6 +10,7 @@ namespace Audiophile.Application.Payments;
 public enum PaymentUpdateOutcome
 {
     Applied,            // our state changed
+    NotPaidYet,         // the gateway says the invoice is still open; nothing to change
     Duplicate,          // seen this exact event before; nothing to do
     AttemptFailed,      // one attempt was declined; the customer can still retry on the same checkout
     Ignored,            // a late event for a payment already closed
@@ -18,6 +19,7 @@ public enum PaymentUpdateOutcome
     NeedsManualRefund   // money taken for an order we had already cancelled
 }
 
+// FLOW 8: called by FawaterakController.Webhook, and by OrderService.SyncWithGatewayAsync.
 // The single place a gateway's report about a transaction changes our state,
 // whether the report came from a webhook or from us asking (inquiry). Both paths
 // share the de-duplication key, so whichever arrives second is a no-op.
@@ -26,9 +28,8 @@ public sealed class PaymentResultApplier(IAppDbContext db, ILogger<PaymentResult
     public async Task<PaymentUpdateOutcome> ApplyAsync(
         string provider, string source, GatewayTransaction tx, string rawPayload, CancellationToken ct)
     {
-        // A kiosk transaction is reported twice with the same id: first "pending"
-        // (reference issued), then "success" (cash paid). The state is part of the
-        // key so the second report is not mistaken for a duplicate of the first.
+        // The state is part of the key: an invoice first seen unpaid (by a sync) and
+        // later reported paid is two different events, not a duplicate.
         var state = tx.Pending ? "pending" : tx.Success ? "success" : "failed";
         var externalId = $"{tx.TransactionId}:{state}";
 
@@ -62,10 +63,7 @@ public sealed class PaymentResultApplier(IAppDbContext db, ILogger<PaymentResult
         var payment = order.Payment!;
 
         if (tx.Pending)
-        {
-            payment.RecordPendingTransaction(tx.TransactionId);
-            return PaymentUpdateOutcome.Applied;
-        }
+            return PaymentUpdateOutcome.NotPaidYet;
 
         if (!tx.Success)
         {
@@ -90,8 +88,8 @@ public sealed class PaymentResultApplier(IAppDbContext db, ILogger<PaymentResult
                 ? PaymentUpdateOutcome.Duplicate
                 : PaymentUpdateOutcome.Ignored;
 
-        // A kiosk customer can pay after we expired the order. The money is real,
-        // so record it, but the order stays cancelled and someone must refund.
+        // A customer can finish paying after the expiry job cancelled the order. The money
+        // is real, so record it, but the order stays cancelled and someone must refund.
         if (order.Status != OrderStatus.Pending)
         {
             payment.MarkSucceeded(tx.TransactionId);

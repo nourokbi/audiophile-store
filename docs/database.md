@@ -23,7 +23,7 @@ flowchart LR
 | Development, local install | **user-secrets** (overrides the line below) | `Host=localhost;Port=5432;Database=audiophile;Username=postgres;Password=<yours>` |
 | Development, Docker | `appsettings.Development.json` (committed; matches `docker-compose.yml`) | `Host=localhost;Port=5432;Database=audiophile;Username=audiophile;Password=audiophile` |
 | Production | Environment variable `ConnectionStrings__Default` | The Neon string (see below) |
-| Tests | Replaced in `ApiFactory` | In-memory SQLite |
+| Tests | `TestDatabase` (tests project) | A new `audiophile_test_<guid>` database per test on the same server as `ConnectionStrings:Default` (or `ConnectionStrings__Tests` in CI), migrated, then deleted |
 
 `appsettings.json` deliberately has an empty `ConnectionStrings:Default`. The app refuses to
 start without one, so a missing setting fails at deploy time, not on the first request.

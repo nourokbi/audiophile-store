@@ -11,6 +11,7 @@ public sealed class Product
     public const int NameMaxLength = 200;
     public const int DescriptionMaxLength = 2000;
     public const int FeaturesMaxLength = 4000;
+    public const int SlugMaxLength = 100;
 
     // Case-insensitive: "Headphone Unit" and "headphone unit" are one box entry, not two.
     // Not readonly: EF Core maps this field to the jsonb "InTheBox" column and sets it when loading.
@@ -25,9 +26,11 @@ public sealed class Product
         int stock,
         ProductCategory category,
         string? features = null,
-        string? imageUrl = null)
+        string? imageUrl = null,
+        string? slug = null)
     {
         Name = Guard.Text(name, 2, NameMaxLength, nameof(name));
+        Slug = ValidSlug(slug ?? ToSlug(Name));
         Description = Guard.Text(description, 10, DescriptionMaxLength, nameof(description));
         Price = Guard.PositiveMoney(price, nameof(price));
         Stock = Guard.AtLeast(stock, 0, nameof(stock));
@@ -38,6 +41,11 @@ public sealed class Product
 
     public Guid Id { get; private set; } = Guid.NewGuid();
     public string Name { get; private set; } = null!;
+
+    // The product's address in the shop: /headphones/xx59-headphones. Set once and never
+    // changed by a rename, so links people saved keep working. Unique.
+    public string Slug { get; private set; } = null!;
+
     public string Description { get; private set; } = null!;
     public string Features { get; private set; } = string.Empty;
     public decimal Price { get; private set; }
@@ -46,7 +54,6 @@ public sealed class Product
     public bool IsActive { get; private set; } = true;
     public ProductCategory Category { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
-
     // Persisted as jsonb; mutated through the box methods, never assigned wholesale.
     public IReadOnlyDictionary<string, int> InTheBox => _inTheBox;
 
@@ -66,6 +73,22 @@ public sealed class Product
         Description = newDescription;
         Category = newCategory;
         Features = newFeatures;
+    }
+
+    // "XX99 Mark II Headphones" → "xx99-mark-ii-headphones"
+    public static string ToSlug(string text)
+    {
+        var chars = text.Trim().ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-');
+        var slug = string.Join('-', new string(chars.ToArray()).Split('-', StringSplitOptions.RemoveEmptyEntries));
+        return slug.Length <= SlugMaxLength ? slug : slug[..SlugMaxLength].TrimEnd('-');
+    }
+
+    private static string ValidSlug(string slug)
+    {
+        var trimmed = Guard.Text(slug, 2, SlugMaxLength, nameof(slug));
+        if (trimmed != ToSlug(trimmed))
+            throw new ArgumentException("slug may only contain lowercase letters, digits and single hyphens.", nameof(slug));
+        return trimmed;
     }
 
     public void ChangePrice(decimal newPrice) => Price = Guard.PositiveMoney(newPrice, nameof(newPrice));

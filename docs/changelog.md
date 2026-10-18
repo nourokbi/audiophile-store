@@ -2,6 +2,71 @@
 
 What changed and why, newest first. Git history has the line-by-line detail; this file is the readable version.
 
+## 2026-10-18 — The shop talks to the API (login → cart → pay → confirmed)
+
+### Added (client)
+- `lib/api.js` (fetch wrapper with one automatic token refresh), `AuthContext`, `CartContext` (the server
+  cart), `CatalogContext` (the API's products by slug).
+- **Login** and **Register** pages in the shop's design; `RequireAuth` sends anonymous visitors to log in
+  and back.
+- The cart drop-down, product page and checkout use the API: prices and stock are the API's, the checkout
+  saves or reuses the address, places the order with an `Idempotency-Key`, and sends Card payments to
+  Fawaterak's page.
+- **My orders** and an **order progress page** (`/orders/:id`) that polls until the webhook confirms the payment.
+- Vite also forwards `/payments` to the API, so `ngrok http 5173` serves the shop and receives the webhook.
+- **Home page is the catalogue**: after the hero, every product is a card (picture, price and stock from the
+  API, a quantity stepper and *Add to cart*), filtered by category chips kept in the URL (`/?category=speakers`).
+  The picture and name open the product page. The promo blocks and category tiles were removed from the home page.
+- `useAddToCart` and `QuantityStepper` are shared by the cards and the product page.
+
+### Changed (API)
+- `Product.Slug` (unique; migration `SeedStorefrontProducts`). The seed is now the storefront's six products
+  with their real text, features, box contents, cart images and prices (EGP); the four existing ids are kept.
+- `OrderItemDto` includes `productImageUrl`.
+
+### Verified
+- Through the Vite proxy and through ngrok: products, sign up, cart, card order with a real Fawaterak invoice,
+  return redirect (302 to `/orders`), forged webhook 401. Screenshots of login, product, checkout and order pages.
+- Not verified here: paying in the browser and the real webhook. That needs a person at the payment page.
+
+## 2026-10-18 — Checkout from the cart; Fawaterak back on
+
+### Removed to keep the payment flow small
+- The `VodafoneCash` (wallet) and `Kiosk` (Fawry / Aman) payment methods, with everything only they used:
+  their payment-method ids, the wallet number and expiry date sent to Fawaterak, `Payment.PaymentCode`
+  (migration `RemovePaymentCode`), the "code expired" webhook and its hash, `RecordPendingTransaction`,
+  and the 48-hour window. Neither could be paid on Fawaterak staging. Phase 2 can add them back as new
+  payment strategies. Methods are stored as text, so the existing Card and CashOnDelivery rows are unaffected.
+- `PaymentResultApplier` answers `NotPaidYet` for an invoice that is still open, instead of recording it.
+- A one-page map of the payment flow (the three moments A, B, C) was published as an artifact.
+
+### Changed
+- `POST /orders` takes `{ addressId, paymentMethod }`. Items come from the cart (emptied by the order), the
+  shipping details from a saved address. A deleted address is 404; an empty cart or a product that is no longer
+  sold is 409.
+- For gateway payments the cart is emptied only once Fawaterak has returned a payment link, so a gateway
+  failure leaves the cart as it was.
+- `Product` has an optimistic concurrency token: PostgreSQL's `xmin`, as the shadow property `Version`
+  (migration `AddProductConcurrencyToken`, which runs no SQL because `xmin` already exists).
+
+### Turned back on
+- Card payments through Fawaterak: every `// PAYMENT GATEWAY (off)` block is live again
+  (`OrderService`, `FawaterakController`, `PaymentExpiryWorker`, the DI registrations).
+- `GET /orders/{id}/payment/events` and `POST /orders/{id}/payment/sync`, now **admin only**.
+- The return URL redirects to `Fawaterak:ClientReturnUrl` instead of the removed `/orders.html`.
+- `FLOW 1`…`FLOW 9` comments trace one payment through the code; `checkout-flow.http` walks through it.
+
+### Verified
+- Against Fawaterak staging: sign up, address, cart, card order (real invoice and payment URL), same
+  Idempotency-Key returns the same order, cart emptied, stock reserved, forged webhook 401, admin sync, customer
+  sync 403, cash on delivery confirmed at once.
+
+### Tests moved to PostgreSQL
+- SQLite has no `xmin`, so 21 of 33 tests failed once the concurrency token existed. SQLite is gone from the
+  tests: `TestDatabase` creates a fresh database per test on the local PostgreSQL (from the API's user-secrets,
+  or `ConnectionStrings__Tests` in CI), applies the real migrations, and deletes it afterwards.
+- All 33 tests pass. The NU1903 warning (vulnerable SQLite package) is gone with the package.
+
 ## 2026-10-15 — Ported the missing features from the original API; moved to PostgreSQL
 
 The original single-project API (`nourokbi/audiophile`) had auth, addresses and product admin that this rebuild didn't.

@@ -4,7 +4,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Audiophile.Application.Common;
 using Audiophile.Application.Payments;
-using Audiophile.Domain.Enums;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -25,6 +24,9 @@ public sealed class FawaterakGateway(
 
     // ---------------------------------------------------------------- checkout
 
+    // FLOW 4: called by OrderService.PlaceOrderAsync (step 2j). Turns our CheckoutRequest into
+    // Fawaterak's JSON, POSTs it to invoiceInitPay, and reads back the invoice id and the
+    // hosted payment URL (data.payment_data.redirectTo).
     public async Task<CheckoutSession> CreateCheckoutAsync(CheckoutRequest request, CancellationToken ct)
     {
         EnsureConfigured();
@@ -34,7 +36,7 @@ public sealed class FawaterakGateway(
 
         var body = new Dictionary<string, object?>
         {
-            ["payment_method_id"] = PaymentMethodIdFor(request.Method),
+            ["payment_method_id"] = CardMethodId(),
             ["cartTotal"] = Money(request.AmountMinor),     // Fawaterak takes pounds, not piasters
             ["currency"] = request.Currency,
             ["invoice_number"] = orderId,
@@ -63,15 +65,10 @@ public sealed class FawaterakGateway(
             },
             // Echoed back in the webhook as pay_load: how the webhook finds our order.
             ["payLoad"] = new { order_id = orderId },
-            // Always return a hosted page, even for Aman / Fawry, where it shows the code.
+            // Always answer with a hosted payment page URL (payment_data.redirectTo).
             ["redirectOption"] = true,
             ["lang"] = "en",
         };
-
-        if (request.Method == PaymentMethod.VodafoneCash)
-            body["mobileWalletNumber"] = LocalPhone(request.Customer.Phone);
-        if (request.Method == PaymentMethod.Kiosk)
-            body["customExpireDate"] = "+2 days";           // matches our 48-hour kiosk window
 
         using var message = new HttpRequestMessage(HttpMethod.Post, "invoiceInitPay") { Content = JsonContent.Create(body) };
         using var doc = await SendAsync(message, "create invoice", ct);
@@ -81,16 +78,17 @@ public sealed class FawaterakGateway(
         var invoiceKey = Str(data, "invoice_key") ?? invoiceId;
 
         data.TryGetProperty("payment_data", out var paymentData);
-        var code = Str(paymentData, "amanCode") ?? Str(paymentData, "fawryCode")
-                   ?? Str(paymentData, "masaryCode") ?? Str(paymentData, "meezaReference");
-        var checkoutUrl = Str(paymentData, "redirectTo") ?? ReturnUrl("pending");
+        var checkoutUrl = Str(paymentData, "redirectTo")
+                          ?? throw new GatewayException("Fawaterak did not return a payment page URL.");
 
         logger.LogInformation("Fawaterak invoice {InvoiceId} created for order {OrderId}", invoiceId, orderId);
-        return new CheckoutSession(invoiceKey, invoiceId, checkoutUrl, code);
+        return new CheckoutSession(invoiceKey, invoiceId, checkoutUrl);
     }
 
     // ---------------------------------------------------------------- inquiry
 
+    // FLOW 7 (second half), and both safety nets: GET getInvoiceData/{invoiceId}.
+    // Fawaterak's own answer to "is this invoice paid, and for how much?".
     public async Task<GatewayTransaction> GetInvoiceAsync(string invoiceId, CancellationToken ct)
     {
         EnsureConfigured();
@@ -114,6 +112,9 @@ public sealed class FawaterakGateway(
 
     // -------------------------------------------------------------- callbacks
 
+    // FLOW 7: called by FawaterakController.Webhook (FLOW 6). Recomputes the hashKey with our
+    // vendor key; if it matches, the webhook really came from Fawaterak. For "paid" it then
+    // calls GetInvoiceAsync, because the signature doesn't cover the amount.
     public async Task<GatewayCallback> ParseWebhookAsync(string rawBody, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(Options.VendorKey))
@@ -148,23 +149,7 @@ public sealed class FawaterakGateway(
                 confirmed with { MerchantReference = confirmed.MerchantReference ?? OrderIdFromPayload(root) });
         }
 
-        // 2. An Aman / Fawry / Masary code expired unpaid.
-        if (string.Equals(Str(root, "status"), "EXPIRED", StringComparison.OrdinalIgnoreCase))
-        {
-            var expected = FawaterakHash.ForExpiredReference(
-                Str(root, "referenceId") ?? "", Str(root, "paymentMethod") ?? "", Options.VendorKey);
-            if (!FawaterakHash.Matches(expected, Str(root, "hashKey")))
-                return Reject("expired");
-
-            return new GatewayCallback(true, "expired", new GatewayTransaction(
-                TransactionId: Str(root, "transactionId") ?? Str(root, "referenceId") ?? "",
-                ProviderOrderId: null,
-                MerchantReference: OrderIdFromPayload(root),
-                AmountMinor: 0, Currency: "", Success: false, Pending: false,
-                SourceType: Str(root, "paymentMethod")));
-        }
-
-        // 3. A failed attempt. Informational only: the customer can try again.
+        // 2. A failed attempt. Informational only: the customer can try again.
         if (Str(root, "errorMessage") is { } error)
         {
             logger.LogInformation("Fawaterak payment attempt failed for invoice {InvoiceId}: {Error}",
@@ -172,7 +157,7 @@ public sealed class FawaterakGateway(
             return new GatewayCallback(true, "failed", null);
         }
 
-        // 4. Refund notice. The documented body carries no signature, so it cannot be
+        // 3. Refund notice. The documented body carries no signature, so it cannot be
         //    trusted to change anything; log it for reconciliation.
         if (Str(root, "transactionId") is not null && Str(root, "reason") is not null)
         {
@@ -302,18 +287,10 @@ public sealed class FawaterakGateway(
             throw new GatewayException("Set Fawaterak:PublicBaseUrl to the ngrok address so Fawaterak can reach the webhook.");
     }
 
-    private int PaymentMethodIdFor(PaymentMethod method)
-    {
-        var id = method switch
-        {
-            PaymentMethod.Card => Options.CardPaymentMethodId,
-            PaymentMethod.VodafoneCash => Options.WalletPaymentMethodId,
-            PaymentMethod.Kiosk => Options.KioskPaymentMethodId,
-            _ => 0,
-        };
-
-        return id > 0 ? id : throw new GatewayException($"No Fawaterak payment method id is configured for {method}.");
-    }
+    private int CardMethodId() =>
+        Options.CardPaymentMethodId > 0
+            ? Options.CardPaymentMethodId
+            : throw new GatewayException("Set Fawaterak:CardPaymentMethodId (from GET getPaymentmethods).");
 
     private static string Money(long minor) => (minor / 100m).ToString("0.00", CultureInfo.InvariantCulture);
 

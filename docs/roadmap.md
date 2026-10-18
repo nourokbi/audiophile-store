@@ -124,8 +124,9 @@ Already done: PostgreSQL via `docker-compose.yml`, the `InitialCreate` migration
       the cart, all in one `SaveChanges`
 - [ ] `POST /orders/preview`: totals without saving
 - [ ] `POST /orders/{id}/cancel` (UC-10): only while `CanBeCancelled`, and it restores stock
-- [ ] Tests: switch `ApiFactory` from SQLite to **Testcontainers PostgreSQL** (a real database in Docker, per test run).
-      The `xmin` token only exists on PostgreSQL, so the **concurrency test** needs it. Add a checkout happy path and
+- [x] Tests on **PostgreSQL** instead of SQLite: `TestDatabase` makes a fresh, migrated database per test on the
+      local server (done 2026-10-18; Testcontainers can replace it later, once Docker works)
+- [ ] Tests: the **concurrency test** (it needs `xmin`, so PostgreSQL), a checkout happy path, and
       "cannot read another customer's order"
 - [ ] Add a minimal **GitHub Actions** workflow that runs `dotnet test` on every PR, then turn on branch protection
 
@@ -168,13 +169,16 @@ chain, not every session) are a possible refinement; revoking everything is the 
 
 ## Phase 4 — Connect the React client · 1 week
 
-- [ ] `client/src/api/` — one small `fetch` wrapper that adds the JWT and the base URL from `VITE_API_URL`
-- [ ] **TanStack Query** for server data (products, cart, orders); remove `data.json` from runtime use
-- [ ] Login / register pages; keep the access token in memory, and the refresh token in an httpOnly cookie
-- [ ] Cart drawer uses the cart API
-- [ ] Checkout page: address → payment method → `POST /orders` with a fresh `Idempotency-Key` →
-      redirect to `checkoutUrl` (or straight to the order page for COD)
-- [ ] My orders page and order details with a status badge
+- [x] `client/src/lib/api.js`: one `fetch` wrapper that adds the JWT, refreshes it once on 401, and reads the
+      base URL from `VITE_API_URL` (done 2026-10-18)
+- [ ] **TanStack Query** for server data (products, cart, orders); today it's React context + `fetch`.
+      `data.json` still supplies images and copy; prices, stock and ids come from the API (matched on slug)
+- [x] Login / register pages (2026-10-18)
+- [ ] Move the refresh token to an httpOnly cookie; today both tokens are in `localStorage`
+- [x] Cart drawer uses the cart API (2026-10-18)
+- [x] Checkout page: address → payment method → `POST /orders` with an `Idempotency-Key` →
+      redirect to `checkoutUrl` (or straight to the order page for COD) (2026-10-18)
+- [x] My orders page and an order progress page that polls until the webhook confirms (2026-10-18)
 - [x] CORS policy in the API for the client origin (`Cors:AllowedOrigins`)
 - [x] Delete the old `wwwroot` demo storefront (removed 2026-10-15; it had no login)
 
