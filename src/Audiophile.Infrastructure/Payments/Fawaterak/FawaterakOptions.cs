@@ -18,9 +18,11 @@ public sealed class FawaterakOptions
 
     // Ids from GET getPaymentmethods. They differ between staging and live.
     public int CardPaymentMethodId { get; set; }
-    public int WalletPaymentMethodId { get; set; }
-    public int KioskPaymentMethodId { get; set; }   // Fawry or Aman
 
     // Public base URL of this API (the ngrok address), used to build webhook and return URLs.
     public string PublicBaseUrl { get; set; } = "";
+
+    // Where FawaterakController.Return sends the customer's browser after paying:
+    // the React client's orders page (Phase 4). It gets ?orderId=…&result=….
+    public string ClientReturnUrl { get; set; } = "http://localhost:5173/orders";
 }

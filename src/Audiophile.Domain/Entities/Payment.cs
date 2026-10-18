@@ -51,9 +51,6 @@ public sealed class Payment
     // The hosted checkout page. Kept so a retried order request can return the same link.
     public string? CheckoutUrl { get; private set; }
 
-    // For cash methods: the code the customer quotes at an Aman / Fawry outlet.
-    public string? PaymentCode { get; private set; }
-
     public Order Order { get; private set; } = null!;
 
     public bool UsesGateway => PaymentMethod != PaymentMethod.CashOnDelivery;
@@ -65,7 +62,7 @@ public sealed class Payment
 
     // Records the checkout session the customer is sent to.
     public void LinkToProvider(
-        string provider, string providerReference, string? providerOrderId, string checkoutUrl, string? paymentCode = null)
+        string provider, string providerReference, string? providerOrderId, string checkoutUrl)
     {
         if (!UsesGateway)
             throw new InvalidOperationException($"A {PaymentMethod} payment does not go through a gateway.");
@@ -77,18 +74,6 @@ public sealed class Payment
         ProviderReference = Guard.Text(providerReference, 1, 255, nameof(providerReference));
         ProviderOrderId = Guard.OptionalText(providerOrderId, 255, nameof(providerOrderId));
         CheckoutUrl = Guard.Text(checkoutUrl, 1, 2048, nameof(checkoutUrl));
-        PaymentCode = Guard.OptionalText(paymentCode, 100, nameof(paymentCode));
-        Touch();
-    }
-
-    // The gateway reported a transaction that is still open, e.g. a kiosk
-    // reference was issued and the customer has not paid yet. Status stays Pending.
-    public void RecordPendingTransaction(string transactionId)
-    {
-        if (Status != PaymentStatus.Pending)
-            return;
-
-        ProviderTransactionId = Guard.Text(transactionId, 1, 255, nameof(transactionId));
         Touch();
     }
 

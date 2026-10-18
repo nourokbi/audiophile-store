@@ -1,6 +1,7 @@
 using Audiophile.Application.Common;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Audiophile.API.ExceptionHandling;
 
@@ -10,34 +11,35 @@ namespace Audiophile.API.ExceptionHandling;
 public sealed class GlobalExceptionHandler(IProblemDetailsService problemDetails, ILogger<GlobalExceptionHandler> logger)
     : IExceptionHandler
 {
-    public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken ct)
+  public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken ct)
+  {
+    var (status, title) = exception switch
     {
-        var (status, title) = exception switch
-        {
-            NotFoundException => (StatusCodes.Status404NotFound, "Not found"),
-            ConflictException or InvalidOperationException => (StatusCodes.Status409Conflict, "Conflict"),
-            UnauthorizedException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
-            ArgumentException => (StatusCodes.Status400BadRequest, "Invalid request"),
-            GatewayTimeoutException => (StatusCodes.Status504GatewayTimeout, "Payment gateway timeout"),
-            GatewayException => (StatusCodes.Status502BadGateway, "Payment gateway error"),
-            _ => (StatusCodes.Status500InternalServerError, "Unexpected error"),
-        };
+      NotFoundException => (StatusCodes.Status404NotFound, "Not found"),
+      ConflictException or InvalidOperationException => (StatusCodes.Status409Conflict, "Conflict"),
+      UnauthorizedException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
+      ArgumentException => (StatusCodes.Status400BadRequest, "Invalid request"),
+      GatewayTimeoutException => (StatusCodes.Status504GatewayTimeout, "Payment gateway timeout"),
+      GatewayException => (StatusCodes.Status502BadGateway, "Payment gateway error"),
+      DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "Cannot perform change, try again later."),
+      _ => (StatusCodes.Status500InternalServerError, "Unexpected error"),
+    };
 
-        if (status == StatusCodes.Status500InternalServerError)
-            logger.LogError(exception, "Unhandled exception");
+    if (status == StatusCodes.Status500InternalServerError)
+      logger.LogError(exception, "Unhandled exception");
 
-        context.Response.StatusCode = status;
-        return await problemDetails.TryWriteAsync(new ProblemDetailsContext
-        {
-            HttpContext = context,
-            Exception = exception,
-            ProblemDetails = new ProblemDetails
-            {
-                Status = status,
-                Title = title,
-                // Our own messages are written for the caller; a 500's is not.
-                Detail = status == StatusCodes.Status500InternalServerError ? null : exception.Message,
-            },
-        });
-    }
+    context.Response.StatusCode = status;
+    return await problemDetails.TryWriteAsync(new ProblemDetailsContext
+    {
+      HttpContext = context,
+      Exception = exception,
+      ProblemDetails = new ProblemDetails
+      {
+        Status = status,
+        Title = title,
+        // Our own messages are written for the caller; a 500's is not.
+        Detail = status == StatusCodes.Status500InternalServerError ? null : exception.Message,
+      },
+    });
+  }
 }

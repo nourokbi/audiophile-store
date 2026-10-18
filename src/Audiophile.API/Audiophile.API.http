@@ -96,7 +96,8 @@ Authorization: Bearer {{token}}
 
 
 ############################## Orders
-# While the gateway is switched off (roadmap Phase 2), only CashOnDelivery is accepted.
+# Orders are placed from the cart (add something in 11 first) and a saved address (9).
+# The full card-payment journey with Fawaterak is in checkout-flow.http.
 
 ### 13. Cash on delivery — confirmed immediately. A new Idempotency-Key on every send.
 # @name codOrder
@@ -105,11 +106,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 Idempotency-Key: cod-{{$timestamp}}
 
-{
-  "items": [ { "productId": "{{productId}}", "quantity": 1 } ],
-  "paymentMethod": "CashOnDelivery",
-  "shipping": { "fullName": "Mona Hassan", "phone": "+201000000000", "street": "12 Tahrir Street", "city": "Cairo", "country": "Egypt", "postalCode": null }
-}
+{ "addressId": "{{address.response.body.$.id}}", "paymentMethod": "CashOnDelivery" }
 
 ### 14. Resend with the SAME Idempotency-Key as 13 → 200, the same order, nothing new
 POST {{base}}/orders
@@ -117,11 +114,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 Idempotency-Key: {{codOrder.request.headers.Idempotency-Key}}
 
-{
-  "items": [ { "productId": "{{productId}}", "quantity": 1 } ],
-  "paymentMethod": "CashOnDelivery",
-  "shipping": { "fullName": "Mona Hassan", "phone": "+201000000000", "street": "12 Tahrir Street", "city": "Cairo", "country": "Egypt", "postalCode": null }
-}
+{ "addressId": "{{address.response.body.$.id}}", "paymentMethod": "CashOnDelivery" }
 
 ### 15. My orders
 GET {{base}}/orders

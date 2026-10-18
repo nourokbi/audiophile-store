@@ -1,16 +1,16 @@
 using Audiophile.Application.Abstractions;
-// using Audiophile.Application.Payments;           // PAYMENT GATEWAY (off)
+using Audiophile.Application.Payments;
 using Audiophile.Domain.Entities;
 using Audiophile.Infrastructure.Auth;
-// using Audiophile.Infrastructure.Payments;        // PAYMENT GATEWAY (off)
-// using Audiophile.Infrastructure.Payments.Fawaterak;  // PAYMENT GATEWAY (off)
+using Audiophile.Infrastructure.Payments;
+using Audiophile.Infrastructure.Payments.Fawaterak;
 using Audiophile.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-// using Microsoft.Extensions.Http.Resilience;      // PAYMENT GATEWAY (off)
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -31,18 +31,18 @@ public static class DependencyInjection
 
         AddIdentityAndJwt(services, configuration);
 
-        // PAYMENT GATEWAY (off): Fawaterak client and the expiry job are not registered.
-        // See the note at the top of Application/Orders/OrderService.cs.
-        // services.Configure<FawaterakOptions>(configuration.GetSection(FawaterakOptions.SectionName));
-        //
-        // // Fawaterak is the only gateway: OrderService and FawaterakController ask for
-        // // IFawaterakGateway and get FawaterakGateway with a typed HttpClient.
-        // services.AddHttpClient<IFawaterakGateway, FawaterakGateway>((sp, client) =>
-        //         client.BaseAddress = new Uri(
-        //             sp.GetRequiredService<IOptions<FawaterakOptions>>().Value.BaseUrl.TrimEnd('/') + "/"))
-        //     .AddStandardResilienceHandler(ConfigureGatewayResilience);
-        //
-        // services.AddHostedService<PaymentExpiryWorker>();
+        services.Configure<FawaterakOptions>(configuration.GetSection(FawaterakOptions.SectionName));
+
+        // Fawaterak is the only gateway for now (Phase 2 makes it pluggable): OrderService and
+        // FawaterakController ask for IFawaterakGateway and get FawaterakGateway with a typed
+        // HttpClient whose base address is Fawaterak's API (staging or live, from config).
+        services.AddHttpClient<IFawaterakGateway, FawaterakGateway>((sp, client) =>
+                client.BaseAddress = new Uri(
+                    sp.GetRequiredService<IOptions<FawaterakOptions>>().Value.BaseUrl.TrimEnd('/') + "/"))
+            .AddStandardResilienceHandler(ConfigureGatewayResilience);
+
+        // Safety net 2: every 5 minutes, closes unpaid gateway orders (OrderService.ExpireStalePaymentsAsync).
+        services.AddHostedService<PaymentExpiryWorker>();
         return services;
     }
 
@@ -91,22 +91,21 @@ public static class DependencyInjection
         services.AddAuthorization();
     }
 
-    // PAYMENT GATEWAY (off)
-    // private static void ConfigureGatewayResilience(HttpStandardResilienceOptions o)
-    // {
-    //     o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(20);
-    //     o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(45);
-    //
-    //     // Retries only for GET (invoice lookups). Creating an invoice is never
-    //     // repeated automatically: after a timeout we cannot know
-    //     // whether the first attempt went through.
-    //     o.Retry.DisableForUnsafeHttpMethods();
-    //
-    //     // Stop calling Fawaterak for a while if half the recent calls fail, so an
-    //     // outage fails fast instead of tying up every request thread.
-    //     o.CircuitBreaker.FailureRatio = 0.5;
-    //     o.CircuitBreaker.MinimumThroughput = 10;
-    //     o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
-    //     o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(30);
-    // }
+    private static void ConfigureGatewayResilience(HttpStandardResilienceOptions o)
+    {
+        o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(20);
+        o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(45);
+
+        // Retries only for GET (invoice lookups). Creating an invoice is never
+        // repeated automatically: after a timeout we cannot know
+        // whether the first attempt went through.
+        o.Retry.DisableForUnsafeHttpMethods();
+
+        // Stop calling Fawaterak for a while if half the recent calls fail, so an
+        // outage fails fast instead of tying up every request thread.
+        o.CircuitBreaker.FailureRatio = 0.5;
+        o.CircuitBreaker.MinimumThroughput = 10;
+        o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+        o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(30);
+    }
 }

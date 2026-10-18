@@ -17,7 +17,6 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         b.Property(p => p.ProviderOrderId).HasMaxLength(255);
         b.Property(p => p.ProviderTransactionId).HasMaxLength(255);
         b.Property(p => p.CheckoutUrl).HasMaxLength(2048);
-        b.Property(p => p.PaymentCode).HasMaxLength(100);
 
         // How a webhook without our order id finds its payment.
         b.HasIndex(p => new { p.Provider, p.ProviderOrderId });
