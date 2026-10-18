@@ -48,6 +48,9 @@ Rules:
   `inTheBox` is an object like `{ "Headphone unit": 1, "User manual": 1 }`.
 - **Create/update body:** `{ name, description, features?, price, stock, category, imageUrl?, inTheBox? }`. Update replaces
   every field, including setting the stock count.
+- Every product has a **`slug`**, its address in the shop (`/headphones/xx59-headphones`). It is unique, made
+  from the name when `POST /products` leaves it out, and never changed by an update. The client matches its
+  pages to the API's products by slug.
 - **DELETE deactivates** the product (it disappears from the shop) instead of deleting it, because past orders point at it.
 
 ## Addresses — `AddressesController` (all 🔑)
@@ -80,21 +83,26 @@ the cart increases that line. Quantity per line is 1–100. Shipping is 50 EGP, 
 
 | Method | Path | Success | Errors |
 |---|---|---|---|
-| POST | `/orders` + header `Idempotency-Key` | **201** new order · **200** same key seen before | 400 · 404 · 409 stock |
+| POST | `/orders` + header `Idempotency-Key` | **201** new order · **200** same key seen before | 400 · 404 address · 409 empty cart / stock / product no longer sold · 502 / 504 gateway |
 | GET | `/orders` | 200 my orders, newest first | 401 |
 | GET | `/orders/{id}` | 200 | 404 |
+| GET | `/orders/{id}/payment/events` | 200 what Fawaterak sent about this order | 🛡 admin · 404 |
+| POST | `/orders/{id}/payment/sync` | 200 the order after asking Fawaterak | 🛡 admin · 404 · 409 not a gateway order |
 
-- Body today: `{ items: [{ productId, quantity }], paymentMethod, shipping: { fullName, phone, street, city, country, postalCode? } }`.
-  Phase 1 changes it to `{ addressId, paymentMethod }`, taking the items from the cart.
-- Only `CashOnDelivery` is accepted while the payment gateway is switched off (roadmap Phase 2).
+- Body: `{ addressId, paymentMethod }`. The items come from the signed-in user's cart, which is emptied when the
+  order is placed; the address is copied into the order. `paymentMethod`: `CashOnDelivery` or `Card`.
+- `CashOnDelivery` is `Confirmed` at once. `Card` stays `Pending` and the response carries
+  `payment.checkoutUrl` (Fawaterak's payment page) until the webhook confirms it.
 - Prices are read from the database, never from the request.
+- The full journey, step by step, is in `src/Audiophile.API/checkout-flow.http`.
 
 ## Other
 
 | Method | Path | Access | Notes |
 |---|---|---|---|
 | GET | `/health` | 🔓 | `{ "status": "ok" }` |
-| — | `/payments/fawaterak/*` | — | Switched off until Phase 2 (see `fawaterak-integration.md`) |
+| POST | `/payments/fawaterak/webhook_json` | 🔓 signed | Fawaterak's webhook; 401 when the `hashKey` is wrong (see `fawaterak-integration.md`) |
+| GET | `/payments/fawaterak/return` | 🔓 | Where the browser lands after paying; redirects to `Fawaterak:ClientReturnUrl` |
 
 ## Errors
 
@@ -121,4 +129,4 @@ Every error is an RFC 7807 **ProblemDetails** body: `{ type, title, status, deta
 | `Jwt:Issuer`, `Jwt:Audience`, `Jwt:AccessTokenMinutes`, `Jwt:RefreshTokenDays` | appsettings | Token settings |
 | `Admin:Email`, `Admin:Password`, `Admin:Name` | user-secrets / env var | The admin account created at startup |
 | `Cors:AllowedOrigins` | appsettings | Origins allowed to call the API (`http://localhost:5173` in Development) |
-| `Fawaterak:*` | user-secrets | Payment gateway (off until Phase 2) |
+| `Fawaterak:*` | user-secrets | Payment gateway. `ClientReturnUrl` (default `http://localhost:5173/orders`) is where customers land after paying |

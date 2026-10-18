@@ -1,8 +1,10 @@
 # Fawaterak integration
 
-Checkout through [Fawaterak](https://fawaterak-api.readme.io) (Egypt): card, mobile wallet and
-cash-outlet codes (Fawry; Aman when enabled on the account), plus cash on delivery with no
-gateway. Currently **switched off** in code while checkout is rebuilt (see roadmap Phase 2).
+Checkout through [Fawaterak](https://fawaterak-api.readme.io) (Egypt): **card only**, plus cash on
+delivery with no gateway. Wallet and Fawry/Aman codes were removed on 2026-10-18 to keep the flow small
+(Phase 2 can add them back as new strategies). Switched back on 2026-10-18, with checkout now placed from the cart. To follow the code, read the
+`FLOW 1`…`FLOW 9` comments, starting at the top of `OrderService.cs`; to try it, send the requests in
+`src/Audiophile.API/checkout-flow.http`.
 
 ## The flow
 
@@ -21,7 +23,7 @@ sequenceDiagram
     A->>A: verify HMAC-SHA256
     A->>F: GET getInvoiceData (confirm paid + amount)
     A->>A: Payment Succeeded, Order Confirmed
-    F-->>C: redirect to /payments/fawaterak/return → /orders.html
+    F-->>C: redirect to /payments/fawaterak/return → client orders page
 ```
 
 1. **Place the order.** Prices come from the database, stock is reserved, the order is saved as
@@ -35,7 +37,7 @@ sequenceDiagram
 5. **Redirect** lands the customer on My orders, which shows our own record. It never changes state.
 
 Safety nets: `POST /orders/{id}/payment/sync` asks Fawaterak directly, and an expiry job
-(every 5 min) asks Fawaterak before cancelling unpaid orders (30 min card/wallet, 48 h cash codes).
+(every 5 min) asks Fawaterak before cancelling orders left unpaid for 30 minutes.
 
 ## Where things live
 
@@ -60,17 +62,28 @@ cd src\Audiophile.API
 dotnet user-secrets set "Fawaterak:ApiKey"    "..."
 dotnet user-secrets set "Fawaterak:VendorKey" "..."          # same value as the API key
 dotnet user-secrets set "Fawaterak:CardPaymentMethodId"   "2"   # from GET getPaymentmethods
-dotnet user-secrets set "Fawaterak:KioskPaymentMethodId"  "3"   # Fawry
-dotnet user-secrets set "Fawaterak:WalletPaymentMethodId" "4"
 dotnet user-secrets set "Fawaterak:PublicBaseUrl" "https://<your-ngrok-domain>"
 
-# terminal 1
+# terminal 1: the API
 dotnet run --project src\Audiophile.API --launch-profile http    # http://localhost:5040
-# terminal 2
-ngrok http 5040
+# terminal 2: the shop; Vite forwards /api and /payments to the API (client/vite.config.js)
+cd client; npm run dev                                            # http://localhost:5173
+# terminal 3: the tunnel goes to the SHOP's port, not the API's
+ngrok http 5173 --url=https://<your-ngrok-domain>
 ```
 
-Open the ngrok URL, add a product, pay with test card `5123450000000008` · `12/26` · CVV `100`.
+Why port 5173: one public URL then serves both the shop and `/payments/fawaterak/*`, which Vite passes to the
+API. Fawaterak's webhook and the customer's return trip both arrive through it.
+
+The test in the browser:
+1. Open **http://localhost:5173** (shop on localhost: your login is stored for that address, and the return
+   redirect goes back to it through `Fawaterak:ClientReturnUrl`).
+2. Create an account → add a product → Checkout → **Card** → *Continue & Pay*.
+3. Pay on Fawaterak's page with `5123450000000008` · `12/26` · CVV `100`.
+4. ngrok's free plan may show a "You are about to visit…" page on the way back: click *Visit Site*.
+5. You land on `/orders/<id>`: "Confirming your payment…", then **Thank you for your order** when the webhook
+   arrives (the page asks the API every 3 seconds).
+
 The ngrok inspector (`http://127.0.0.1:4040`) shows every webhook and our response.
 
 ## Learned on the first real payment
@@ -84,8 +97,6 @@ The ngrok inspector (`http://127.0.0.1:4040`) shows every webhook and our respon
 
 ## Known gaps
 
-- The payment code is switched off (`// PAYMENT GATEWAY (off)`) until roadmap Phase 2 makes the gateway pluggable.
-- The return URL still points at the removed `/orders.html` page; Phase 2 points it at the React client's orders page.
-- The sync and events endpoints must be admin-only when they come back.
-- No concurrency token on stock yet (roadmap Phase 1).
-- Wallet and Fawry can't be paid in staging; Aman isn't enabled on the staging account.
+- Fawaterak is still the only gateway, called through `IFawaterakGateway`. Roadmap Phase 2 makes it pluggable.
+- The return URL goes to `Fawaterak:ClientReturnUrl` (the React orders page), which doesn't exist until Phase 4.
+- No automated tests for the gateway yet (Phase 2: a `FakePaymentGateway`).
