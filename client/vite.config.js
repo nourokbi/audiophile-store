@@ -5,12 +5,18 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    // In development, /api/products is forwarded to the .NET API as /products,
-    // so the browser sees one origin and no CORS setup is needed.
+    // The browser only ever talks to this dev server, which forwards to the .NET API:
+    //   /api/products            → http://localhost:5040/products   (the shop's API calls)
+    //   /payments/fawaterak/...  → http://localhost:5040/payments/... (webhook + return redirect)
+    // So one public ngrok URL for this server (`ngrok http 5173`) serves the shop AND lets
+    // Fawaterak reach the webhook. One origin also means the API needs no CORS setup.
     proxy: {
       '/api': {
         target: 'http://localhost:5040',
         rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      '/payments': {
+        target: 'http://localhost:5040',
       },
     },
   },

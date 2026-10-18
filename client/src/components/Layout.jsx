@@ -1,20 +1,12 @@
-import React from 'react';
 import { Outlet } from 'react-router-dom';
 
 import Navbar from './Navbar';
 import Footer from './Footer';
 
-const Layout = (props) => {
+const Layout = () => {
 	return (
 		<>
-			<Navbar
-				cart={props.cart}
-				clearCart={props.clearCart}
-				totalPrice={props.totalPrice}
-				setTotalPrice={props.setTotalPrice}
-				updateQuantity={props.updateQuantity}
-				removeFromCart={props.removeFromCart}
-			/>
+			<Navbar />
 			<Outlet />
 			<Footer />
 		</>

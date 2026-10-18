@@ -1,15 +1,21 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import logo from '/assets/shared/desktop/logo.svg';
 import hamburger from '/assets/shared/tablet/icon-hamburger.svg';
 
 import Menu from './Menu';
 import Cart from './Cart';
+import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 
-const Navbar = (props) => {
+const Navbar = () => {
+	const { user, logout } = useAuth();
+	const { cart } = useCart();
 	const [showMenu, setShowMenu] = React.useState(false);
 	const [showCart, setShowCart] = React.useState(false);
+	const [showAccount, setShowAccount] = React.useState(false);
+	const navigate = useNavigate();
 
 	function toggleMenu() {
 		setShowMenu((prev) => !prev);
@@ -78,11 +84,50 @@ const Navbar = (props) => {
 							Earphones
 						</Link>
 					</div>
+					<div className='flex items-center gap-6'>
+					{user ? (
+						<div className='relative'>
+							<button
+								onClick={() => setShowAccount((v) => !v)}
+								className='text-white text-[13px] uppercase font-bold tracking-[2px] hover:text-cream transition-all duration-200'
+							>
+								{user.name.split(' ')[0]}
+							</button>
+							{showAccount && (
+								<div className='absolute right-0 top-[36px] bg-white rounded-[8px] p-4 flex flex-col gap-2 min-w-[160px] shadow-lg z-50'>
+									<Link
+										to='/orders'
+										onClick={() => setShowAccount(false)}
+										className='text-[13px] uppercase font-bold tracking-[1px] text-black hover:text-cream'
+									>
+										My orders
+									</Link>
+									<button
+										onClick={async () => {
+											setShowAccount(false);
+											await logout();
+											navigate('/');
+										}}
+										className='text-left text-[13px] uppercase font-bold tracking-[1px] text-black/50 hover:text-cream'
+									>
+										Log out
+									</button>
+								</div>
+							)}
+						</div>
+					) : (
+						<Link
+							to='/login'
+							className='text-white text-[13px] uppercase font-bold tracking-[2px] hover:text-cream transition-all duration-200'
+						>
+							Log in
+						</Link>
+					)}
 					<div onClick={toggleCart} className='relative cursor-pointer'>
-						{props.cart.length > 0 && (
+						{cart.totalQuantity > 0 && (
 							<div className='absolute top-[-10px] right-[-10px] rounded-full bg-cream flex items-center justify-center h-[20px] w-[20px]'>
 								<p className='text-white font-bold text-[12px]'>
-									{props.cart.length}
+									{cart.totalQuantity}
 								</p>
 							</div>
 						)}
@@ -98,6 +143,7 @@ const Navbar = (props) => {
 							/>
 						</svg>
 					</div>
+					</div>
 				</div>
 			</nav>
 			{showMenu && (
@@ -110,16 +156,12 @@ const Navbar = (props) => {
 			)}
 			{showCart && (
 				<>
-					<div className='fixed top-0 bottom-0 left-0 right-0 bg-black/50 z-[1]' />
+					<div
+						onClick={() => setShowCart(false)}
+						className='fixed top-0 bottom-0 left-0 right-0 bg-black/50 z-[1]'
+					/>
 					<div className='md:w-[377px] absolute xs:left-6 xs:right-6 md:left-auto md:right-10 lg:right-40 top-[120px] z-30'>
-						<Cart
-							cart={props.cart}
-							clearCart={props.clearCart}
-							totalPrice={props.totalPrice}
-							setTotalPrice={props.setTotalPrice}
-							updateQuantity={props.updateQuantity}
-							removeFromCart={props.removeFromCart}
-						/>
+						<Cart onClose={() => setShowCart(false)} />
 					</div>
 				</>
 			)}
