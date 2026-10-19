@@ -45,6 +45,7 @@ Rules:
   `minPrice` ≤ `maxPrice`. Only active products are listed, ordered by name.
 - **Search** matches name or description, case-insensitive.
 - A **product** is `{ id, name, description, features, price, stock, inStock, category, imageUrl, inTheBox }`;
+  `category` is `Headphones`, `Speakers`, `Earphones`, `Amplifiers` or `Accessories`;
   `inTheBox` is an object like `{ "Headphone unit": 1, "User manual": 1 }`.
 - **Create/update body:** `{ name, description, features?, price, stock, category, imageUrl?, inTheBox? }`. Update replaces
   every field, including setting the stock count.

@@ -34,7 +34,8 @@ start without one, so a missing setting fails at deploy time, not on the first r
 
 - **Tables:** Identity (`AspNetUsers`, `AspNetRoles`, `AspNetUserRoles`, …), `Addresses`, `RefreshTokens`,
   `Products`, `Carts`, `CartItems`, `Orders`, `OrderItems`, `Payments`, `PaymentEvents`.
-- **Seed data (`HasData` in the entity configurations):** the `Admin` and `Customer` roles and 4 sample products.
+- **Seed data (`HasData` in the entity configurations):** the `Admin` and `Customer` roles and 22 products: the
+  six original ones and the new collection of 16 (migration `SeedNewCollection`), with photos in `client/public/assets/products`.
 - **Not seeded:** the admin *account*. Its password is a secret, so it can't live in a migration. It's created at
   startup from `Admin:Email` / `Admin:Password` (`DatabaseInitializer`), only if it doesn't exist yet.
 
