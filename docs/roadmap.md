@@ -205,7 +205,7 @@ chain, not every session) are a possible refinement; revoking everything is the 
 
 - [x] `client/src/lib/api.js`: one `fetch` wrapper that adds the JWT, refreshes it once on 401, and reads the
       base URL from `VITE_API_URL` (done 2026-10-18)
-- [ ] **TanStack Query** for server data (products, cart, orders); today it's React context + `fetch`.
+- [ ] **TanStack Query** for server data (products, cart, orders); today it's React context + `fetch`. Moved to Phase 5, after the admin API
       `data.json` still supplies images and copy; prices, stock and ids come from the API (matched on slug)
 - [x] Login / register pages (2026-10-18)
 - [ ] Move the refresh token to an httpOnly cookie; today both tokens are in `localStorage`
@@ -226,9 +226,35 @@ chain, not every session) are a possible refinement; revoking everything is the 
 
 Same React app, under `/admin`, behind a route guard that checks the `Admin` role.
 
-- [x] The page itself (2026-10-19): stat cards, orders chart, low stock, recent orders and the product table. Products
-      are live; revenue, the chart and recent orders are sample data in `client/src/data/adminSample.js` until the
-      endpoints below exist
+- [x] The page itself (2026-10-19): stat cards, orders chart, low stock, recent orders with *Export CSV*, and the
+      product table with *Restock*, *Price* and an *Available* switch on every row. Products are live; revenue, the
+      chart and recent orders are sample data in `client/src/data/adminSample.js`, and the product actions only
+      change the page, until the endpoints below exist
+
+### The admin API the dashboard is waiting for (next step)
+
+Every call the dashboard makes is in `client/src/lib/adminApi.js`. Build these, then replace each function body
+there with its `api(...)` call and set `ADMIN_API_CONNECTED = true`:
+
+| Endpoint | Used by | Notes |
+|---|---|---|
+| `GET /admin/products` | Product table | All products **including hidden ones** (`GET /products` only lists active ones), paged |
+| `POST /admin/products/{id}/restock` `{ quantity }` | *Restock* button | `Product.Restock`, answer with the product |
+| `PUT /admin/products/{id}/price` `{ price }` | *Price* button | `Product.ChangePrice` |
+| `PUT /admin/products/{id}/availability` `{ isActive }` | *Available* switch | `Product.Activate` (add it back to the entity) / `Deactivate` |
+| `GET /admin/stats` | Stat cards and the orders chart | Revenue for 30 days, active orders, orders per day for the last 7 days |
+| `GET /admin/orders?status=&from=&to=&page=` | Recent orders and *Export CSV* | Paged, newest first, with the customer's name |
+| `PUT /admin/orders/{id}/status` `{ status }` | Order details (next) | `Order.ChangeStatus`, the state machine refuses illegal moves |
+
+All under `[Authorize(Roles = Roles.Admin)]`, with HTTP tests that a customer gets 403.
+
+### Do not forget, after the admin API exists
+
+- [ ] **TanStack Query (React Query)** for every server call: products, cart, orders and the admin lists. It brings
+      caching, loading and error state, refetch after a change (restock, cancel) and polling (it replaces the
+      3 second timer in `OrderDetail.jsx`). Keep `lib/api.js` as the function each query calls; no need for axios.
+- [ ] **Chart.js** (with `react-chartjs-2`) for the dashboard: replace the `div` bars of *Orders this week* in
+      `AdminDashboard.jsx` with a bar chart fed by `GET /admin/stats`, then add revenue over time and sales by category.
 
 - [ ] Products: table, create / edit / deactivate, set stock and price (UC-11)
 - [ ] Orders: table with filter by status and date, paged (UC-12)

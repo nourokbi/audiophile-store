@@ -2,6 +2,13 @@
 
 What changed and why, newest first. Git history has the line-by-line detail; this file is the readable version.
 
+## 2026-10-19 — Admin product actions
+
+- Every row of the admin product table has *Restock*, *Price* and an *Available* switch, in a small dialog with a
+  preview of the change. The calls live in `client/src/lib/adminApi.js` and only change the page until the admin API
+  exists; the roadmap lists the endpoints to build.
+- React Query and Chart.js are planned for right after the admin API (roadmap, Phase 5).
+
 ## 2026-10-19 — Cart page, address picker, pagination
 
 - Cart items are bigger cards with the photo, category, description, stock and a link to the product page.

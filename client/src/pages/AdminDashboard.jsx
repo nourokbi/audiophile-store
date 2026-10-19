@@ -1,12 +1,13 @@
-import { Link } from 'react-router-dom';
+import React from 'react';
 import { AlertTriangle, Boxes, Download, Info, Package, Plus, TrendingUp, Users, Wallet } from 'lucide-react';
 
+import AdminProducts from '../components/AdminProducts';
 import { StatusBadge } from '../components/OrderParts';
 import { useCatalog } from '../context/CatalogContext';
 import { SAMPLE_ORDERS, SAMPLE_SALES_BY_DAY, SAMPLE_STATS } from '../data/adminSample';
+import { ADMIN_API_CONNECTED } from '../lib/adminApi';
 import { downloadCsv } from '../lib/csv';
 import { formatPrice } from '../lib/format';
-import { findCategory } from '../lib/navigation';
 
 const LOW_STOCK = 8;
 
@@ -18,8 +19,14 @@ const exportRecentOrders = () =>
 	]);
 
 // The admin overview, the products are real and the sales and orders are sample data until the admin API exists
+// The chart is plain div bars for now, Chart.js replaces it once GET /admin/stats exists (see the roadmap)
 const AdminDashboard = () => {
-	const { products } = useCatalog();
+	const { products: catalog } = useCatalog();
+	const [changes, setChanges] = React.useState({}); // product id to { stock, price, available } edited on this page
+
+	const products = catalog.map((p) => ({ available: true, ...p, ...changes[p.id] }));
+	const onChange = (id, patch) => setChanges((all) => ({ ...all, [id]: { ...all[id], ...patch } }));
+
 	const lowStock = products.filter((p) => p.stock <= LOW_STOCK).sort((a, b) => a.stock - b.stock);
 	const unitsInStock = products.reduce((sum, p) => sum + p.stock, 0);
 	const busiestDay = Math.max(...SAMPLE_SALES_BY_DAY.map((d) => d.orders));
@@ -40,6 +47,7 @@ const AdminDashboard = () => {
 				<Info size={18} className='shrink-0' />
 				Revenue, the sales chart and recent orders are sample data until the admin API is ready. Products and stock are
 				live.
+				{!ADMIN_API_CONNECTED && ' Restock, price and availability changes stay on this page and are not saved yet.'}
 			</p>
 
 			<div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'>
@@ -118,33 +126,7 @@ const AdminDashboard = () => {
 				</Table>
 			</section>
 
-			<section className='card flex flex-col gap-4 overflow-hidden p-6'>
-				<h2 className='text-[18px]'>Products</h2>
-				<Table head={['Product', 'Category', 'Price', 'Stock', 'Status']}>
-					{products.map((p) => (
-						<tr key={p.slug} className='border-t border-line'>
-							<td className='py-3 pr-4'>
-								<Link to={`/${p.category}/${p.slug}`} className='flex items-center gap-3 font-bold hover:text-brand-dark'>
-									<img src={p.image.mobile} alt='' className='h-10 w-10 rounded object-cover' />
-									{p.name}
-								</Link>
-							</td>
-							<td className='py-3 pr-4 text-muted'>{findCategory(p.category)?.label}</td>
-							<td className='py-3 pr-4'>{formatPrice(p.price)}</td>
-							<td className={`py-3 pr-4 font-bold ${p.stock <= LOW_STOCK ? 'text-brand-dark' : ''}`}>{p.stock}</td>
-							<td className='py-3'>
-								<span
-									className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-widest ${
-										p.inStock ? 'bg-brand-soft text-brand-dark' : 'bg-panel text-muted'
-									}`}
-								>
-									{p.inStock ? 'On sale' : 'Sold out'}
-								</span>
-							</td>
-						</tr>
-					))}
-				</Table>
-			</section>
+			<AdminProducts products={products} lowStock={LOW_STOCK} onChange={onChange} />
 		</div>
 	);
 };

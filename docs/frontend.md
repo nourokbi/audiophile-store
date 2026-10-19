@@ -127,8 +127,14 @@ stock and low stock list are live from the catalogue; revenue, the chart and rec
 `src/data/adminSample.js`, and a banner on the page says so. When the admin API exists, each sample value is
 replaced by its call: `GET /admin/stats`, `GET /admin/orders`, and the product buttons by the admin product endpoints.
 
+The product table has *Restock* (add units), *Price* (set a new price) and an *Available* switch on every row. Each
+action goes through `lib/adminApi.js`; until the admin API exists those functions only answer with what they were
+given, so the change stays on the page and a banner says it is not saved. The roadmap lists the endpoint each one
+expects. `components/Dialog.jsx` is the small window the restock and price forms open in.
+
 *Export CSV* on Recent orders saves the table as `recent-orders-<date>.csv` in the browser (`lib/csv.js`), so it
 opens in Excel or Google Sheets. It exports the sample rows today and the real orders once `GET /admin/orders` exists.
 
-The orders chart is plain `div` bars with heights in percent, no chart library. If the dashboard grows several
-charts, Recharts is the simplest React option to add.
+The orders chart is plain `div` bars with heights in percent, no chart library yet. Chart.js replaces it once
+`GET /admin/stats` exists, and React Query takes over the data loading at the same time (both are in the roadmap
+under Phase 5).
