@@ -2,6 +2,15 @@
 
 What changed and why, newest first. Git history has the line-by-line detail; this file is the readable version.
 
+## 2026-10-19 — Cart page, address picker, pagination
+
+- **Cart page** at `/cart`, opened from the cart icon, instead of the drop-down: quantities, remove, totals, how
+  much more for free shipping, and the way to checkout.
+- **Checkout address picker**: choose one of your saved addresses or *Add a new address*; with none saved the form
+  shows straight away. A new address is saved once, so retrying after an error does not save it twice.
+- **Pagination** on the storefront: nine products per page with previous, page numbers and next.
+- **Order tracker**: the connecting line now runs under the step circles instead of over them.
+
 ## 2026-10-19 — Dark theme, user drawer, filters, new collection, admin dashboard
 
 ### Added

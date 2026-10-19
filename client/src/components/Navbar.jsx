@@ -2,7 +2,6 @@ import React from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { ChevronDown, Menu, ShoppingBag, User, X } from 'lucide-react';
 
-import Cart from './Cart';
 import Logo from './Logo';
 import UserDrawer from './UserDrawer';
 import { useAuth } from '../context/AuthContext';
@@ -13,7 +12,7 @@ import { CATEGORIES, navLinkClass } from '../lib/navigation';
 const Navbar = () => {
 	const { user } = useAuth();
 	const { cart } = useCart();
-	const [open, setOpen] = React.useState(null); // 'menu', 'cart', 'account' or null
+	const [open, setOpen] = React.useState(null); // 'menu', 'account' or null
 
 	const toggle = (panel) => setOpen((current) => (current === panel ? null : panel));
 	const close = () => setOpen(null);
@@ -39,18 +38,14 @@ const Navbar = () => {
 				</nav>
 
 				<div className='flex items-center justify-end gap-3'>
-					<button
-						aria-label='Cart'
-						onClick={() => toggle('cart')}
-						className='relative rounded p-2 transition-colors hover:bg-panel'
-					>
+					<Link to='/cart' aria-label='Cart' onClick={close} className='relative rounded p-2 transition-colors hover:bg-panel'>
 						<ShoppingBag size={22} />
 						{cart.totalQuantity > 0 && (
 							<span className='absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand px-1 text-[12px] font-bold text-white'>
 								{cart.totalQuantity}
 							</span>
 						)}
-					</button>
+					</Link>
 					<button
 						aria-label='Account'
 						onClick={() => toggle('account')}
@@ -75,17 +70,6 @@ const Navbar = () => {
 						</NavLink>
 					))}
 				</nav>
-			)}
-
-			{open === 'cart' && (
-				<>
-					<div className='fixed inset-0 top-20 -z-10 bg-black/40' onClick={close} />
-					<div className='page relative'>
-						<div className='absolute right-6 top-4 w-[calc(100%-48px)] md:right-10 md:w-[400px] lg:right-0'>
-							<Cart onClose={close} />
-						</div>
-					</div>
-				</>
 			)}
 
 			{open === 'account' && <UserDrawer onClose={close} />}

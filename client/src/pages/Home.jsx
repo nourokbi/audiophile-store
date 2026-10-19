@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { ArrowRight, BadgeCheck, ChevronDown, CreditCard, PackageX, RotateCcw, Search, Truck } from 'lucide-react';
+import { ArrowRight, BadgeCheck, ChevronDown, ChevronLeft, ChevronRight, CreditCard, PackageX, RotateCcw, Search, Truck } from 'lucide-react';
 
 import ProductCard from '../components/ProductCard';
 import { useCatalog } from '../context/CatalogContext';
@@ -29,6 +29,7 @@ const PROMISES = [
 ];
 
 const EMPTY_FILTERS = { search: '', price: 'all', sort: 'featured', inStockOnly: false };
+const PAGE_SIZE = 9;
 
 // The storefront, used for the home page, the new collection and each category page
 const Home = ({ collection }) => {
@@ -36,11 +37,17 @@ const Home = ({ collection }) => {
 	const navigate = useNavigate();
 	const { products, loading, error } = useCatalog();
 	const [filters, setFilters] = React.useState(EMPTY_FILTERS);
+	const [page, setPage] = React.useState(1);
+
+	// A new category or collection starts again on the first page
+	React.useEffect(() => setPage(1), [category, collection]);
 
 	if (category !== 'all' && !findCategory(category)) return <Navigate to='/' replace />;
 
-	const set = (key) => (e) =>
+	const set = (key) => (e) => {
 		setFilters({ ...filters, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
+		setPage(1);
+	};
 	const price = PRICES.find((p) => p.key === filters.price);
 	const term = filters.search.trim().toLowerCase();
 
@@ -55,6 +62,15 @@ const Home = ({ collection }) => {
 				(!term || p.name.toLowerCase().includes(term) || p.description.toLowerCase().includes(term)),
 		)
 		.sort(SORTS[filters.sort].compare);
+
+	const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+	const current = Math.min(page, pages);
+	const onPage = shown.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+
+	const goTo = (next) => {
+		setPage(next);
+		document.getElementById('shop')?.scrollIntoView({ behavior: 'smooth' });
+	};
 
 	const heading = collection === 'new' ? 'New collection' : findCategory(category)?.label ?? 'Shop all products';
 	const filtered = JSON.stringify(filters) !== JSON.stringify(EMPTY_FILTERS);
@@ -117,7 +133,10 @@ const Home = ({ collection }) => {
 						</label>
 						{filtered && (
 							<button
-								onClick={() => setFilters(EMPTY_FILTERS)}
+								onClick={() => {
+									setFilters(EMPTY_FILTERS);
+									setPage(1);
+								}}
 								className='label flex items-center gap-2 text-muted hover:text-brand-dark'
 							>
 								<RotateCcw size={14} /> Clear filters
@@ -128,7 +147,7 @@ const Home = ({ collection }) => {
 
 				<div className='flex items-center justify-between px-1 text-[14px] text-muted'>
 					<span>
-						Showing <strong className='text-ink'>{shown.length}</strong> of {products.length} products
+						Showing <strong className='text-ink'>{onPage.length}</strong> of {shown.length} products
 					</span>
 					{error && <span className='text-red-600'>Products could not be loaded ({error})</span>}
 				</div>
@@ -139,11 +158,13 @@ const Home = ({ collection }) => {
 					<p className='card p-10 text-center text-muted'>No product matches these filters.</p>
 				) : (
 					<div className='grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3'>
-						{shown.map((product) => (
+						{onPage.map((product) => (
 							<ProductCard key={product.slug} product={product} />
 						))}
 					</div>
 				)}
+
+				{pages > 1 && <Pagination current={current} pages={pages} onChange={goTo} />}
 			</section>
 
 			<section className='bg-panel py-16'>
@@ -160,6 +181,31 @@ const Home = ({ collection }) => {
 				</div>
 			</section>
 		</>
+	);
+};
+
+// Previous, every page number and next, the current page is orange
+const Pagination = ({ current, pages, onChange }) => {
+	const square = 'flex h-11 w-11 items-center justify-center rounded shadow-sm transition-colors disabled:opacity-40';
+	return (
+		<nav aria-label='Pages' className='flex items-center justify-center gap-2 pt-4'>
+			<button aria-label='Previous page' disabled={current === 1} onClick={() => onChange(current - 1)} className={`${square} bg-surface hover:bg-panel`}>
+				<ChevronLeft size={18} />
+			</button>
+			{Array.from({ length: pages }, (_, i) => i + 1).map((n) => (
+				<button
+					key={n}
+					aria-current={n === current ? 'page' : undefined}
+					onClick={() => onChange(n)}
+					className={`${square} label ${n === current ? 'bg-brand text-white' : 'bg-surface hover:bg-panel'}`}
+				>
+					{n}
+				</button>
+			))}
+			<button aria-label='Next page' disabled={current === pages} onClick={() => onChange(current + 1)} className={`${square} bg-surface hover:bg-panel`}>
+				<ChevronRight size={18} />
+			</button>
+		</nav>
 	);
 };
 

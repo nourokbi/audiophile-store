@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 import Home from './pages/Home';
+import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Product from './pages/Product';
 import AuthPage from './pages/AuthPage';
@@ -26,6 +27,7 @@ const App = () => (
 							<Route element={<Layout />}>
 								<Route path='/' element={<Home />} />
 								<Route path='/new' element={<Home collection='new' />} />
+								<Route path='/cart' element={<Cart />} />
 								<Route path='/login' element={<AuthPage mode='login' />} />
 								<Route path='/register' element={<AuthPage mode='register' />} />
 								<Route element={<RequireAuth />}>

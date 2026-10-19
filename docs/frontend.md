@@ -21,11 +21,11 @@ After a change to `tailwind.config.js`, restart `npm run dev`: the dev server do
 
 | Folder | What lives there |
 |---|---|
-| `src/pages` | One file per route: `Home`, `Product`, `AuthPage`, `Checkout`, `Orders`, `OrderDetail`, `Settings`, `AdminDashboard` |
-| `src/components` | Pieces used by several pages: `Navbar`, `UserDrawer`, `Cart`, `Footer`, `ProductCard`, `QuantityStepper`, `TextField`, `Picture`, `OrderParts`, `Logo`, `Layout`, `RequireAuth` |
+| `src/pages` | One file per route: `Home`, `Product`, `Cart`, `AuthPage`, `Checkout`, `Orders`, `OrderDetail`, `Settings`, `AdminDashboard` |
+| `src/components` | Pieces used by several pages: `Navbar`, `UserDrawer`, `Footer`, `ProductCard`, `QuantityStepper`, `TextField`, `Picture`, `OrderParts`, `Logo`, `Layout`, `RequireAuth` |
 | `src/context` | Shared state: `ThemeContext` (light or dark), `AuthContext` (who is signed in), `CartContext` (the server cart), `CatalogContext` (the products) |
 | `src/hooks` | `useAddToCart`, used by the product cards and the product page |
-| `src/lib` | `api.js` (every call to the API), `format.js` (prices), `navigation.js` (the categories with their icons) |
+| `src/lib` | `api.js` (every call to the API), `format.js` (prices), `navigation.js` (the categories with their icons), `shipping.js` (the free shipping threshold shown on the cart page) |
 | `src/data/pictures.json` | Each product's photo, and for the six original products the responsive sizes and the gallery |
 | `src/data/adminSample.js` | Sample numbers for the admin dashboard until the admin API exists |
 
@@ -37,8 +37,9 @@ After a change to `tailwind.config.js`, restart `npm run dev`: the dev server do
 | `/new` | The new collection, the same storefront showing only new products | no |
 | `/headphones`, `/speakers`, `/earphones`, `/amplifiers`, `/accessories` | The same storefront with that category selected | no |
 | `/:category/:slug` | Product page | no |
+| `/cart` | The cart with quantities, remove, totals and the way to checkout | no, it asks to log in |
 | `/login`, `/register` | One card for both | no |
-| `/checkout` | Address, payment method, summary | yes |
+| `/checkout` | Pick a saved address or add a new one, payment method, summary | yes |
 | `/orders` | My orders with status tabs | yes |
 | `/orders/:id` | One order: progress, items, summary, cancel | yes |
 | `/settings` | Profile, light or dark theme, saved addresses | yes |
@@ -50,14 +51,15 @@ The signed in routes sit under one `RequireAuth` route in `App.jsx`, which sends
 ## Header and user drawer
 
 The header has the logo on the left, **Home**, **Categories** (opens on hover with the five categories) and
-**New collection** in the middle, and the cart and the account button on the right. The account button opens the
+**New collection** in the middle, and the cart and the account button on the right. The cart icon opens `/cart`. The account button opens the
 **user drawer** from the right: My orders, Admin dashboard (admins only), Settings, the dark theme switch and Log
 out. Visitors who are not signed in get Log in, Create account and the theme switch.
 
 ## Storefront filters
 
 Category chips, a search box, a price range (under 1,000, 1,000 to 3,000, 3,000 to 5,000, over 5,000 EGP), a sort
-(featured, price both ways, name) and *in stock only*. The filtering runs in the browser over the whole catalogue,
+(featured, price both ways, name) and *in stock only*, with nine products per page and previous, page number and
+next buttons under the grid. Changing a filter or a category goes back to page one. The filtering runs in the browser over the whole catalogue,
 which is fine for a shop this size; with hundreds of products it moves to the API's `search`, `minPrice` and
 `maxPrice` parameters.
 

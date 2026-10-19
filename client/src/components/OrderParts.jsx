@@ -39,7 +39,7 @@ export const OrderProgress = ({ status }) => {
 							<span className={`absolute right-1/2 top-4 h-0.5 w-full ${i <= current ? 'bg-brand' : 'bg-panel-strong'}`} />
 						)}
 						<span
-							className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
+							className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full ${
 								done ? 'bg-brand text-white' : 'bg-surface text-muted ring-1 ring-line'
 							}`}
 						>
