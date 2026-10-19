@@ -6,9 +6,9 @@ const BADGE = {
 	Pending: 'bg-panel text-muted',
 	Confirmed: 'bg-brand-soft text-brand-dark',
 	Processing: 'bg-brand-soft text-brand-dark',
-	Shipped: 'bg-ink text-white',
-	Delivered: 'bg-emerald-50 text-emerald-700',
-	Cancelled: 'bg-red-50 text-red-700',
+	Shipped: 'bg-ink text-page',
+	Delivered: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+	Cancelled: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300',
 };
 
 export const StatusBadge = ({ status }) => (
@@ -40,7 +40,7 @@ export const OrderProgress = ({ status }) => {
 						)}
 						<span
 							className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
-								done ? 'bg-brand text-white' : 'bg-white text-muted ring-1 ring-line'
+								done ? 'bg-brand text-white' : 'bg-surface text-muted ring-1 ring-line'
 							}`}
 						>
 							<Icon size={16} />
@@ -65,7 +65,7 @@ export const OrderItems = ({ items }) => (
 		{items.map((item) => (
 			<li key={item.productId} className='flex items-center justify-between gap-4 rounded bg-panel p-3'>
 				<div className='flex min-w-0 items-center gap-4'>
-					{item.productImageUrl && <img src={item.productImageUrl} alt='' className='h-14 w-14 rounded bg-white' />}
+					{item.productImageUrl && <img src={item.productImageUrl} alt='' className='h-14 w-14 rounded bg-surface' />}
 					<div className='min-w-0'>
 						<p className='truncate text-[15px] font-bold'>{item.productName}</p>
 						<p className='text-[13px] text-muted'>

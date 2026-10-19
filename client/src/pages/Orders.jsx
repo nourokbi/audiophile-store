@@ -55,7 +55,7 @@ const Orders = () => {
 								<button
 									key={t.key}
 									onClick={() => setTab(t.key)}
-									className={`chip rounded-full ${tab === t.key ? 'bg-brand text-white' : 'bg-white shadow-sm hover:bg-panel'}`}
+									className={`chip rounded-full ${tab === t.key ? 'bg-brand text-white' : 'bg-surface shadow-sm hover:bg-panel'}`}
 								>
 									{t.label} <span className='ml-1 opacity-70'>{count}</span>
 								</button>

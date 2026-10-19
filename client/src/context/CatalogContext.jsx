@@ -1,39 +1,48 @@
 import React from 'react';
 import { api } from '../lib/api';
-import data from '../data/data.json';
+import pictures from '../data/pictures.json';
 
-// One product list for the whole shop, text and images from data.json joined on the slug with the API's id, price and stock
+// The products from the API, with the photos and gallery from pictures.json added by slug
 const CatalogContext = React.createContext(null);
 
-// New products first, then the dearest, so the flagship models lead the grid
-const LOOKS = [...data].sort((a, b) => Number(b.new) - Number(a.new) || b.price - a.price);
+const sameImageEverywhere = (url) => ({ mobile: url, tablet: url, desktop: url });
+
+function toProduct(p) {
+	const look = pictures[p.slug] ?? {};
+	const image = look.image ?? p.imageUrl;
+	return {
+		id: p.id,
+		slug: p.slug,
+		name: p.name,
+		description: p.description,
+		features: p.features,
+		price: p.price,
+		stock: p.stock,
+		inStock: p.inStock,
+		category: p.category.toLowerCase(),
+		includes: Object.entries(p.inTheBox).map(([item, quantity]) => ({ item, quantity })),
+		image: typeof image === 'string' ? sameImageEverywhere(image) : image,
+		gallery: look.gallery ?? null,
+		isNew: Boolean(look.new),
+	};
+}
 
 export function CatalogProvider({ children }) {
-	const [live, setLive] = React.useState({});
+	const [products, setProducts] = React.useState([]);
 	const [loading, setLoading] = React.useState(true);
 	const [error, setError] = React.useState(null);
 
 	React.useEffect(() => {
 		api('/products?pageSize=50')
-			.then((page) => setLive(Object.fromEntries(page.items.map((p) => [p.slug, p]))))
+			.then((page) => setProducts(page.items.map(toProduct)))
 			.catch((e) => setError(e.message))
 			.finally(() => setLoading(false));
 	}, []);
 
-	const value = React.useMemo(() => {
-		// A product the API does not sell keeps no id or price, so it shows as not available
-		const products = LOOKS.map((look) => {
-			const sold = live[look.slug];
-			return {
-				...look,
-				id: sold?.id ?? null,
-				price: sold?.price ?? null,
-				stock: sold?.stock ?? 0,
-				inStock: Boolean(sold?.inStock),
-			};
-		});
-		return { products, loading, error, findBySlug: (slug) => products.find((p) => p.slug === slug) };
-	}, [live, loading, error]);
+	const value = React.useMemo(
+		() => ({ products, loading, error, findBySlug: (slug) => products.find((p) => p.slug === slug) }),
+		[products, loading, error],
+	);
 
 	return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>;
 }

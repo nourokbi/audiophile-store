@@ -2,7 +2,13 @@ import { NavLink } from 'react-router-dom';
 import { Headphones, Speaker, AudioLines } from 'lucide-react';
 
 import Logo from './Logo';
-import { NAV_LINKS, navLinkClass } from '../lib/navigation';
+import { CATEGORIES, navLinkClass } from '../lib/navigation';
+
+const LINKS = [
+	{ to: '/', label: 'Home' },
+	{ to: '/new', label: 'New collection' },
+	...CATEGORIES.map((c) => ({ to: `/${c.key}`, label: c.label })),
+];
 
 const Footer = () => (
 	<footer className='bg-panel pb-12 pt-16'>
@@ -10,7 +16,7 @@ const Footer = () => (
 			<div className='flex flex-col justify-between gap-8 lg:flex-row lg:items-center'>
 				<Logo />
 				<nav className='flex flex-wrap items-center gap-6'>
-					{NAV_LINKS.map((link) => (
+					{LINKS.map((link) => (
 						<NavLink key={link.to} to={link.to} end className={navLinkClass}>
 							{link.label}
 						</NavLink>

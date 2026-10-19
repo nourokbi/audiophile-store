@@ -2,7 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The light and dark palettes from the Stitch project as red green blue values */
 @layer base {
+	:root {
+		--page: 251 249 249;
+		--surface: 255 255 255;
+		--panel: 245 243 243;
+		--panel-strong: 233 232 231;
+		--line: 228 226 226;
+		--ink: 27 28 28;
+		--muted: 95 94 94;
+		--brand: 216 125 74;
+		--brand-hover: 192 106 57;
+		--brand-dark: 149 73 26;
+		--brand-soft: 251 238 230;
+		color-scheme: light;
+	}
+
+	.dark {
+		--page: 18 20 20;
+		--surface: 30 32 32;
+		--panel: 41 42 42;
+		--panel-strong: 52 53 53;
+		--line: 58 60 60;
+		--ink: 227 226 226;
+		--muted: 168 165 163;
+		--brand: 216 125 74;
+		--brand-hover: 232 145 96;
+		--brand-dark: 255 182 144;
+		--brand-soft: 58 36 24;
+		color-scheme: dark;
+	}
+
 	body {
 		@apply bg-page text-ink font-sans antialiased;
 	}
@@ -22,7 +53,7 @@
 	}
 
 	.card {
-		@apply rounded bg-white shadow-sm;
+		@apply rounded bg-surface shadow-sm;
 	}
 
 	.label {
@@ -50,14 +81,18 @@
 	}
 
 	.btn-dark {
-		@apply btn bg-ink text-white hover:bg-black;
+		@apply btn bg-ink text-page hover:opacity-90;
 	}
 
 	.input {
-		@apply h-12 w-full rounded bg-panel px-4 text-[15px] font-medium text-ink placeholder:text-muted/70 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand disabled:text-muted;
+		@apply h-12 w-full rounded bg-panel px-4 text-[15px] font-medium text-ink placeholder:text-muted/70 focus:bg-surface focus:outline-none focus:ring-1 focus:ring-brand disabled:text-muted;
 	}
 
 	.chip {
 		@apply label rounded px-4 py-2 transition-colors;
+	}
+
+	.menu-item {
+		@apply label flex w-full items-center gap-3 rounded px-3 py-3 text-left transition-colors hover:bg-panel;
 	}
 }

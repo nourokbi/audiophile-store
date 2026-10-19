@@ -1,10 +1,25 @@
 import React from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { ArrowRight, BadgeCheck, CreditCard, PackageX, Search, Truck } from 'lucide-react';
+import { ArrowRight, BadgeCheck, ChevronDown, CreditCard, PackageX, RotateCcw, Search, Truck } from 'lucide-react';
 
 import ProductCard from '../components/ProductCard';
 import { useCatalog } from '../context/CatalogContext';
-import { CATEGORIES } from '../lib/navigation';
+import { CATEGORIES, findCategory } from '../lib/navigation';
+
+const PRICES = [
+	{ key: 'all', label: 'Any price', min: 0, max: Infinity },
+	{ key: 'under-1000', label: 'Under EGP 1,000', min: 0, max: 999 },
+	{ key: '1000-3000', label: 'EGP 1,000 to 3,000', min: 1000, max: 3000 },
+	{ key: '3000-5000', label: 'EGP 3,000 to 5,000', min: 3000, max: 5000 },
+	{ key: 'over-5000', label: 'Over EGP 5,000', min: 5000, max: Infinity },
+];
+
+const SORTS = {
+	featured: { label: 'Featured', compare: (a, b) => Number(b.isNew) - Number(a.isNew) || b.price - a.price },
+	'price-asc': { label: 'Price, low to high', compare: (a, b) => a.price - b.price },
+	'price-desc': { label: 'Price, high to low', compare: (a, b) => b.price - a.price },
+	name: { label: 'Name, A to Z', compare: (a, b) => a.name.localeCompare(b.name) },
+};
 
 const PROMISES = [
 	{ icon: Truck, title: 'Free shipping', text: 'On every order of EGP 5,000 or more' },
@@ -13,62 +28,101 @@ const PROMISES = [
 	{ icon: BadgeCheck, title: 'Real stock', text: 'What you see is what we have, reserved when you order' },
 ];
 
-// The storefront, used for the home page and for each category page
-const Home = () => {
+const EMPTY_FILTERS = { search: '', price: 'all', sort: 'featured', inStockOnly: false };
+
+// The storefront, used for the home page, the new collection and each category page
+const Home = ({ collection }) => {
 	const { category = 'all' } = useParams();
 	const navigate = useNavigate();
 	const { products, loading, error } = useCatalog();
-	const [search, setSearch] = React.useState('');
-	const [inStockOnly, setInStockOnly] = React.useState(false);
+	const [filters, setFilters] = React.useState(EMPTY_FILTERS);
 
-	if (category !== 'all' && !CATEGORIES.includes(category)) return <Navigate to='/' replace />;
+	if (category !== 'all' && !findCategory(category)) return <Navigate to='/' replace />;
 
-	const term = search.trim().toLowerCase();
-	const shown = products.filter(
-		(p) =>
-			(category === 'all' || p.category === category) &&
-			(!inStockOnly || p.inStock) &&
-			(!term || p.name.toLowerCase().includes(term) || p.description.toLowerCase().includes(term)),
-	);
+	const set = (key) => (e) =>
+		setFilters({ ...filters, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
+	const price = PRICES.find((p) => p.key === filters.price);
+	const term = filters.search.trim().toLowerCase();
+
+	const shown = products
+		.filter(
+			(p) =>
+				(collection !== 'new' || p.isNew) &&
+				(category === 'all' || p.category === category) &&
+				(!filters.inStockOnly || p.inStock) &&
+				p.price >= price.min &&
+				p.price <= price.max &&
+				(!term || p.name.toLowerCase().includes(term) || p.description.toLowerCase().includes(term)),
+		)
+		.sort(SORTS[filters.sort].compare);
+
+	const heading = collection === 'new' ? 'New collection' : findCategory(category)?.label ?? 'Shop all products';
+	const filtered = JSON.stringify(filters) !== JSON.stringify(EMPTY_FILTERS);
 
 	return (
 		<>
-			{category === 'all' && <Hero />}
+			{category === 'all' && !collection && <Hero />}
 
-			<section className='page flex flex-col gap-8 pb-24 pt-12'>
-				<div className='card flex flex-col gap-6 p-6'>
-					<div className='flex flex-wrap items-center justify-between gap-4'>
-						<div className='flex flex-wrap gap-2'>
-							{['all', ...CATEGORIES].map((key) => (
-								<button
-									key={key}
-									onClick={() => navigate(key === 'all' ? '/' : `/${key}`)}
-									className={`chip ${category === key ? 'bg-brand text-white shadow-sm' : 'bg-panel hover:bg-panel-strong'}`}
-								>
-									{key === 'all' ? 'All items' : key}
-								</button>
-							))}
-						</div>
-						<label className='flex cursor-pointer select-none items-center gap-3'>
+			<section id='shop' className='page flex scroll-mt-20 flex-col gap-8 pb-24 pt-12'>
+				<div>
+					<p className='eyebrow'>{collection === 'new' ? 'Just arrived' : 'The collection'}</p>
+					<h1 className='title mt-2'>{heading}</h1>
+				</div>
+
+				<div className='card flex flex-col gap-5 p-6'>
+					<div className='flex flex-wrap gap-2'>
+						{[{ key: 'all', label: 'All items' }, ...CATEGORIES].map(({ key, label }) => (
+							<button
+								key={key}
+								onClick={() => navigate(key === 'all' ? (collection === 'new' ? '/new' : '/') : `/${key}`)}
+								className={`chip ${category === key ? 'bg-brand text-white shadow-sm' : 'bg-panel hover:bg-panel-strong'}`}
+							>
+								{label}
+							</button>
+						))}
+					</div>
+
+					<div className='grid grid-cols-1 gap-3 md:grid-cols-12'>
+						<div className='relative flex items-center md:col-span-6'>
+							<Search size={18} className='pointer-events-none absolute left-4 text-muted' />
 							<input
-								type='checkbox'
-								className='peer sr-only'
-								checked={inStockOnly}
-								onChange={(e) => setInStockOnly(e.target.checked)}
+								type='search'
+								value={filters.search}
+								onChange={set('search')}
+								placeholder='Search products'
+								className='input pl-11'
 							/>
+						</div>
+						<Select value={filters.price} onChange={set('price')} className='md:col-span-3' label='Price'>
+							{PRICES.map((p) => (
+								<option key={p.key} value={p.key}>
+									{p.label}
+								</option>
+							))}
+						</Select>
+						<Select value={filters.sort} onChange={set('sort')} className='md:col-span-3' label='Sort'>
+							{Object.entries(SORTS).map(([key, s]) => (
+								<option key={key} value={key}>
+									{s.label}
+								</option>
+							))}
+						</Select>
+					</div>
+
+					<div className='flex flex-wrap items-center justify-between gap-4'>
+						<label className='flex cursor-pointer select-none items-center gap-3'>
+							<input type='checkbox' className='peer sr-only' checked={filters.inStockOnly} onChange={set('inStockOnly')} />
 							<span className="relative h-6 w-11 rounded-full bg-panel-strong transition-colors after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-transform after:content-[''] peer-checked:bg-brand peer-checked:after:translate-x-5" />
 							<span className='label'>In stock only</span>
 						</label>
-					</div>
-					<div className='relative flex items-center'>
-						<Search size={18} className='pointer-events-none absolute left-4 text-muted' />
-						<input
-							type='search'
-							value={search}
-							onChange={(e) => setSearch(e.target.value)}
-							placeholder='Search headphones, speakers and earphones'
-							className='input pl-11'
-						/>
+						{filtered && (
+							<button
+								onClick={() => setFilters(EMPTY_FILTERS)}
+								className='label flex items-center gap-2 text-muted hover:text-brand-dark'
+							>
+								<RotateCcw size={14} /> Clear filters
+							</button>
+						)}
 					</div>
 				</div>
 
@@ -76,15 +130,17 @@ const Home = () => {
 					<span>
 						Showing <strong className='text-ink'>{shown.length}</strong> of {products.length} products
 					</span>
-					{error && <span className='text-red-600'>Prices and stock could not be loaded ({error})</span>}
+					{error && <span className='text-red-600'>Products could not be loaded ({error})</span>}
 				</div>
 
-				{shown.length === 0 ? (
+				{loading ? (
+					<p className='card p-10 text-center text-muted'>Loading products...</p>
+				) : shown.length === 0 ? (
 					<p className='card p-10 text-center text-muted'>No product matches these filters.</p>
 				) : (
 					<div className='grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3'>
 						{shown.map((product) => (
-							<ProductCard key={product.slug} product={product} loading={loading} />
+							<ProductCard key={product.slug} product={product} />
 						))}
 					</div>
 				)}
@@ -107,12 +163,21 @@ const Home = () => {
 	);
 };
 
+const Select = ({ label, className, children, ...props }) => (
+	<div className={`relative flex items-center ${className}`}>
+		<select aria-label={label} className='input cursor-pointer appearance-none pr-10' {...props}>
+			{children}
+		</select>
+		<ChevronDown size={18} className='pointer-events-none absolute right-4 text-muted' />
+	</div>
+);
+
 const Hero = () => (
-	<section className='bg-white shadow-sm'>
+	<section className='bg-surface shadow-sm'>
 		<div className='page grid grid-cols-1 items-center gap-10 py-12 lg:grid-cols-12 lg:py-20'>
 			<div className='flex flex-col gap-5 lg:col-span-7'>
 				<p className='eyebrow flex items-center gap-2'>
-					<span className='h-2 w-2 rounded-full bg-brand' /> New product
+					<span className='h-2 w-2 rounded-full bg-brand' /> Flagship
 				</p>
 				<h1 className='text-[40px] leading-[44px] tracking-tight md:text-[56px] md:leading-[58px]'>
 					Sound uncompromised.
@@ -125,9 +190,9 @@ const Hero = () => (
 					<Link to='/headphones/xx99-mark-two-headphones' className='btn-primary'>
 						See product <ArrowRight size={16} />
 					</Link>
-					<a href='#shop' className='btn-secondary'>
-						Shop all
-					</a>
+					<Link to='/new' className='btn-secondary'>
+						New collection
+					</Link>
 				</div>
 			</div>
 			<div className='relative lg:col-span-5'>
@@ -137,17 +202,13 @@ const Hero = () => (
 						alt='XX99 Mark II headphones'
 						className='h-full w-full object-cover'
 					/>
-					<span className='label absolute right-4 top-4 flex items-center gap-2 rounded bg-white/90 px-3 py-1 text-[11px] shadow-sm'>
-						<span className='h-2 w-2 animate-pulse rounded-full bg-brand' /> Flagship
-					</span>
-					<div className='absolute bottom-4 left-4 rounded bg-ink px-4 py-2 text-white'>
+					<div className='absolute bottom-4 left-4 rounded bg-ink px-4 py-2 text-page'>
 						<p className='text-[11px] uppercase tracking-widest opacity-75'>Headphones</p>
 						<p className='text-[18px] font-bold uppercase'>XX99 Mark II</p>
 					</div>
 				</div>
 			</div>
 		</div>
-		<span id='shop' className='block scroll-mt-20' />
 	</section>
 );
 

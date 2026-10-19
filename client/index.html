@@ -13,6 +13,14 @@
 		/>
 
 		<title>Audiophile</title>
+		<!-- Applies the saved theme before the first paint so a dark page never flashes white -->
+		<script>
+			try {
+				const saved = localStorage.getItem('audiophile.theme');
+				const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+				if (dark) document.documentElement.classList.add('dark');
+			} catch {}
+		</script>
 	</head>
 	<body>
 		<div id="root"></div>

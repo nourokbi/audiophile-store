@@ -226,6 +226,10 @@ chain, not every session) are a possible refinement; revoking everything is the 
 
 Same React app, under `/admin`, behind a route guard that checks the `Admin` role.
 
+- [x] The page itself (2026-10-19): stat cards, orders chart, low stock, recent orders and the product table. Products
+      are live; revenue, the chart and recent orders are sample data in `client/src/data/adminSample.js` until the
+      endpoints below exist
+
 - [ ] Products: table, create / edit / deactivate, set stock and price (UC-11)
 - [ ] Orders: table with filter by status and date, paged (UC-12)
 - [ ] Order details: items, customer, payment, the *next status* buttons the state machine allows (UC-13)

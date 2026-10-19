@@ -2,6 +2,23 @@
 
 What changed and why, newest first. Git history has the line-by-line detail; this file is the readable version.
 
+## 2026-10-19 — Dark theme, user drawer, filters, new collection, admin dashboard
+
+### Added
+- **16 new products** in five categories (two new ones: `Amplifiers` and `Accessories`), seeded by migration
+  `SeedNewCollection`, with photos from the Stitch project in `client/public/assets/products`.
+- **Dark theme**: every color is a CSS variable with a light and a dark value, switched from the user drawer or
+  Settings and remembered in the browser.
+- **User drawer** from the account button: My orders, Admin dashboard (admins only), Settings, theme switch, Log out.
+- **Header**: Home, Categories (opens on hover) and New collection in the middle; `/new` lists the new collection.
+- **Filters**: price range and sort, plus *Clear filters*.
+- **Settings page**: profile, theme, and saved addresses with delete.
+- **Admin dashboard** (`/admin`, admins only): live products and stock, sample revenue and orders until the admin API.
+
+### Changed
+- The API is now the only source of product text and prices; `data.json` became `pictures.json` with just the
+  photos and galleries (570 lines to 209). "You may also like" picks products from the same category.
+
 ## 2026-10-19 — The shop gets the Stitch design
 
 ### Changed (client)
