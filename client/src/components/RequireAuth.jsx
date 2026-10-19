@@ -1,9 +1,8 @@
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-// Pages that need a signed-in customer (checkout, orders). Anyone else goes to /login, which
-// sends them back here afterwards.
-const RequireAuth = ({ children }) => {
+// Wraps the pages that need a signed in customer, anyone else goes to login and comes back afterwards
+const RequireAuth = () => {
 	const { user } = useAuth();
 	const location = useLocation();
 
@@ -11,7 +10,7 @@ const RequireAuth = ({ children }) => {
 		const back = location.pathname + location.search;
 		return <Navigate to={`/login?redirect=${encodeURIComponent(back)}`} replace />;
 	}
-	return children;
+	return <Outlet />;
 };
 
 export default RequireAuth;

@@ -1,171 +1,113 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { LogOut, Menu, Package, ShoppingBag, User, X } from 'lucide-react';
 
-import logo from '/assets/shared/desktop/logo.svg';
-import hamburger from '/assets/shared/tablet/icon-hamburger.svg';
-
-import Menu from './Menu';
 import Cart from './Cart';
+import Logo from './Logo';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { NAV_LINKS, navLinkClass } from '../lib/navigation';
 
+// The fixed header from the Stitch design, with the cart panel and the account menu
 const Navbar = () => {
 	const { user, logout } = useAuth();
 	const { cart } = useCart();
-	const [showMenu, setShowMenu] = React.useState(false);
-	const [showCart, setShowCart] = React.useState(false);
-	const [showAccount, setShowAccount] = React.useState(false);
 	const navigate = useNavigate();
+	const [open, setOpen] = React.useState(null); // 'menu', 'cart', 'account' or null
 
-	function toggleMenu() {
-		setShowMenu((prev) => !prev);
-	}
+	const toggle = (panel) => setOpen((current) => (current === panel ? null : panel));
+	const close = () => setOpen(null);
 
-	function toggleCart() {
-		setShowCart((prev) => !prev);
-	}
-
-	React.useEffect(() => {
-		function handleResize() {
-			if (window.innerWidth > 975) {
-				setShowMenu(false);
-			}
-		}
-
-		window.addEventListener('resize', handleResize);
-
-		return () => {
-			window.removeEventListener('resize', handleResize);
-		};
-	}, []);
+	const onLogout = async () => {
+		close();
+		await logout();
+		navigate('/');
+	};
 
 	return (
-		<>
-			<nav className='absolute top-0 left-0 right-0 xs:px-[24px] md:px-[40px] lg:px-[165px] bg-stone z-50'>
-				<div className='flex justify-between items-center py-[35px]'>
-					<div className='flex items-center xs:justify-between md:justify-normal md:gap-[42px]'>
-						<img
-							onClick={toggleMenu}
-							src={hamburger}
-							className='lg:hidden cursor-pointer'
-						/>
-						{/* Logo when screen-size is larger than xs */}
-						<Link to='/' className='xs:hidden md:flex'>
-							<img src={logo} />
-						</Link>
-					</div>
-					{/* Logo when screen-size is xs */}
-					<Link to='/' className='xs:flex md:hidden'>
-						<img src={logo} />
-					</Link>
-					<div className='text-white xs:hidden lg:flex text-[13px] uppercase font-bold leading-[25px] tracking-[2px] gap-[34px]'>
-						<Link
-							to='/'
-							className='hover:text-cream transition-all duration-200'
-						>
-							Home
-						</Link>
-						<Link
-							to='/headphones'
-							className='hover:text-cream transition-all duration-200'
-						>
-							Headphones
-						</Link>
-						<Link
-							to='/speakers'
-							className='hover:text-cream transition-all duration-200'
-						>
-							Speakers
-						</Link>
-						<Link
-							to='/earphones'
-							className='hover:text-cream transition-all duration-200'
-						>
-							Earphones
-						</Link>
-					</div>
-					<div className='flex items-center gap-6'>
+		<header className='fixed inset-x-0 top-0 z-50 bg-white/90 shadow-[0_1px_8px_rgba(0,0,0,0.04)] backdrop-blur-md'>
+			<div className='page flex h-20 items-center justify-between gap-4'>
+				<div className='flex items-center gap-8'>
+					<button className='lg:hidden' aria-label='Menu' onClick={() => toggle('menu')}>
+						{open === 'menu' ? <X size={24} /> : <Menu size={24} />}
+					</button>
+					<Logo />
+					<nav className='hidden items-center gap-6 lg:flex'>
+						{NAV_LINKS.map((link) => (
+							<NavLink key={link.to} to={link.to} end className={navLinkClass}>
+								{link.label}
+							</NavLink>
+						))}
+					</nav>
+				</div>
+
+				<div className='flex items-center gap-5'>
+					<button
+						aria-label='Cart'
+						onClick={() => toggle('cart')}
+						className='relative p-2 transition-colors hover:text-brand-dark'
+					>
+						<ShoppingBag size={24} />
+						{cart.totalQuantity > 0 && (
+							<span className='absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand px-1 text-[12px] font-bold text-white'>
+								{cart.totalQuantity}
+							</span>
+						)}
+					</button>
+
 					{user ? (
 						<div className='relative'>
-							<button
-								onClick={() => setShowAccount((v) => !v)}
-								className='text-white text-[13px] uppercase font-bold tracking-[2px] hover:text-cream transition-all duration-200'
-							>
-								{user.name.split(' ')[0]}
+							<button onClick={() => toggle('account')} className='flex items-center gap-3'>
+								<span className='hidden text-right sm:block'>
+									<span className='label block normal-case'>{user.name}</span>
+									<span className='block text-[10px] font-bold uppercase tracking-widest text-brand-dark'>
+										{user.roles?.includes('Admin') ? 'Admin' : 'Customer'}
+									</span>
+								</span>
+								<span className='flex h-9 w-9 items-center justify-center rounded-full bg-brand-dark text-white'>
+									<User size={18} />
+								</span>
 							</button>
-							{showAccount && (
-								<div className='absolute right-0 top-[36px] bg-white rounded-[8px] p-4 flex flex-col gap-2 min-w-[160px] shadow-lg z-50'>
-									<Link
-										to='/orders'
-										onClick={() => setShowAccount(false)}
-										className='text-[13px] uppercase font-bold tracking-[1px] text-black hover:text-cream'
-									>
-										My orders
+							{open === 'account' && (
+								<div className='card absolute right-0 top-12 flex min-w-[180px] flex-col p-2 shadow-lg'>
+									<Link to='/orders' onClick={close} className='label flex items-center gap-2 rounded px-3 py-2 hover:bg-panel'>
+										<Package size={16} /> My orders
 									</Link>
-									<button
-										onClick={async () => {
-											setShowAccount(false);
-											await logout();
-											navigate('/');
-										}}
-										className='text-left text-[13px] uppercase font-bold tracking-[1px] text-black/50 hover:text-cream'
-									>
-										Log out
+									<button onClick={onLogout} className='label flex items-center gap-2 rounded px-3 py-2 text-muted hover:bg-panel'>
+										<LogOut size={16} /> Log out
 									</button>
 								</div>
 							)}
 						</div>
 					) : (
-						<Link
-							to='/login'
-							className='text-white text-[13px] uppercase font-bold tracking-[2px] hover:text-cream transition-all duration-200'
-						>
+						<Link to='/login' className='btn-primary h-10 px-5'>
 							Log in
 						</Link>
 					)}
-					<div onClick={toggleCart} className='relative cursor-pointer'>
-						{cart.totalQuantity > 0 && (
-							<div className='absolute top-[-10px] right-[-10px] rounded-full bg-cream flex items-center justify-center h-[20px] w-[20px]'>
-								<p className='text-white font-bold text-[12px]'>
-									{cart.totalQuantity}
-								</p>
-							</div>
-						)}
-						<svg
-							width='23'
-							height='20'
-							xmlns='http://www.w3.org/2000/svg'
-							className='fill-white hover:fill-cream transition-all duration-200'
-						>
-							<path
-								d='M8.625 15.833c1.132 0 2.054.935 2.054 2.084 0 1.148-.922 2.083-2.054 2.083-1.132 0-2.054-.935-2.054-2.083 0-1.15.922-2.084 2.054-2.084zm9.857 0c1.132 0 2.054.935 2.054 2.084 0 1.148-.922 2.083-2.054 2.083-1.132 0-2.053-.935-2.053-2.083 0-1.15.92-2.084 2.053-2.084zm-9.857 1.39a.69.69 0 00-.685.694.69.69 0 00.685.694.69.69 0 00.685-.694.69.69 0 00-.685-.695zm9.857 0a.69.69 0 00-.684.694.69.69 0 00.684.694.69.69 0 00.685-.694.69.69 0 00-.685-.695zM4.717 0c.316 0 .59.215.658.517l.481 2.122h16.47a.68.68 0 01.538.262c.127.166.168.38.11.579l-2.695 9.236a.672.672 0 01-.648.478H7.41a.667.667 0 00-.673.66c0 .364.303.66.674.66h12.219c.372 0 .674.295.674.66 0 .364-.302.66-.674.66H7.412c-1.115 0-2.021-.889-2.021-1.98 0-.812.502-1.511 1.218-1.816L4.176 1.32H.674A.667.667 0 010 .66C0 .296.302 0 .674 0zm16.716 3.958H6.156l1.797 7.917h11.17l2.31-7.917z'
-								fillRule='nonzero'
-							/>
-						</svg>
-					</div>
-					</div>
 				</div>
-			</nav>
-			{showMenu && (
+			</div>
+
+			{open === 'menu' && (
+				<nav className='page flex flex-col gap-4 border-t border-line py-6 lg:hidden'>
+					{NAV_LINKS.map((link) => (
+						<NavLink key={link.to} to={link.to} end onClick={close} className={navLinkClass}>
+							{link.label}
+						</NavLink>
+					))}
+				</nav>
+			)}
+
+			{open === 'cart' && (
 				<>
-					<div className='fixed top-0 bottom-0 left-0 right-0 bg-black/50 z-[1]' />
-					<div className='absolute left-0 right-0 z-40'>
-						<Menu />
+					<div className='fixed inset-0 top-20 -z-10 bg-black/40' onClick={close} />
+					<div className='page relative'>
+						<div className='absolute right-6 top-4 w-[calc(100%-48px)] md:right-10 md:w-[400px] lg:right-0'>
+							<Cart onClose={close} />
+						</div>
 					</div>
 				</>
 			)}
-			{showCart && (
-				<>
-					<div
-						onClick={() => setShowCart(false)}
-						className='fixed top-0 bottom-0 left-0 right-0 bg-black/50 z-[1]'
-					/>
-					<div className='md:w-[377px] absolute xs:left-6 xs:right-6 md:left-auto md:right-10 lg:right-40 top-[120px] z-30'>
-						<Cart onClose={() => setShowCart(false)} />
-					</div>
-				</>
-			)}
-		</>
+		</header>
 	);
 };
 

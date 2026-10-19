@@ -19,4 +19,6 @@ module.exports = {
       { allowConstantExport: true },
     ],
   },
+  // A context file exports its provider together with its hook on purpose
+  overrides: [{ files: ['src/context/*.jsx'], rules: { 'react-refresh/only-export-components': 'off' } }],
 }

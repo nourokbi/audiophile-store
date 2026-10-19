@@ -2,6 +2,27 @@
 
 What changed and why, newest first. Git history has the line-by-line detail; this file is the readable version.
 
+## 2026-10-19 — The shop gets the Stitch design
+
+### Changed (client)
+- Every customer page rebuilt from the light screens of the Stitch project: header, storefront, product page,
+  login and register, checkout, my orders, order page, footer. Tailwind with ten named colors and a few shared
+  classes (`card`, `btn-primary`, `input`, …) in `index.css`; icons from `lucide-react`.
+- `CatalogContext` hands out finished products (text and pictures from `data.json`, id, price and stock from the
+  API), so no page joins the two any more.
+- `/headphones`, `/speakers` and `/earphones` are the storefront with that category selected; `Category`, `Menu`
+  and `BestGear` were removed.
+- New on the storefront: search and an *in stock only* switch. New on My orders: status tabs, an order tracker and
+  an account summary. Show password button on login and register.
+- `Picture` replaces the three desktop, tablet and mobile `<img>` tags, and the signed in routes share one
+  `RequireAuth` parent route.
+- `npm run lint` passes with zero warnings. `docs/frontend.md` describes the structure and the design tokens.
+
+### Changed (API, development only)
+- The admin account comes from `Admin:Email` and `Admin:Password` in user-secrets and its password is set straight
+  from there on every start, so a short development password works.
+- `Database:MigrateOnStartup` is off in Development: apply new migrations with `dotnet ef database update`.
+
 ## 2026-10-18 — Phase 1 done (`v0.2.0`)
 
 ### Added

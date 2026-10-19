@@ -2,36 +2,25 @@
 export default {
 	content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
 	theme: {
-		screens: {
-			xs: '360px',
-			sm: '480px',
-			md: '768px',
-			lg: '976px',
-			xl: '1160px',
-			xxl: '1440px',
-		},
 		extend: {
+			// The light theme from the Stitch project, reduced to the few colors the shop uses
 			colors: {
-				cream: '#D87D4A',
-				'cream-light': '#FBAF85',
-				stone: '#101010',
-				'gray-light': '#F1F1F1',
-				'gray-very-light': '#FAFAFA',
+				brand: '#d87d4a',
+				'brand-hover': '#c06a39',
+				'brand-dark': '#95491a',
+				'brand-soft': '#fbeee6',
+				ink: '#1b1c1c',
+				muted: '#5f5e5e',
+				page: '#fbf9f9',
+				panel: '#f5f3f3',
+				'panel-strong': '#e9e8e7',
+				line: '#e4e2e2',
 			},
 			fontFamily: {
-				sans: 'Manrope',
+				sans: ['Manrope', 'sans-serif'],
 			},
-			backgroundImage: {
-				'lg-hero-pattern': "url('/assets/home/desktop/image-hero.jpg')",
-				'md-hero-pattern': "url('/assets/home/tablet/image-header.jpg')",
-				'xs-hero-pattern': "url('/assets/home/mobile/image-header.jpg')",
-				circles: "url('/assets/home/desktop/pattern-circles.svg')",
-				'xs-ZX7': "url('/assets/home/desktop/image-speaker-zx7.jpg')",
-				'md-ZX7': "url('/assets/home/tablet/image-speaker-zx7.jpg')",
-				'lg-ZX7': "url('/assets/home/mobile/image-speaker-zx7.jpg')",
-				'lg-YX1': "url('/assets/home/desktop/image-earphones-yx1.jpg')",
-				'md-YX1': "url('/assets/home/tablet/image-earphones-yx1.jpg')",
-				'xs-YX1': "url('/assets/home/mobile/image-earphones-yx1.jpg')",
+			maxWidth: {
+				page: '1110px',
 			},
 		},
 	},

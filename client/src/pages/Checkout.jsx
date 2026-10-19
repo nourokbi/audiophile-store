@@ -1,19 +1,21 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Banknote, CreditCard, Lock, ShieldCheck, ShoppingBag } from 'lucide-react';
 
-import CoDLogo from '/assets/checkout/icon-cash-on-delivery.svg';
 import TextField from '../components/TextField';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { api } from '../lib/api';
 import { formatPrice } from '../lib/format';
 
-// Checkout: save the shipping address, place the order from the server cart, then
-//   Card           → go to Fawaterak's payment page (payment.checkoutUrl)
-//   CashOnDelivery → straight to the order page, already confirmed.
-// The totals shown are the API's (GET /cart), the same numbers the order will use.
-const EMPTY_FORM = { name: '', phoneNumber: '', address: '', zipCode: '', city: '', country: '' };
+const EMPTY_FORM = { name: '', phone: '', street: '', postalCode: '', city: '', country: '' };
 
+const METHODS = [
+	{ value: 'Card', label: 'Card', note: 'Paid on Fawaterak', icon: CreditCard },
+	{ value: 'CashOnDelivery', label: 'Cash on delivery', note: 'Pay the courier', icon: Banknote },
+];
+
+// Saves the address, places the order from the cart, then a card order goes to Fawaterak's page and cash goes to the order page
 const Checkout = () => {
 	const { user } = useAuth();
 	const { cart, refresh } = useCart();
@@ -21,16 +23,15 @@ const Checkout = () => {
 
 	const [method, setMethod] = React.useState('Card');
 	const [form, setForm] = React.useState(EMPTY_FORM);
-	const [saved, setSaved] = React.useState(null); // the address used last time, if any
+	const [saved, setSaved] = React.useState(null); // the address used last time
 	const [errors, setErrors] = React.useState({});
 	const [serverError, setServerError] = React.useState('');
 	const [busy, setBusy] = React.useState(false);
 
-	// One key per checkout attempt: pressing the button twice, or retrying after a network
-	// error, returns the same order instead of creating a second one (Idempotency-Key).
+	// One key per checkout attempt, so a double click or a retry returns the same order
 	const idempotencyKey = React.useRef(crypto.randomUUID());
 
-	// Fill the form with the customer's most recent saved address.
+	// Start from the customer's most recent saved address
 	React.useEffect(() => {
 		api('/addresses')
 			.then((list) => {
@@ -39,9 +40,9 @@ const Checkout = () => {
 				setSaved(last);
 				setForm({
 					name: last.fullAddressName,
-					phoneNumber: last.phone,
-					address: last.street,
-					zipCode: last.postalCode ?? '',
+					phone: last.phone,
+					street: last.street,
+					postalCode: last.postalCode ?? '',
 					city: last.city,
 					country: last.country,
 				});
@@ -53,34 +54,27 @@ const Checkout = () => {
 
 	const validate = () => {
 		const next = {};
-		if (form.name.trim().length < 3) next.name = 'Name is required';
-		if (!/^\+?[\d\s()-]{7,20}$/.test(form.phoneNumber.trim())) next.phoneNumber = 'Invalid phone number';
-		if (form.address.trim().length < 3) next.address = 'Address is required';
-		if (form.city.trim().length < 2) next.city = 'City is required';
-		if (form.country.trim().length < 2) next.country = 'Country is required';
+		if (form.name.trim().length < 3) next.name = 'Required';
+		if (!/^\+?[\d\s()-]{7,20}$/.test(form.phone.trim())) next.phone = 'Invalid phone';
+		if (form.street.trim().length < 3) next.street = 'Required';
+		if (form.city.trim().length < 2) next.city = 'Required';
+		if (form.country.trim().length < 2) next.country = 'Required';
 		setErrors(next);
 		return Object.keys(next).length === 0;
 	};
 
-	// Reuse the saved address when nothing changed; otherwise save the new one.
+	// Reuses the saved address when nothing changed, otherwise saves a new one
 	const addressId = async () => {
 		const body = {
 			fullAddressName: form.name.trim(),
-			street: form.address.trim(),
+			street: form.street.trim(),
 			city: form.city.trim(),
 			country: form.country.trim(),
-			phone: form.phoneNumber.trim(),
-			postalCode: form.zipCode.trim() || null,
+			phone: form.phone.trim(),
+			postalCode: form.postalCode.trim() || null,
 		};
-		const same =
-			saved &&
-			saved.fullAddressName === body.fullAddressName &&
-			saved.street === body.street &&
-			saved.city === body.city &&
-			saved.country === body.country &&
-			saved.phone === body.phone &&
-			(saved.postalCode ?? null) === body.postalCode;
-		if (same) return saved.id;
+		const unchanged = saved && Object.keys(body).every((key) => (saved[key] ?? null) === body[key]);
+		if (unchanged) return saved.id;
 
 		const created = await api('/addresses', { method: 'POST', body });
 		setSaved(created);
@@ -101,14 +95,12 @@ const Checkout = () => {
 			});
 
 			if (order.paymentMethod === 'Card' && order.payment?.checkoutUrl) {
-				// Leave the shop for Fawaterak's hosted page. It sends the browser back to
-				// /payments/fawaterak/return, which forwards to /orders/:id.
 				window.location.assign(order.payment.checkoutUrl);
 				return;
 			}
 
 			idempotencyKey.current = crypto.randomUUID();
-			await refresh(); // the order emptied the cart on the server
+			await refresh();
 			navigate(`/orders/${order.id}`);
 		} catch (err) {
 			setServerError(err.message);
@@ -118,204 +110,179 @@ const Checkout = () => {
 
 	if (cart.items.length === 0 && !busy) {
 		return (
-			<main className='mt-[95px] bg-gray-light'>
-				<div className='xs:px-[24px] md:px-[40px] lg:px-[165px] xs:pt-10 md:pt-16 lg:pt-[79px] pb-[140px]'>
-					<section className='bg-white xs:p-6 md:p-12 rounded-[8px]'>
-						<h3>Checkout</h3>
-						<p className='p text-black/50 mt-4'>Your cart is empty.</p>
-						<div className='flex gap-4 mt-8'>
-							<Link to='/'>
-								<button className='btn bg-cream hover:bg-cream-light'>Continue shopping</button>
-							</Link>
-							<Link to='/orders'>
-								<button className='btn bg-stone hover:bg-black/70'>My orders</button>
-							</Link>
-						</div>
-					</section>
+			<div className='page py-16'>
+				<div className='card flex flex-col items-center gap-4 p-10 text-center'>
+					<ShoppingBag size={32} className='text-muted' />
+					<h1 className='text-[24px]'>Your cart is empty</h1>
+					<div className='flex gap-3'>
+						<Link to='/' className='btn-primary'>
+							Continue shopping
+						</Link>
+						<Link to='/orders' className='btn-secondary'>
+							My orders
+						</Link>
+					</div>
 				</div>
-			</main>
+			</div>
 		);
 	}
 
 	return (
-		<main className='mt-[95px] bg-gray-light'>
-			<div className='xs:px-[24px] md:px-[40px] lg:px-[165px] xs:pt-4 md:pt-8 lg:pt-[79px]'>
-				<button
-					onClick={() => navigate(-1)}
-					className='p text-black/50 cursor-pointer hover:text-cream transition-all duration-150'
-				>
-					Go back
-				</button>
+		<form onSubmit={onSubmit} noValidate className='page flex flex-col gap-8 pb-24 pt-10'>
+			<div className='flex flex-wrap items-end justify-between gap-4'>
+				<div>
+					<button type='button' onClick={() => navigate(-1)} className='label flex items-center gap-2 text-muted hover:text-brand-dark'>
+						<ArrowLeft size={16} /> Back
+					</button>
+					<h1 className='title mt-4'>Checkout</h1>
+				</div>
+				<p className='label flex items-center gap-2 rounded bg-panel px-3 py-2 text-[11px]'>
+					<Lock size={14} /> Stock is reserved when you place the order
+				</p>
 			</div>
-			<form
-				onSubmit={onSubmit}
-				noValidate
-				className='xs:px-[24px] md:px-[40px] lg:px-[165px] mt-[38px] pb-[140px] flex xs:flex-col xl:flex-row gap-8 xs:items-center xl:items-start'
-			>
-				<section className='bg-white xs:p-6 md:p-12 rounded-[8px] w-full'>
-					<h3>Checkout</h3>
 
-					<div className='mt-10'>
-						<p className='text-cream text-[13px] font-bold uppercase leading-[25px] tracking-wide'>Billing Details</p>
-						<div className='mt-4 flex flex-col gap-6'>
-							<div className='flex xs:flex-col md:flex-row items-center gap-4'>
-								<TextField
-									label='Name'
-									name='name'
-									autoComplete='name'
-									placeholder='Alexei Ward'
-									value={form.name}
-									onChange={onChange}
-									error={errors.name}
-								/>
-								<TextField label='Email address' name='email' value={user?.email ?? ''} disabled readOnly />
-							</div>
+			<div className='grid grid-cols-1 items-start gap-8 lg:grid-cols-3'>
+				<div className='flex flex-col gap-6 lg:col-span-2'>
+					<Section number='01' title='Billing details'>
+						<TextField label='Full name' name='name' autoComplete='name' value={form.name} onChange={onChange} error={errors.name} />
+						<div className='grid grid-cols-1 gap-5 md:grid-cols-2'>
+							<TextField label='Email address' name='email' value={user?.email ?? ''} disabled readOnly />
 							<TextField
 								label='Phone number'
-								name='phoneNumber'
+								name='phone'
 								type='tel'
 								autoComplete='tel'
 								placeholder='+20 100 000 0000'
-								value={form.phoneNumber}
+								value={form.phone}
 								onChange={onChange}
-								error={errors.phoneNumber}
+								error={errors.phone}
 							/>
 						</div>
-					</div>
+					</Section>
 
-					<div className='mt-[53px]'>
-						<p className='text-cream text-[13px] font-bold uppercase leading-[25px] tracking-wide'>Shipping Info</p>
-						<div className='mt-4 flex flex-col gap-6'>
+					<Section number='02' title='Shipping information'>
+						<TextField
+							label='Street address'
+							name='street'
+							autoComplete='street-address'
+							placeholder='12 Tahrir Street'
+							value={form.street}
+							onChange={onChange}
+							error={errors.street}
+						/>
+						<div className='grid grid-cols-1 gap-5 md:grid-cols-2'>
 							<TextField
-								label='Address'
-								name='address'
-								autoComplete='street-address'
-								placeholder='12 Tahrir Street'
-								value={form.address}
+								label='Postal code (optional)'
+								name='postalCode'
+								autoComplete='postal-code'
+								placeholder='11511'
+								maxLength={20}
+								value={form.postalCode}
 								onChange={onChange}
-								error={errors.address}
 							/>
-							<div className='flex xs:flex-col md:flex-row items-center gap-4'>
-								<TextField
-									label='ZIP Code (optional)'
-									name='zipCode'
-									autoComplete='postal-code'
-									placeholder='11511'
-									maxLength={20}
-									value={form.zipCode}
-									onChange={onChange}
-								/>
-								<TextField
-									label='City'
-									name='city'
-									autoComplete='address-level2'
-									placeholder='Cairo'
-									value={form.city}
-									onChange={onChange}
-									error={errors.city}
-								/>
-							</div>
 							<TextField
-								label='Country'
-								name='country'
-								autoComplete='country-name'
-								placeholder='Egypt'
-								value={form.country}
+								label='City'
+								name='city'
+								autoComplete='address-level2'
+								placeholder='Cairo'
+								value={form.city}
 								onChange={onChange}
-								error={errors.country}
+								error={errors.city}
 							/>
 						</div>
-					</div>
+						<TextField
+							label='Country'
+							name='country'
+							autoComplete='country-name'
+							placeholder='Egypt'
+							value={form.country}
+							onChange={onChange}
+							error={errors.country}
+						/>
+					</Section>
 
-					<div className='mt-[61px]'>
-						<p className='text-cream text-[13px] font-bold uppercase leading-[25px] tracking-wide'>Payment Details</p>
-						<div className='flex xs:flex-col xs:gap-[17px] md:gap-0 md:flex-row mt-4 justify-between'>
-							<p className='text-black text-xs font-bold flex-1'>Payment Method</p>
-							<div className='flex flex-col flex-1 gap-4'>
-								{[
-									['Card', 'Card (Fawaterak)'],
-									['CashOnDelivery', 'Cash on Delivery'],
-								].map(([value, label]) => (
-									<label
-										key={value}
-										className={`flex items-center gap-4 p-[18px] rounded-lg border cursor-pointer hover:border-cream transition-all duration-150 ${
-											method === value ? 'border-cream' : 'border-stone-300'
-										}`}
-									>
-										<input
-											type='radio'
-											name='payment'
-											value={value}
-											checked={method === value}
-											onChange={() => setMethod(value)}
-											className='cursor-pointer accent-cream'
-										/>
-										<span className='text-black text-xs font-bold'>{label}</span>
-									</label>
-								))}
-							</div>
+					<Section number='03' title='Payment method'>
+						<div className='grid grid-cols-2 gap-3'>
+							{METHODS.map(({ value, label, note, icon: Icon }) => (
+								<button
+									key={value}
+									type='button'
+									onClick={() => setMethod(value)}
+									className={`flex flex-col items-center gap-1 rounded p-4 transition-colors ${
+										method === value ? 'bg-brand-soft text-brand-dark ring-1 ring-brand' : 'bg-panel hover:bg-panel-strong'
+									}`}
+								>
+									<Icon size={22} />
+									<span className='label'>{label}</span>
+									<span className='text-[12px] text-muted'>{note}</span>
+								</button>
+							))}
 						</div>
+						<p className='flex gap-3 rounded bg-panel p-4 text-[14px] text-muted'>
+							<ShieldCheck size={20} className='shrink-0 text-brand' />
+							{method === 'Card'
+								? 'You type your card on Fawaterak’s secure page, never on ours. Staging test card 5123 4500 0000 0008, expiry 12/26, CVV 100.'
+								: 'Pay in cash when the courier arrives. Make sure your address and phone are right.'}
+						</p>
+					</Section>
+				</div>
 
-						<div className='mt-[30px] flex xs:flex-col md:flex-row items-center gap-8'>
-							{method === 'CashOnDelivery' && <img src={CoDLogo} alt='' />}
-							<p className='text-black/50 text-[15px] font-medium leading-[25px]'>
-								{method === 'Card'
-									? 'You’ll enter your card on Fawaterak’s secure payment page. Your card details never reach our servers. Staging test card: 5123 4500 0000 0008, 12/26, CVV 100.'
-									: 'The ‘Cash on Delivery’ option enables you to pay in cash when our delivery courier arrives at your residence. Just make sure your address is correct so that your order will not be cancelled.'}
-							</p>
-						</div>
+				<aside className='card flex flex-col gap-5 p-6 lg:sticky lg:top-28'>
+					<div className='flex items-center justify-between'>
+						<h2 className='text-[18px]'>Summary</h2>
+						<span className='rounded bg-panel px-2 py-1 text-[11px] font-bold uppercase'>{cart.totalQuantity} {cart.totalQuantity === 1 ? 'item' : 'items'}</span>
 					</div>
-				</section>
-
-				<section className='rounded-[8px] p-8 bg-white xs:w-full xl:w-auto'>
-					<h6 className='h6 text-black'>Summary</h6>
-					<div className='flex flex-col items-center gap-6 py-8 overflow-y-auto max-h-[304px] xs:w-full lg:w-[284px]'>
+					<ul className='flex max-h-[280px] flex-col gap-4 overflow-y-auto'>
 						{cart.items.map((item) => (
-							<div key={item.productId} className='w-full flex items-center justify-between'>
-								<div className='flex items-center gap-4'>
-									{item.imageUrl && <img src={item.imageUrl} alt='' className='w-16 h-16 rounded-[8px]' />}
-									<div className='flex flex-col'>
-										<p className='text-[15px] font-bold leading-[25px] text-black'>{item.productName}</p>
-										<p className='text-[14px] font-bold leading-[25px] text-black/50'>{formatPrice(item.unitPrice)}</p>
+							<li key={item.productId} className='flex items-center justify-between gap-3'>
+								<div className='flex min-w-0 items-center gap-3'>
+									{item.imageUrl && <img src={item.imageUrl} alt='' className='h-12 w-12 rounded bg-panel' />}
+									<div className='min-w-0'>
+										<p className='truncate text-[14px] font-bold'>{item.productName}</p>
+										<p className='text-[13px] text-muted'>{formatPrice(item.unitPrice)}</p>
 									</div>
 								</div>
-								<p className='text-[15px] font-bold text-black/50 p-[15px]'>x{item.quantity}</p>
-							</div>
+								<span className='text-[14px] font-bold text-muted'>x{item.quantity}</span>
+							</li>
 						))}
-					</div>
-
-					<div className='flex flex-col gap-2'>
-						<SummaryRow label='Total' value={formatPrice(cart.subTotal)} />
-						<SummaryRow label='Shipping' value={cart.shippingFee > 0 ? formatPrice(cart.shippingFee) : 'Free'} />
-						<div className='flex items-center justify-between mt-4'>
-							<p className='text-[15px] font-[500] leading-[25px] text-black/50 uppercase'>Grand Total</p>
-							<h6 className='font-bold leading-[25px] text-cream'>{formatPrice(cart.total)}</h6>
+					</ul>
+					<div className='flex flex-col gap-2 rounded bg-panel p-4 text-[15px]'>
+						<Row label='Subtotal' value={formatPrice(cart.subTotal)} />
+						<Row label='Shipping' value={cart.shippingFee > 0 ? formatPrice(cart.shippingFee) : 'Free'} />
+						<div className='mt-2 flex items-center justify-between border-t border-line pt-3'>
+							<span className='label'>Grand total</span>
+							<span className='text-[24px] font-bold text-brand'>{formatPrice(cart.total)}</span>
 						</div>
 					</div>
-
 					{serverError && (
-						<p role='alert' className='text-red-600 text-[14px] font-bold mt-6 lg:max-w-[284px]'>
+						<p role='alert' className='text-[14px] font-bold text-red-600'>
 							{serverError}
 						</p>
 					)}
-
-					<button
-						type='submit'
-						disabled={busy}
-						className='btn w-full bg-cream text-white hover:bg-cream-light transition-all duration-150 mt-8 disabled:opacity-60 disabled:cursor-wait'
-					>
-						{busy ? 'Placing your order…' : method === 'Card' ? 'Continue & Pay' : 'Place order'}
+					<button type='submit' disabled={busy} className='btn-primary w-full'>
+						{busy ? 'Placing your order...' : method === 'Card' ? `Continue and pay ${formatPrice(cart.total)}` : 'Place order'}
+						{!busy && <ArrowRight size={16} />}
 					</button>
-				</section>
-			</form>
-		</main>
+				</aside>
+			</div>
+		</form>
 	);
 };
 
-const SummaryRow = ({ label, value }) => (
+const Section = ({ number, title, children }) => (
+	<section className='card flex flex-col gap-5 p-6 md:p-8'>
+		<h2 className='flex items-center gap-3 text-[18px]'>
+			<span className='rounded bg-panel px-2 py-1 text-[12px] text-muted'>{number}</span>
+			{title}
+		</h2>
+		{children}
+	</section>
+);
+
+const Row = ({ label, value }) => (
 	<div className='flex items-center justify-between'>
-		<p className='text-[15px] font-[500] leading-[25px] text-black/50 uppercase'>{label}</p>
-		<h6 className='font-bold leading-[25px] text-black'>{value}</h6>
+		<span className='text-muted'>{label}</span>
+		<span className='font-bold'>{value}</span>
 	</div>
 );
 

@@ -1,17 +1,16 @@
 import React from 'react';
 import { api, getSession, onSessionChange, setSession } from '../lib/api';
 
-// Who is signed in. The API owns the truth (tokens, roles); this only remembers the session
-// and exposes login / register / logout to the pages.
+// Who is signed in, with login, register and logout for the pages
 const AuthContext = React.createContext(null);
 
 export function AuthProvider({ children }) {
 	const [user, setUser] = React.useState(() => getSession()?.user ?? null);
 
-	// Keep React in step when api.js drops the session (a refresh token was refused).
+	// Keeps React in step when api.js drops a refused session
 	React.useEffect(() => onSessionChange((s) => setUser(s?.user ?? null)), []);
 
-	// On first load, check the saved session still works (this refreshes it if it expired).
+	// On first load checks that the saved session still works
 	React.useEffect(() => {
 		if (!getSession()) return;
 		api('/auth/me').catch(() => setSession(null));

@@ -40,7 +40,7 @@ every push and pull request.
 | 1 Checkout + concurrency | ✅ done: checkout from the cart, `xmin` + one retry, cancel, order tests, CI |
 | 2 Pluggable payments | 🟡 Fawaterak is on (card only) and tested for real; **the pluggable design and fake-gateway tests left** |
 | 3 Login, roles, addresses | ✅ done |
-| 4 React client | 🟡 login, cart, checkout, orders, home catalogue, cancel button done; **guest cart, httpOnly cookie left** |
+| 4 React client | 🟡 redesigned from Stitch (light theme, Lucide icons) with every customer page; **guest cart, httpOnly cookie left** |
 | 5 Admin dashboard | ⬜ not started |
 | 6 Caching + messaging | ⬜ not started |
 | 7 Docker, CI, deploy | ⬜ not started (AWS was considered; the VPS + Neon plan still stands) |
@@ -216,7 +216,9 @@ chain, not every session) are a possible refinement; revoking everything is the 
 - [x] Home page lists every product as a card with quantity + *Add to cart*, filtered by category (2026-10-18)
 - [ ] **Guest cart**: today you must log in before adding; keep a local cart and merge it into the server cart on login
 - [x] *Cancel order* button on the order page (2026-10-18)
-- [ ] Fix the old lint errors (unused `React` imports in Home, Footer, Menu, Category, BestGear; an apostrophe in Footer)
+- [x] Fix the old lint errors (gone with the redesign; `npm run lint` passes with zero warnings)
+- [x] **Redesign from the Stitch project** (2026-10-19): light theme, Lucide icons, one product list in `CatalogContext`,
+      category pages folded into the storefront, search and *in stock only* filters, order tracker. See `docs/frontend.md`
 - [x] CORS policy in the API for the client origin (`Cors:AllowedOrigins`)
 - [x] Delete the old `wwwroot` demo storefront (removed 2026-10-15; it had no login)
 

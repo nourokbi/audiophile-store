@@ -3,35 +3,61 @@
 @tailwind utilities;
 
 @layer base {
-	h1 {
-		@apply text-[56px] font-bold leading-[58px] tracking-[2px] uppercase;
+	body {
+		@apply bg-page text-ink font-sans antialiased;
 	}
 
-	h2 {
-		@apply text-[40px] font-bold leading-[44px] tracking-[1.4px] uppercase;
-	}
-
-	h3 {
-		@apply text-[32px] font-bold leading-[36px] tracking-[1.1px] uppercase;
-	}
-
+	h1,
+	h2,
+	h3,
 	h4 {
-		@apply text-[28px] font-bold leading-normal tracking-[2px] uppercase;
+		@apply font-bold uppercase;
+	}
+}
+
+/* The repeated building blocks of the Stitch design, so pages only say what they are */
+@layer components {
+	.page {
+		@apply mx-auto w-full max-w-page px-6 md:px-10 lg:px-0;
 	}
 
-	h5 {
-		@apply text-[24px] font-bold leading-normal tracking-[1.4px] uppercase;
+	.card {
+		@apply rounded bg-white shadow-sm;
 	}
 
-	h6 {
-		@apply text-[18px] font-bold leading-normal tracking-[1.3px] uppercase;
+	.label {
+		@apply text-[13px] font-bold uppercase tracking-wider;
 	}
 
-	p {
-		@apply text-[15px] font-[500] leading-[25px];
+	.eyebrow {
+		@apply text-[12px] font-bold uppercase tracking-[0.25em] text-brand-dark;
+	}
+
+	.title {
+		@apply text-[32px] leading-tight tracking-tight md:text-[40px];
 	}
 
 	.btn {
-		@apply py-[15px] px-[30px] text-[13px] uppercase font-bold tracking-[1px] text-white cursor-pointer;
+		@apply label inline-flex h-12 items-center justify-center gap-2 rounded px-6 transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+	}
+
+	.btn-primary {
+		@apply btn bg-brand text-white shadow-sm hover:bg-brand-hover;
+	}
+
+	.btn-secondary {
+		@apply btn bg-panel text-ink hover:bg-panel-strong;
+	}
+
+	.btn-dark {
+		@apply btn bg-ink text-white hover:bg-black;
+	}
+
+	.input {
+		@apply h-12 w-full rounded bg-panel px-4 text-[15px] font-medium text-ink placeholder:text-muted/70 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand disabled:text-muted;
+	}
+
+	.chip {
+		@apply label rounded px-4 py-2 transition-colors;
 	}
 }

@@ -2,9 +2,7 @@ import React from 'react';
 import { api } from '../lib/api';
 import { useAuth } from './AuthContext';
 
-// The cart lives on the server (GET /cart), so it survives a refresh and is exactly what
-// checkout will order. Every cart endpoint returns the whole cart, so each action simply
-// replaces what we show: no totals are calculated here.
+// The cart lives on the server and every cart endpoint returns the whole cart, so each action just replaces what we show
 const EMPTY = { items: [], totalQuantity: 0, subTotal: 0, shippingFee: 0, total: 0 };
 const CartContext = React.createContext(null);
 

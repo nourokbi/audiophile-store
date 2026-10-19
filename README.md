@@ -9,6 +9,7 @@ and a React client.
 [`docs/diagrams.md`](docs/diagrams.md) (architecture, ERD, state machines) ·
 [`docs/database.md`](docs/database.md) (PostgreSQL, Neon, migrations) ·
 [`docs/api.md`](docs/api.md) (every endpoint) · [`docs/checkout-flow.md`](docs/checkout-flow.md) (follow one order through the code) ·
+[`docs/frontend.md`](docs/frontend.md) (the shop's structure and design) ·
 [`docs/changelog.md`](docs/changelog.md) (what changed).
 
 This is a rebuild of an earlier single-project API ([`nourokbi/audiophile`](https://github.com/nourokbi/audiophile)),

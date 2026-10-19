@@ -1,17 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { ShoppingBag, Trash2 } from 'lucide-react';
 
+import QuantityStepper from './QuantityStepper';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { formatPrice } from '../lib/format';
 
-// The cart drop-down. Every button calls the API and shows the cart it sends back.
+// The cart panel under the header, every change goes to the API and shows the cart it sends back
 const Cart = ({ onClose }) => {
 	const { user } = useAuth();
 	const { cart, setQuantity, remove, clear } = useCart();
 	const [error, setError] = React.useState('');
 
-	const run = (action) => async () => {
+	const run = async (action) => {
 		setError('');
 		try {
 			await action();
@@ -22,75 +24,73 @@ const Cart = ({ onClose }) => {
 
 	if (!user) {
 		return (
-			<div className='rounded-[8px] p-8 bg-white'>
-				<h6 className='h6 text-black'>Cart</h6>
-				<p className='p text-black/50 mt-4'>Log in to add products and keep your cart on any device.</p>
-				<Link to='/login' onClick={onClose}>
-					<button className='btn w-full bg-cream hover:bg-cream-light transition-all duration-150 mt-6'>Log in</button>
+			<div className='card p-6 shadow-xl'>
+				<h3 className='text-[18px]'>Cart</h3>
+				<p className='mt-3 text-[15px] text-muted'>Log in to add products and keep your cart on any device.</p>
+				<Link to='/login' onClick={onClose} className='btn-primary mt-6 w-full'>
+					Log in
 				</Link>
 			</div>
 		);
 	}
 
 	return (
-		<div className='rounded-[8px] p-8 bg-white'>
-			<div className='flex justify-between items-center'>
-				<h6 className='h6 text-black'>Cart {cart.items.length > 0 && `(${cart.totalQuantity})`}</h6>
+		<div className='card p-6 shadow-xl'>
+			<div className='flex items-center justify-between'>
+				<h3 className='text-[18px]'>Cart ({cart.totalQuantity})</h3>
 				{cart.items.length > 0 && (
-					<button
-						onClick={run(clear)}
-						className='text-[15px] font-[500] leading-[25px] underline text-black/50 hover:text-cream transition-all duration-200'
-					>
-						Remove all
+					<button onClick={() => run(clear)} className='flex items-center gap-1 text-[14px] text-muted hover:text-red-600'>
+						<Trash2 size={14} /> Remove all
 					</button>
 				)}
 			</div>
-			<div className='flex flex-col items-center gap-6 py-8 overflow-y-auto max-h-[304px]'>
-				{cart.items.length === 0 && <h6 className='text-black/20'>Cart is empty</h6>}
-				{cart.items.map((item) => (
-					<div key={item.productId} className='w-full flex items-center justify-between gap-4'>
-						<div className='flex items-center gap-4'>
-							{item.imageUrl && <img src={item.imageUrl} alt='' className='w-16 h-16 rounded-[8px]' />}
-							<div className='flex flex-col'>
-								<p className='text-[15px] font-bold leading-[25px] text-black'>{item.productName}</p>
-								<p className='text-[14px] font-bold leading-[25px] text-black/50'>{formatPrice(item.unitPrice)}</p>
-							</div>
-						</div>
-						<div className='w-[96px] h-[32px] flex justify-between bg-gray-light p-[15px] items-center shrink-0'>
-							<button
-								aria-label={`One less ${item.productName}`}
-								onClick={run(() =>
-									item.quantity > 1 ? setQuantity(item.productId, item.quantity - 1) : remove(item.productId),
-								)}
-								className='text-[13px] text-black/30 hover:text-cream font-bold tracking-[1px]'
-							>
-								-
-							</button>
-							<span className='text-[13px] text-black font-bold tracking-[1px]'>{item.quantity}</span>
-							<button
-								aria-label={`One more ${item.productName}`}
-								onClick={run(() => setQuantity(item.productId, item.quantity + 1))}
-								className='text-[13px] text-black/30 hover:text-cream font-bold tracking-[1px]'
-							>
-								+
-							</button>
-						</div>
-					</div>
-				))}
-			</div>
-			{error && <p className='text-red-600 text-[14px] font-bold mb-4'>{error}</p>}
-			{cart.items.length > 0 && (
-				<div className='flex flex-col gap-6'>
-					<div className='flex justify-between items-center'>
-						<p className='text-[15px] font-[500] leading-[25px] text-black/50 uppercase'>Total</p>
-						<h6 className='h6 text-black'>{formatPrice(cart.subTotal)}</h6>
-					</div>
-					<Link to='/checkout' onClick={onClose}>
-						<button className='btn w-full bg-cream text-white hover:bg-cream-light transition-all duration-150'>
-							Checkout
-						</button>
-					</Link>
+
+			{cart.items.length === 0 ? (
+				<div className='flex flex-col items-center gap-3 py-10 text-muted'>
+					<ShoppingBag size={32} />
+					<p className='text-[15px]'>Your cart is empty</p>
 				</div>
+			) : (
+				<ul className='flex max-h-[320px] flex-col gap-4 overflow-y-auto py-6'>
+					{cart.items.map((item) => (
+						<li key={item.productId} className='flex items-center justify-between gap-3'>
+							<div className='flex min-w-0 items-center gap-3'>
+								{item.imageUrl && <img src={item.imageUrl} alt='' className='h-14 w-14 rounded bg-panel' />}
+								<div className='min-w-0'>
+									<p className='truncate text-[15px] font-bold'>{item.productName}</p>
+									<p className='text-[14px] font-bold text-muted'>{formatPrice(item.unitPrice)}</p>
+								</div>
+							</div>
+							<QuantityStepper
+								small
+								value={item.quantity}
+								label={item.productName}
+								onChange={(quantity) => run(() => setQuantity(item.productId, quantity))}
+							/>
+							<button
+								aria-label={`Remove ${item.productName}`}
+								onClick={() => run(() => remove(item.productId))}
+								className='text-muted hover:text-red-600'
+							>
+								<Trash2 size={16} />
+							</button>
+						</li>
+					))}
+				</ul>
+			)}
+
+			{error && <p className='mb-4 text-[14px] font-bold text-red-600'>{error}</p>}
+
+			{cart.items.length > 0 && (
+				<>
+					<div className='flex items-center justify-between border-t border-line pt-4'>
+						<span className='label text-muted'>Subtotal</span>
+						<span className='text-[18px] font-bold'>{formatPrice(cart.subTotal)}</span>
+					</div>
+					<Link to='/checkout' onClick={onClose} className='btn-primary mt-6 w-full'>
+						Checkout
+					</Link>
+				</>
 			)}
 		</div>
 	);
