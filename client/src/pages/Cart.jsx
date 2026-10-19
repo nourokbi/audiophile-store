@@ -1,17 +1,20 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, LogIn, ShoppingBag, Trash2 } from 'lucide-react';
+import { ArrowRight, Check, LogIn, ShoppingBag, Trash2 } from 'lucide-react';
 
 import QuantityStepper from '../components/QuantityStepper';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useCatalog } from '../context/CatalogContext';
 import { formatPrice } from '../lib/format';
+import { findCategory } from '../lib/navigation';
 import { SHIPPING } from '../lib/shipping';
 
 // The cart page, every change goes to the API and the page shows the cart it sends back
 const Cart = () => {
 	const { user } = useAuth();
 	const { cart, setQuantity, remove, clear } = useCart();
+	const { products } = useCatalog();
 	const [error, setError] = React.useState('');
 
 	const run = async (action) => {
@@ -57,28 +60,15 @@ const Cart = () => {
 			</div>
 
 			<div className='grid grid-cols-1 items-start gap-8 lg:grid-cols-3'>
-				<section className='card flex flex-col divide-y divide-line lg:col-span-2'>
+				<section className='flex flex-col gap-4 lg:col-span-2'>
 					{cart.items.map((item) => (
-						<div key={item.productId} className='flex flex-wrap items-center gap-4 p-5 sm:flex-nowrap'>
-							{item.imageUrl && <img src={item.imageUrl} alt='' className='h-20 w-20 shrink-0 rounded bg-panel object-cover' />}
-							<div className='min-w-0 flex-1'>
-								<p className='truncate text-[16px] font-bold'>{item.productName}</p>
-								<p className='text-[14px] text-muted'>{formatPrice(item.unitPrice)} each</p>
-							</div>
-							<QuantityStepper
-								value={item.quantity}
-								label={item.productName}
-								onChange={(quantity) => run(() => setQuantity(item.productId, quantity))}
-							/>
-							<p className='w-28 text-right text-[16px] font-bold'>{formatPrice(item.lineTotal)}</p>
-							<button
-								aria-label={`Remove ${item.productName}`}
-								onClick={() => run(() => remove(item.productId))}
-								className='rounded p-2 text-muted hover:bg-panel hover:text-red-600'
-							>
-								<Trash2 size={18} />
-							</button>
-						</div>
+						<CartItem
+							key={item.productId}
+							item={item}
+							product={products.find((p) => p.id === item.productId)}
+							onQuantity={(quantity) => run(() => setQuantity(item.productId, quantity))}
+							onRemove={() => run(() => remove(item.productId))}
+						/>
 					))}
 				</section>
 
@@ -107,6 +97,63 @@ const Cart = () => {
 				</aside>
 			</div>
 		</div>
+	);
+};
+
+// One cart line as a card, the catalogue adds the category, description, stock and the link to the product
+const CartItem = ({ item, product, onQuantity, onRemove }) => {
+	const href = product ? `/${product.category}/${product.slug}` : null;
+	const image = product?.image.mobile ?? item.imageUrl;
+
+	return (
+		<article className='card flex flex-col gap-5 p-5 sm:flex-row'>
+			<Link to={href ?? '#'} className='shrink-0 overflow-hidden rounded bg-panel sm:w-44'>
+				{image && <img src={image} alt={item.productName} className='aspect-square w-full object-cover' />}
+			</Link>
+
+			<div className='flex min-w-0 flex-1 flex-col gap-3'>
+				<div className='flex items-start justify-between gap-4'>
+					<div className='min-w-0'>
+						{product && <p className='eyebrow text-[11px]'>{findCategory(product.category)?.label}</p>}
+						<Link to={href ?? '#'} className='mt-1 block text-[18px] font-bold uppercase hover:text-brand-dark'>
+							{item.productName}
+						</Link>
+					</div>
+					<button
+						aria-label={`Remove ${item.productName}`}
+						onClick={onRemove}
+						className='rounded p-2 text-muted hover:bg-panel hover:text-red-600'
+					>
+						<Trash2 size={18} />
+					</button>
+				</div>
+
+				{product && <p className='line-clamp-2 text-[14px] text-muted'>{product.description}</p>}
+
+				{product && (
+					<p className='flex items-center gap-2 text-[13px] font-bold'>
+						{product.stock > 5 ? (
+							<span className='flex items-center gap-1 text-emerald-600'>
+								<Check size={14} /> In stock
+							</span>
+						) : (
+							<span className='text-brand-dark'>Only {product.stock} left</span>
+						)}
+						<span className='text-muted'>- {formatPrice(item.unitPrice)} each</span>
+					</p>
+				)}
+
+				<div className='mt-auto flex items-center justify-between gap-4 pt-2'>
+					<QuantityStepper
+						value={item.quantity}
+						max={Math.max(item.quantity, product?.stock ?? 100)}
+						label={item.productName}
+						onChange={onQuantity}
+					/>
+					<p className='text-[20px] font-bold'>{formatPrice(item.lineTotal)}</p>
+				</div>
+			</div>
+		</article>
 	);
 };
 

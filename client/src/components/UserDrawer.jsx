@@ -87,7 +87,7 @@ const UserDrawer = ({ onClose }) => {
 
 				{user && (
 					<div className='border-t border-line p-4'>
-						<button onClick={onLogout} className='menu-item text-muted'>
+						<button onClick={onLogout} className='menu-item text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950'>
 							<LogOut size={18} /> Log out
 						</button>
 					</div>

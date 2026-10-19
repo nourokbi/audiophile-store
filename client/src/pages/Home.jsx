@@ -65,7 +65,8 @@ const Home = ({ collection }) => {
 
 	const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
 	const current = Math.min(page, pages);
-	const onPage = shown.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+	const first = (current - 1) * PAGE_SIZE;
+	const onPage = shown.slice(first, first + PAGE_SIZE);
 
 	const goTo = (next) => {
 		setPage(next);
@@ -147,7 +148,11 @@ const Home = ({ collection }) => {
 
 				<div className='flex items-center justify-between px-1 text-[14px] text-muted'>
 					<span>
-						Showing <strong className='text-ink'>{onPage.length}</strong> of {shown.length} products
+						Showing{' '}
+						<strong className='text-ink'>
+							{onPage.length === 0 ? 0 : `${first + 1} to ${first + onPage.length}`}
+						</strong>{' '}
+						of {shown.length} products
 					</span>
 					{error && <span className='text-red-600'>Products could not be loaded ({error})</span>}
 				</div>

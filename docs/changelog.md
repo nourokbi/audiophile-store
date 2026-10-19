@@ -4,6 +4,11 @@ What changed and why, newest first. Git history has the line-by-line detail; thi
 
 ## 2026-10-19 — Cart page, address picker, pagination
 
+- Cart items are bigger cards with the photo, category, description, stock and a link to the product page.
+- *Export CSV* for recent orders on the admin dashboard.
+- The product counter shows the range on the page, like *Showing 10 to 18 of 22 products*.
+- Log out in the user drawer is red.
+
 - **Cart page** at `/cart`, opened from the cart icon, instead of the drop-down: quantities, remove, totals, how
   much more for free shipping, and the way to checkout.
 - **Checkout address picker**: choose one of your saved addresses or *Add a new address*; with none saved the form

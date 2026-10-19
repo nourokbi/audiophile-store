@@ -1,13 +1,21 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Boxes, Info, Package, Plus, TrendingUp, Users, Wallet } from 'lucide-react';
+import { AlertTriangle, Boxes, Download, Info, Package, Plus, TrendingUp, Users, Wallet } from 'lucide-react';
 
 import { StatusBadge } from '../components/OrderParts';
 import { useCatalog } from '../context/CatalogContext';
 import { SAMPLE_ORDERS, SAMPLE_SALES_BY_DAY, SAMPLE_STATS } from '../data/adminSample';
+import { downloadCsv } from '../lib/csv';
 import { formatPrice } from '../lib/format';
 import { findCategory } from '../lib/navigation';
 
 const LOW_STOCK = 8;
+
+// Saves the recent orders as a CSV file that opens in Excel or Google Sheets
+const exportRecentOrders = () =>
+	downloadCsv(`recent-orders-${new Date().toISOString().slice(0, 10)}.csv`, [
+		['Order', 'Customer', 'Date', 'Payment', 'Status', 'Total (EGP)'],
+		...SAMPLE_ORDERS.map((o) => [o.id, o.customer, o.date, o.method, o.status, o.total]),
+	]);
 
 // The admin overview, the products are real and the sales and orders are sample data until the admin API exists
 const AdminDashboard = () => {
@@ -85,9 +93,14 @@ const AdminDashboard = () => {
 			<section className='card flex flex-col gap-4 overflow-hidden p-6'>
 				<div className='flex items-center justify-between'>
 					<h2 className='text-[18px]'>Recent orders</h2>
-					<span className='flex items-center gap-2 text-[13px] text-muted'>
-						<Users size={16} /> {SAMPLE_STATS.customers} customers
-					</span>
+					<div className='flex items-center gap-4'>
+						<span className='hidden items-center gap-2 text-[13px] text-muted sm:flex'>
+							<Users size={16} /> {SAMPLE_STATS.customers} customers
+						</span>
+						<button onClick={exportRecentOrders} className='btn-secondary h-10 px-4'>
+							<Download size={16} /> Export CSV
+						</button>
+					</div>
 				</div>
 				<Table head={['Order', 'Customer', 'Date', 'Payment', 'Status', 'Total']}>
 					{SAMPLE_ORDERS.map((o) => (

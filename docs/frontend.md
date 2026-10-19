@@ -25,7 +25,7 @@ After a change to `tailwind.config.js`, restart `npm run dev`: the dev server do
 | `src/components` | Pieces used by several pages: `Navbar`, `UserDrawer`, `Footer`, `ProductCard`, `QuantityStepper`, `TextField`, `Picture`, `OrderParts`, `Logo`, `Layout`, `RequireAuth` |
 | `src/context` | Shared state: `ThemeContext` (light or dark), `AuthContext` (who is signed in), `CartContext` (the server cart), `CatalogContext` (the products) |
 | `src/hooks` | `useAddToCart`, used by the product cards and the product page |
-| `src/lib` | `api.js` (every call to the API), `format.js` (prices), `navigation.js` (the categories with their icons), `shipping.js` (the free shipping threshold shown on the cart page) |
+| `src/lib` | `api.js` (every call to the API), `format.js` (prices), `navigation.js` (the categories with their icons), `shipping.js` (the free shipping threshold shown on the cart page), `csv.js` (downloads rows as a CSV file) |
 | `src/data/pictures.json` | Each product's photo, and for the six original products the responsive sizes and the gallery |
 | `src/data/adminSample.js` | Sample numbers for the admin dashboard until the admin API exists |
 
@@ -37,7 +37,7 @@ After a change to `tailwind.config.js`, restart `npm run dev`: the dev server do
 | `/new` | The new collection, the same storefront showing only new products | no |
 | `/headphones`, `/speakers`, `/earphones`, `/amplifiers`, `/accessories` | The same storefront with that category selected | no |
 | `/:category/:slug` | Product page | no |
-| `/cart` | The cart with quantities, remove, totals and the way to checkout | no, it asks to log in |
+| `/cart` | The cart as product cards (photo, category, description, stock, quantity, line total), totals and the way to checkout | no, it asks to log in |
 | `/login`, `/register` | One card for both | no |
 | `/checkout` | Pick a saved address or add a new one, payment method, summary | yes |
 | `/orders` | My orders with status tabs | yes |
@@ -126,3 +126,9 @@ left out: the card is always typed on Fawaterak's page, never on ours.
 stock and low stock list are live from the catalogue; revenue, the chart and recent orders come from
 `src/data/adminSample.js`, and a banner on the page says so. When the admin API exists, each sample value is
 replaced by its call: `GET /admin/stats`, `GET /admin/orders`, and the product buttons by the admin product endpoints.
+
+*Export CSV* on Recent orders saves the table as `recent-orders-<date>.csv` in the browser (`lib/csv.js`), so it
+opens in Excel or Google Sheets. It exports the sample rows today and the real orders once `GET /admin/orders` exists.
+
+The orders chart is plain `div` bars with heights in percent, no chart library. If the dashboard grows several
+charts, Recharts is the simplest React option to add.
