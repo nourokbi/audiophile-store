@@ -1,79 +1,65 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { ShoppingBag } from 'lucide-react';
 
 import QuantityStepper from './QuantityStepper';
 import { useAddToCart } from '../hooks/useAddToCart';
 import { formatPrice } from '../lib/format';
+import { findCategory } from '../lib/navigation';
 
-// One product on the home page: picture, name, price and stock from the API, and a way to
-// add it to the cart without opening the product. The picture and name open the full page.
-// `product` is the data.json entry (look); `live` is the API's product (price, stock, id).
-const ProductCard = ({ product, live, loading }) => {
+// One product in the grid, it can go straight into the cart and the picture or name opens the full page
+const ProductCard = ({ product }) => {
 	const [quantity, setQuantity] = React.useState(1);
 	const { addToCart, busy, notice } = useAddToCart();
 	const href = `/${product.category}/${product.slug}`;
-	const soldOut = live && !live.inStock;
+	const soldOut = !product.inStock;
 
 	const onAdd = async () => {
-		if (await addToCart(live.id, quantity)) setQuantity(1);
+		if (await addToCart(product.id, quantity)) setQuantity(1);
 	};
 
 	return (
-		<article className='flex flex-col bg-white rounded-[8px] overflow-hidden border border-transparent hover:border-cream/40 transition-all duration-150'>
-			<Link to={href} className='block bg-gray-light aspect-square overflow-hidden' aria-label={product.name}>
+		<article className='card group flex flex-col overflow-hidden transition-shadow duration-300 hover:shadow-xl'>
+			<Link to={href} className='relative block aspect-[4/3] overflow-hidden bg-panel' aria-label={product.name}>
 				<img
 					src={product.image.mobile}
 					alt=''
 					loading='lazy'
-					className='w-full h-full object-cover hover:scale-[1.03] transition-transform duration-300'
+					className='h-full w-full object-cover transition-transform duration-500 group-hover:scale-105'
 				/>
+				{product.isNew && (
+					<span className='absolute left-4 top-4 rounded bg-ink px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-page'>
+						New
+					</span>
+				)}
 			</Link>
 
-			<div className='flex flex-col flex-1 p-6 gap-3'>
-				<div className='flex items-center justify-between gap-3 min-h-[20px]'>
-					<p className='text-[12px] text-black/40 font-bold uppercase tracking-[2px]'>{product.category}</p>
-					{product.new && (
-						<p className='text-[12px] text-cream font-bold uppercase tracking-[2px]'>New</p>
-					)}
-				</div>
-
-				<Link to={href} className='hover:text-cream transition-all duration-150'>
-					<h6 className='text-[18px] leading-[24px]'>{product.name}</h6>
+			<div className='flex flex-1 flex-col gap-2 p-6'>
+				<p className='text-[11px] font-bold uppercase tracking-widest text-brand-dark'>{findCategory(product.category)?.label}</p>
+				<Link to={href}>
+					<h2 className='text-[18px] tracking-tight transition-colors group-hover:text-brand-dark'>{product.name}</h2>
 				</Link>
-				<p className='p text-black/50 line-clamp-2'>{product.description}</p>
-
-				<div className='flex items-baseline justify-between gap-3 mt-auto pt-2'>
-					<p className='text-[18px] font-bold tracking-[1.3px] text-black tabular-nums'>
-						{live ? formatPrice(live.price) : loading ? '…' : 'Not available'}
-					</p>
-					<p className={`text-[13px] font-bold ${soldOut ? 'text-red-600' : 'text-black/40'}`}>
-						{!live ? '' : soldOut ? 'Out of stock' : live.stock <= 5 ? `Only ${live.stock} left` : 'In stock'}
-					</p>
+				<p className='line-clamp-2 text-[14px] text-muted'>{product.description}</p>
+				<div className='mt-auto flex items-baseline justify-between pt-2'>
+					<span className='text-[24px] font-bold'>
+						{formatPrice(product.price)}
+					</span>
+					<span className={`text-[13px] font-bold ${soldOut ? 'text-red-600' : 'text-muted'}`}>
+						{soldOut ? 'Out of stock' : product.stock <= 5 ? `Only ${product.stock} left` : 'In stock'}
+					</span>
 				</div>
-
-				<div className='flex gap-3'>
-					<QuantityStepper
-						value={quantity}
-						onChange={setQuantity}
-						max={Math.max(1, live?.stock ?? 1)}
-						label={product.name}
-					/>
-					<button
-						onClick={onAdd}
-						disabled={!live || soldOut || busy}
-						className='btn flex-1 px-4 bg-cream hover:bg-cream-light transition-all duration-150 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed'
-					>
-						{busy ? 'Adding…' : soldOut ? 'Sold out' : 'Add to cart'}
-					</button>
-				</div>
-
-				<p
-					role='status'
-					className={`text-[13px] font-bold min-h-[20px] ${notice?.ok ? 'text-cream' : 'text-red-600'}`}
-				>
-					{notice?.text}
-				</p>
 			</div>
+
+			<div className='flex items-center gap-3 px-6 pb-2'>
+				<QuantityStepper value={quantity} onChange={setQuantity} max={Math.max(1, product.stock)} label={product.name} />
+				<button onClick={onAdd} disabled={soldOut || busy} className='btn-primary flex-1'>
+					<ShoppingBag size={18} />
+					{busy ? 'Adding...' : soldOut ? 'Sold out' : 'Add to cart'}
+				</button>
+			</div>
+			<p role='status' className={`min-h-[36px] px-6 pb-4 pt-2 text-[13px] font-bold ${notice?.ok ? 'text-brand-dark' : 'text-red-600'}`}>
+				{notice?.text}
+			</p>
 		</article>
 	);
 };

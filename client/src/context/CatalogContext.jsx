@@ -1,27 +1,50 @@
 import React from 'react';
 import { api } from '../lib/api';
+import pictures from '../data/pictures.json';
 
-// The API's products, by slug. data.json still drives the look of the pages (images, gallery,
-// "you may also like"); the API is the source of truth for what can be bought: id, price, stock.
-// The two meet on the slug, which the API seeds with the same values as data.json.
-const CatalogContext = React.createContext({ bySlug: {}, loading: true, error: null });
+// The products from the API, with the photos and gallery from pictures.json added by slug
+const CatalogContext = React.createContext(null);
+
+const sameImageEverywhere = (url) => ({ mobile: url, tablet: url, desktop: url });
+
+function toProduct(p) {
+	const look = pictures[p.slug] ?? {};
+	const image = look.image ?? p.imageUrl;
+	return {
+		id: p.id,
+		slug: p.slug,
+		name: p.name,
+		description: p.description,
+		features: p.features,
+		price: p.price,
+		stock: p.stock,
+		inStock: p.inStock,
+		category: p.category.toLowerCase(),
+		includes: Object.entries(p.inTheBox).map(([item, quantity]) => ({ item, quantity })),
+		image: typeof image === 'string' ? sameImageEverywhere(image) : image,
+		gallery: look.gallery ?? null,
+		isNew: Boolean(look.new),
+	};
+}
 
 export function CatalogProvider({ children }) {
-	const [state, setState] = React.useState({ bySlug: {}, loading: true, error: null });
+	const [products, setProducts] = React.useState([]);
+	const [loading, setLoading] = React.useState(true);
+	const [error, setError] = React.useState(null);
 
 	React.useEffect(() => {
 		api('/products?pageSize=50')
-			.then((page) =>
-				setState({
-					bySlug: Object.fromEntries(page.items.map((p) => [p.slug, p])),
-					loading: false,
-					error: null,
-				}),
-			)
-			.catch((e) => setState({ bySlug: {}, loading: false, error: e.message }));
+			.then((page) => setProducts(page.items.map(toProduct)))
+			.catch((e) => setError(e.message))
+			.finally(() => setLoading(false));
 	}, []);
 
-	return <CatalogContext.Provider value={state}>{children}</CatalogContext.Provider>;
+	const value = React.useMemo(
+		() => ({ products, loading, error, findBySlug: (slug) => products.find((p) => p.slug === slug) }),
+		[products, loading, error],
+	);
+
+	return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>;
 }
 
 export function useCatalog() {

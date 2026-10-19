@@ -2,6 +2,65 @@
 
 What changed and why, newest first. Git history has the line-by-line detail; this file is the readable version.
 
+## 2026-10-19 — Admin product actions
+
+- Every row of the admin product table has *Restock*, *Price* and an *Available* switch, in a small dialog with a
+  preview of the change. The calls live in `client/src/lib/adminApi.js` and only change the page until the admin API
+  exists; the roadmap lists the endpoints to build.
+- React Query and Chart.js are planned for right after the admin API (roadmap, Phase 5).
+
+## 2026-10-19 — Cart page, address picker, pagination
+
+- Cart items are bigger cards with the photo, category, description, stock and a link to the product page.
+- *Export CSV* for recent orders on the admin dashboard.
+- The product counter shows the range on the page, like *Showing 10 to 18 of 22 products*.
+- Log out in the user drawer is red.
+
+- **Cart page** at `/cart`, opened from the cart icon, instead of the drop-down: quantities, remove, totals, how
+  much more for free shipping, and the way to checkout.
+- **Checkout address picker**: choose one of your saved addresses or *Add a new address*; with none saved the form
+  shows straight away. A new address is saved once, so retrying after an error does not save it twice.
+- **Pagination** on the storefront: nine products per page with previous, page numbers and next.
+- **Order tracker**: the connecting line now runs under the step circles instead of over them.
+
+## 2026-10-19 — Dark theme, user drawer, filters, new collection, admin dashboard
+
+### Added
+- **16 new products** in five categories (two new ones: `Amplifiers` and `Accessories`), seeded by migration
+  `SeedNewCollection`, with photos from the Stitch project in `client/public/assets/products`.
+- **Dark theme**: every color is a CSS variable with a light and a dark value, switched from the user drawer or
+  Settings and remembered in the browser.
+- **User drawer** from the account button: My orders, Admin dashboard (admins only), Settings, theme switch, Log out.
+- **Header**: Home, Categories (opens on hover) and New collection in the middle; `/new` lists the new collection.
+- **Filters**: price range and sort, plus *Clear filters*.
+- **Settings page**: profile, theme, and saved addresses with delete.
+- **Admin dashboard** (`/admin`, admins only): live products and stock, sample revenue and orders until the admin API.
+
+### Changed
+- The API is now the only source of product text and prices; `data.json` became `pictures.json` with just the
+  photos and galleries (570 lines to 209). "You may also like" picks products from the same category.
+
+## 2026-10-19 — The shop gets the Stitch design
+
+### Changed (client)
+- Every customer page rebuilt from the light screens of the Stitch project: header, storefront, product page,
+  login and register, checkout, my orders, order page, footer. Tailwind with ten named colors and a few shared
+  classes (`card`, `btn-primary`, `input`, …) in `index.css`; icons from `lucide-react`.
+- `CatalogContext` hands out finished products (text and pictures from `data.json`, id, price and stock from the
+  API), so no page joins the two any more.
+- `/headphones`, `/speakers` and `/earphones` are the storefront with that category selected; `Category`, `Menu`
+  and `BestGear` were removed.
+- New on the storefront: search and an *in stock only* switch. New on My orders: status tabs, an order tracker and
+  an account summary. Show password button on login and register.
+- `Picture` replaces the three desktop, tablet and mobile `<img>` tags, and the signed in routes share one
+  `RequireAuth` parent route.
+- `npm run lint` passes with zero warnings. `docs/frontend.md` describes the structure and the design tokens.
+
+### Changed (API, development only)
+- The admin account comes from `Admin:Email` and `Admin:Password` in user-secrets and its password is set straight
+  from there on every start, so a short development password works.
+- `Database:MigrateOnStartup` is off in Development: apply new migrations with `dotnet ef database update`.
+
 ## 2026-10-18 — Phase 1 done (`v0.2.0`)
 
 ### Added

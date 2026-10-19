@@ -37,17 +37,17 @@ with a system design you can explain end to end in an interview.
 | Authentication | ✅ Done | Identity + JWT: register, login (with lockout), refresh with rotation and reuse detection, logout, `me`. Admin account from configuration |
 | Products API | ✅ Done | List with search, category, price range and paging; get by id; admin create / update / deactivate |
 | Addresses API | ✅ Done | Customer's own addresses: list, get, create, update, soft delete |
-| Cart API | ✅ Done, **not committed** | Per signed-in user |
-| Orders API | 🟡 Partial | Places an order from items sent by the client, **not from the cart yet**; no cancel. List and get work |
-| Fawaterak payments | ⏸️ Built, then **switched off** | Commented out (`// PAYMENT GATEWAY (off)`), so only cash on delivery works |
-| Webhooks, idempotency, expiry job | ✅ Built (switched off with payments) | `PaymentResultApplier`, `PaymentEvent` unique index, `PaymentExpiryWorker` |
-| Stock concurrency | ❌ Not started | Two buyers of the last unit can both succeed until the `xmin` token lands (roadmap Phase 1) |
-| React client | 🟡 UI only | Reads products from a static `data.json`; no API calls |
+| Cart API | ✅ Done | Per signed-in user, the shipping fee is worked out by the API |
+| Orders API | ✅ Done | Checkout from the cart with an Idempotency-Key, list, get and cancel |
+| Fawaterak payments | ✅ Done | Card on Fawaterak's hosted page, verified webhook, sync and expiry job; a real staging payment went through |
+| Webhooks, idempotency, expiry job | ✅ Done | `PaymentResultApplier`, `PaymentEvent` unique index, `PaymentExpiryWorker` |
+| Stock concurrency | ✅ Done | `xmin` token plus one retry, so two buyers of the last unit get one order and one 409 |
+| React client | ✅ Done for customers | Redesigned from the Stitch project: storefront, product, login, checkout, orders, cancel. See [`frontend.md`](frontend.md) |
 | Admin dashboard | ❌ Not started | The admin API endpoints for products exist |
 | Caching / messaging | ❌ Not started | |
-| Tests | 🟢 33 passing | Unit tests (domain, payments, cart) + 8 HTTP integration tests (auth, roles, ownership) |
-| Docker / CI / deploy | 🟡 Started | `docker-compose.yml` runs PostgreSQL; no API image, CI or deploy yet |
-| GitHub | ❌ No remote yet | Local repo only; most of this work is uncommitted |
+| Tests | 🟢 37 passing | Domain, payments, cart, stock concurrency, and HTTP tests for auth, roles, ownership and orders |
+| Docker / CI / deploy | 🟡 Started | GitHub Actions runs the tests and the shop build; no API image or deploy yet |
+| GitHub | ✅ Done | `nourokbi/audiophile-store`, one pull request per step |
 
 **Ported from the original repo (`nourokbi/audiophile`) on 2026-10-15:** auth, addresses, product CRUD,
 PostgreSQL with `jsonb` and check constraints, rate limiting and CORS, rebuilt for the four layers and

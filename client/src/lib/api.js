@@ -1,13 +1,7 @@
-// The one place the shop talks to the .NET API.
-//
-// In development Vite forwards /api/* to http://localhost:5040 (see vite.config.js), so the
-// browser only ever sees one origin and the API needs no CORS setup. In production set
-// VITE_API_URL to the API's address.
+// The one place the shop talks to the API, Vite forwards /api to localhost:5040 in development and VITE_API_URL sets it in production
 const BASE = import.meta.env.VITE_API_URL ?? '/api';
 
-// The session (tokens + user) is kept in localStorage so a page refresh keeps you logged in.
-// Simple, but readable by any script on the page; an httpOnly cookie for the refresh token is
-// the safer production choice (roadmap Phase 4/7).
+// The session is kept in localStorage so a refresh keeps you logged in, an httpOnly cookie is the safer choice for later
 const SESSION_KEY = 'audiophile.session';
 
 export class ApiError extends Error {
@@ -39,20 +33,18 @@ export function setSession(next) {
 		if (next) localStorage.setItem(SESSION_KEY, JSON.stringify(next));
 		else localStorage.removeItem(SESSION_KEY);
 	} catch {
-		// Private mode or blocked storage: the session still lives until the tab closes.
+		// With storage blocked the session still lives until the tab closes
 	}
 	listeners.forEach((fn) => fn(next));
 }
 
-// Lets AuthContext re-render when a refresh fails and the session is dropped.
+// Lets AuthContext re-render when a refresh fails and the session is dropped
 export function onSessionChange(fn) {
 	listeners.add(fn);
 	return () => listeners.delete(fn);
 }
 
-// The access token lives 15 minutes. When a call gets 401, swap the refresh token for a new
-// pair once and repeat the call. Parallel 401s share one refresh: refresh tokens are single-use,
-// and the API treats a second use as theft and ends every session.
+// On a 401 the refresh token is traded once for a new pair and the call repeated, parallel calls share that one refresh
 let refreshing = null;
 
 async function refreshSession() {
@@ -77,7 +69,7 @@ async function refreshSession() {
 	return refreshing;
 }
 
-// ProblemDetails → one readable sentence for the UI.
+// Turns the API's ProblemDetails into one readable sentence
 function messageFrom(problem, status) {
 	if (problem?.errors) {
 		const first = Object.values(problem.errors).flat()[0];

@@ -4,9 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
-// "Add to cart" as the product page and the product cards both need it: anonymous visitors
-// go to /login and come back; signed-in customers get the API's answer as a short notice
-// ("Added 2 to your cart." or why it was refused, e.g. not enough stock).
+// Add to cart for the product page and the cards, visitors go to login first and customers get a short notice back
 export function useAddToCart() {
 	const { user } = useAuth();
 	const { add } = useCart();
@@ -15,7 +13,7 @@ export function useAddToCart() {
 	const [busy, setBusy] = React.useState(false);
 	const [notice, setNotice] = React.useState(null); // { ok: boolean, text: string }
 
-	// Clear the notice a few seconds after it appears.
+	// Clears the notice a few seconds after it appears
 	React.useEffect(() => {
 		if (!notice) return;
 		const timer = setTimeout(() => setNotice(null), 3500);

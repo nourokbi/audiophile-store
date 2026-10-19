@@ -37,12 +37,20 @@ public static class DatabaseInitializer
             return;
         }
 
+        // The password is set directly from configuration, so it skips the customer password rules and always matches it
         var admin = await users.FindByEmailAsync(email);
         if (admin is null)
         {
             admin = User.Create(configuration["Admin:Name"] ?? "Store Admin", email);
-            Check(await users.CreateAsync(admin, password), "create the admin account");
+            admin.PasswordHash = users.PasswordHasher.HashPassword(admin, password);
+            Check(await users.CreateAsync(admin), "create the admin account");
             logger.LogInformation("Admin account {Email} created", email);
+        }
+        else if (!await users.CheckPasswordAsync(admin, password))
+        {
+            admin.PasswordHash = users.PasswordHasher.HashPassword(admin, password);
+            Check(await users.UpdateAsync(admin), "update the admin password");
+            logger.LogInformation("Admin account {Email} password updated from configuration", email);
         }
 
         if (!await users.IsInRoleAsync(admin, Roles.Admin))

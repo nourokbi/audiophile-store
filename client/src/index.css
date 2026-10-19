@@ -2,36 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The light and dark palettes from the Stitch project as red green blue values */
 @layer base {
-	h1 {
-		@apply text-[56px] font-bold leading-[58px] tracking-[2px] uppercase;
+	:root {
+		--page: 251 249 249;
+		--surface: 255 255 255;
+		--panel: 245 243 243;
+		--panel-strong: 233 232 231;
+		--line: 228 226 226;
+		--ink: 27 28 28;
+		--muted: 95 94 94;
+		--brand: 216 125 74;
+		--brand-hover: 192 106 57;
+		--brand-dark: 149 73 26;
+		--brand-soft: 251 238 230;
+		color-scheme: light;
 	}
 
-	h2 {
-		@apply text-[40px] font-bold leading-[44px] tracking-[1.4px] uppercase;
+	.dark {
+		--page: 18 20 20;
+		--surface: 30 32 32;
+		--panel: 41 42 42;
+		--panel-strong: 52 53 53;
+		--line: 58 60 60;
+		--ink: 227 226 226;
+		--muted: 168 165 163;
+		--brand: 216 125 74;
+		--brand-hover: 232 145 96;
+		--brand-dark: 255 182 144;
+		--brand-soft: 58 36 24;
+		color-scheme: dark;
 	}
 
-	h3 {
-		@apply text-[32px] font-bold leading-[36px] tracking-[1.1px] uppercase;
+	body {
+		@apply bg-page text-ink font-sans antialiased;
 	}
 
+	h1,
+	h2,
+	h3,
 	h4 {
-		@apply text-[28px] font-bold leading-normal tracking-[2px] uppercase;
+		@apply font-bold uppercase;
+	}
+}
+
+/* The repeated building blocks of the Stitch design, so pages only say what they are */
+@layer components {
+	.page {
+		@apply mx-auto w-full max-w-page px-6 md:px-10 lg:px-0;
 	}
 
-	h5 {
-		@apply text-[24px] font-bold leading-normal tracking-[1.4px] uppercase;
+	.card {
+		@apply rounded bg-surface shadow-sm;
 	}
 
-	h6 {
-		@apply text-[18px] font-bold leading-normal tracking-[1.3px] uppercase;
+	.label {
+		@apply text-[13px] font-bold uppercase tracking-wider;
 	}
 
-	p {
-		@apply text-[15px] font-[500] leading-[25px];
+	.eyebrow {
+		@apply text-[12px] font-bold uppercase tracking-[0.25em] text-brand-dark;
+	}
+
+	.title {
+		@apply text-[32px] leading-tight tracking-tight md:text-[40px];
 	}
 
 	.btn {
-		@apply py-[15px] px-[30px] text-[13px] uppercase font-bold tracking-[1px] text-white cursor-pointer;
+		@apply label inline-flex h-12 items-center justify-center gap-2 rounded px-6 transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+	}
+
+	.btn-primary {
+		@apply btn bg-brand text-white shadow-sm hover:bg-brand-hover;
+	}
+
+	.btn-secondary {
+		@apply btn bg-panel text-ink hover:bg-panel-strong;
+	}
+
+	.btn-dark {
+		@apply btn bg-ink text-page hover:opacity-90;
+	}
+
+	.input {
+		@apply h-12 w-full rounded bg-panel px-4 text-[15px] font-medium text-ink placeholder:text-muted/70 focus:bg-surface focus:outline-none focus:ring-1 focus:ring-brand disabled:text-muted;
+	}
+
+	.chip {
+		@apply label rounded px-4 py-2 transition-colors;
+	}
+
+	.menu-item {
+		@apply label flex w-full items-center gap-3 rounded px-3 py-3 text-left transition-colors hover:bg-panel;
 	}
 }

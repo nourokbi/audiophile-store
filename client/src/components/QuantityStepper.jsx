@@ -1,17 +1,22 @@
-// The grey "- 1 +" box from the product page design. Never goes below 1 or above max.
-const QuantityStepper = ({ value, onChange, max = 100, label = 'product', className = '' }) => {
+import { Minus, Plus } from 'lucide-react';
+
+// The grey minus and plus box, it never goes below 1 or above max
+const QuantityStepper = ({ value, onChange, max = 100, label = 'product', small = false }) => {
+	const size = small ? 'h-9' : 'h-12';
+	const button = 'flex w-9 h-full items-center justify-center text-muted hover:text-ink disabled:opacity-30 disabled:hover:text-muted';
+
 	return (
-		<div className={`w-[120px] h-[48px] flex justify-between bg-gray-light px-[15px] items-center shrink-0 ${className}`}>
+		<div className={`flex shrink-0 items-center overflow-hidden rounded bg-panel ${size}`}>
 			<button
 				type='button'
 				aria-label={`One less ${label}`}
 				disabled={value <= 1}
 				onClick={() => onChange(Math.max(1, value - 1))}
-				className='text-[14px] text-black/30 hover:text-cream font-bold tracking-[1px] disabled:hover:text-black/30 disabled:cursor-not-allowed px-1'
+				className={button}
 			>
-				-
+				<Minus size={14} />
 			</button>
-			<span className='text-[14px] text-black font-bold tracking-[1px] tabular-nums' aria-live='polite'>
+			<span className='min-w-[24px] text-center text-[15px] font-bold tabular-nums' aria-live='polite'>
 				{value}
 			</span>
 			<button
@@ -19,9 +24,9 @@ const QuantityStepper = ({ value, onChange, max = 100, label = 'product', classN
 				aria-label={`One more ${label}`}
 				disabled={value >= max}
 				onClick={() => onChange(Math.min(max, value + 1))}
-				className='text-[14px] text-black/30 hover:text-cream font-bold tracking-[1px] disabled:hover:text-black/30 disabled:cursor-not-allowed px-1'
+				className={button}
 			>
-				+
+				<Plus size={14} />
 			</button>
 		</div>
 	);

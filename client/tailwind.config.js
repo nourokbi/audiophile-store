@@ -1,37 +1,30 @@
+// Each color reads a CSS variable from index.css, so the dark theme only swaps the variables
+const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
+
 /** @type {import('tailwindcss').Config} */
 export default {
 	content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+	darkMode: 'class',
 	theme: {
-		screens: {
-			xs: '360px',
-			sm: '480px',
-			md: '768px',
-			lg: '976px',
-			xl: '1160px',
-			xxl: '1440px',
-		},
 		extend: {
 			colors: {
-				cream: '#D87D4A',
-				'cream-light': '#FBAF85',
-				stone: '#101010',
-				'gray-light': '#F1F1F1',
-				'gray-very-light': '#FAFAFA',
+				brand: token('brand'),
+				'brand-hover': token('brand-hover'),
+				'brand-dark': token('brand-dark'),
+				'brand-soft': token('brand-soft'),
+				ink: token('ink'),
+				muted: token('muted'),
+				page: token('page'),
+				surface: token('surface'),
+				panel: token('panel'),
+				'panel-strong': token('panel-strong'),
+				line: token('line'),
 			},
 			fontFamily: {
-				sans: 'Manrope',
+				sans: ['Manrope', 'sans-serif'],
 			},
-			backgroundImage: {
-				'lg-hero-pattern': "url('/assets/home/desktop/image-hero.jpg')",
-				'md-hero-pattern': "url('/assets/home/tablet/image-header.jpg')",
-				'xs-hero-pattern': "url('/assets/home/mobile/image-header.jpg')",
-				circles: "url('/assets/home/desktop/pattern-circles.svg')",
-				'xs-ZX7': "url('/assets/home/desktop/image-speaker-zx7.jpg')",
-				'md-ZX7': "url('/assets/home/tablet/image-speaker-zx7.jpg')",
-				'lg-ZX7': "url('/assets/home/mobile/image-speaker-zx7.jpg')",
-				'lg-YX1': "url('/assets/home/desktop/image-earphones-yx1.jpg')",
-				'md-YX1': "url('/assets/home/tablet/image-earphones-yx1.jpg')",
-				'xs-YX1': "url('/assets/home/mobile/image-earphones-yx1.jpg')",
+			maxWidth: {
+				page: '1110px',
 			},
 		},
 	},

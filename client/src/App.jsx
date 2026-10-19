@@ -1,30 +1,24 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 import Home from './pages/Home';
-import Category from './pages/Category';
+import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Product from './pages/Product';
 import AuthPage from './pages/AuthPage';
 import Orders from './pages/Orders';
 import OrderDetail from './pages/OrderDetail';
+import Settings from './pages/Settings';
+import AdminDashboard from './pages/AdminDashboard';
 import Layout from './components/Layout';
 import RequireAuth from './components/RequireAuth';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { CatalogProvider } from './context/CatalogContext';
+import { ThemeProvider } from './context/ThemeContext';
 
-import data from './data/data.json';
-
-// Category pages are presentation (images, copy) and still read data.json.
-const categories = {
-	headphones: { title: 'Headphones', products: data.filter((item) => item.category === 'headphones') },
-	speakers: { title: 'Speakers', products: data.filter((item) => item.category === 'speakers') },
-	earphones: { title: 'Earphones', products: data.filter((item) => item.category === 'earphones') },
-};
-
-// Auth first (who you are), then the cart (yours), then the catalogue (prices and stock).
-const App = () => {
-	return (
+// The theme first, then who you are, your cart, and the catalogue
+const App = () => (
+	<ThemeProvider>
 		<AuthProvider>
 			<CartProvider>
 				<CatalogProvider>
@@ -32,33 +26,20 @@ const App = () => {
 						<Routes>
 							<Route element={<Layout />}>
 								<Route path='/' element={<Home />} />
+								<Route path='/new' element={<Home collection='new' />} />
+								<Route path='/cart' element={<Cart />} />
 								<Route path='/login' element={<AuthPage mode='login' />} />
 								<Route path='/register' element={<AuthPage mode='register' />} />
-								<Route
-									path='/checkout'
-									element={
-										<RequireAuth>
-											<Checkout />
-										</RequireAuth>
-									}
-								/>
-								<Route
-									path='/orders'
-									element={
-										<RequireAuth>
-											<Orders />
-										</RequireAuth>
-									}
-								/>
-								<Route
-									path='/orders/:id'
-									element={
-										<RequireAuth>
-											<OrderDetail />
-										</RequireAuth>
-									}
-								/>
-								<Route path=':category' element={<Category categories={categories} />} />
+								<Route element={<RequireAuth />}>
+									<Route path='/checkout' element={<Checkout />} />
+									<Route path='/orders' element={<Orders />} />
+									<Route path='/orders/:id' element={<OrderDetail />} />
+									<Route path='/settings' element={<Settings />} />
+								</Route>
+								<Route element={<RequireAuth role='Admin' />}>
+									<Route path='/admin' element={<AdminDashboard />} />
+								</Route>
+								<Route path=':category' element={<Home />} />
 								<Route path=':category/:slug' element={<Product />} />
 							</Route>
 						</Routes>
@@ -66,7 +47,7 @@ const App = () => {
 				</CatalogProvider>
 			</CartProvider>
 		</AuthProvider>
-	);
-};
+	</ThemeProvider>
+);
 
 export default App;
