@@ -27,12 +27,12 @@ A finished, deployed project beats a bigger unfinished one on a CV.
 
 ---
 
-## Where we are now (2026-10-18)
+## Where we are now (2026-10-19)
 
-**Phase 1 is done** (`v0.2.0`). A customer can sign up, fill a cart from the home page, check out, pay by card on
-Fawaterak (staging), watch the order turn *Confirmed* when the webhook arrives, and cancel an unpaid order.
-Two checkouts for the last unit give one order and one 409. 37 tests pass on PostgreSQL, in GitHub Actions on
-every push and pull request.
+**Phase 1 is done** (`v0.2.0`) and the **shop is redesigned** from the Stitch project (PR #6): light and dark theme,
+22 products in five categories, filters and pagination, a cart page, checkout with saved addresses, order tracking
+and cancel. The **admin dashboard page exists** but runs on sample data and page-only changes, so the next phase is
+the admin API behind it. 37 tests pass on PostgreSQL, in GitHub Actions on every push and pull request.
 
 | Phase | Status |
 |---|---|
@@ -40,19 +40,22 @@ every push and pull request.
 | 1 Checkout + concurrency | ✅ done: checkout from the cart, `xmin` + one retry, cancel, order tests, CI |
 | 2 Pluggable payments | 🟡 Fawaterak is on (card only) and tested for real; **the pluggable design and fake-gateway tests left** |
 | 3 Login, roles, addresses | ✅ done |
-| 4 React client | 🟡 redesigned from Stitch (light theme, Lucide icons) with every customer page; **guest cart, httpOnly cookie left** |
-| 5 Admin dashboard | ⬜ not started |
+| 4 React client | ✅ every customer page, redesigned from Stitch with a dark theme; **guest cart and httpOnly cookie left** |
+| 5 Admin dashboard | 🟡 the page is built on sample data; **the admin API is next** (branch `phase-5/admin-api`) |
 | 6 Caching + messaging | ⬜ not started |
 | 7 Docker, CI, deploy | ⬜ not started (AWS was considered; the VPS + Neon plan still stands) |
 
 ### Next up, in this order
 
-One branch and one PR each.
+Phase 5 is worked on the branch `phase-5/admin-api`, one commit per step, with a pull request whenever a step
+works end to end (API, tests and the dashboard connected). The steps and their endpoints are in Phase 5 below.
 
-1. **Phase 2**: `IPaymentGateway` + keyed services + resolver, one webhook route `POST /payments/{provider}/webhook`,
-   `Payments:Enabled`, `FakePaymentGateway` tests. Optionally bring wallet or Fawry back as a second strategy.
-2. **Phase 4 leftovers**: guest cart (merged on login), refresh token in an httpOnly cookie.
-3. Then Phases 5 → 6 → 7.
+1. **Admin products API**: list with hidden products, restock, price, availability; connect the dashboard buttons.
+2. **Admin orders API**: list with filters, one order with its customer and payment, change the status; an orders page.
+3. **Admin stats API**: the stat cards and the chart, then **Chart.js**.
+4. **React Query** across the client, now that every list has an API.
+5. Then Phase 4 leftovers (guest cart, httpOnly cookie), Phase 2 (pluggable payments, kept as a later refactor),
+   and Phases 6 → 7.
 
 Dropped: `POST /orders/preview`. `GET /cart` already returns the totals the order will use.
 
@@ -231,22 +234,67 @@ Same React app, under `/admin`, behind a route guard that checks the `Admin` rol
       chart and recent orders are sample data in `client/src/data/adminSample.js`, and the product actions only
       change the page, until the endpoints below exist
 
-### The admin API the dashboard is waiting for (next step)
+### Rules for every admin endpoint
 
-Every call the dashboard makes is in `client/src/lib/adminApi.js`. Build these, then replace each function body
-there with its `api(...)` call and set `ADMIN_API_CONNECTED = true`:
+- One `AdminController` route prefix, `/admin`, with `[Authorize(Roles = Roles.Admin)]` on the class.
+- Services in `Application/Admin/` (`AdminProductService`, `AdminOrderService`, `AdminStatsService`), shaped like
+  `OrderService`: the controller only reads the request and calls one method.
+- The rules stay in the entities (`Product.Restock`, `Order.ChangeStatus`); the services load, call and save.
+- Reads are `AsNoTracking` projections straight into DTOs; lists are paged like `GET /products`.
+- Stock changes go through the same `xmin` retry as checkout (`RetryOnStockConflictAsync`), because a restock and a
+  checkout can touch the same product at once.
+- Every endpoint gets an HTTP test for the admin and one that a customer gets **403**.
+- The dashboard's calls are all in `client/src/lib/adminApi.js`: replace each function body with its `api(...)` call
+  and set `ADMIN_API_CONNECTED = true` when the step is connected.
 
-| Endpoint | Used by | Notes |
+### Step 1 — Admin products API (UC-11)
+
+| Endpoint | Body | Answer | Used by |
+|---|---|---|---|
+| `GET /admin/products?search=&category=&isActive=&page=&pageSize=` | | Page of products **including hidden ones** | Product table |
+| `POST /admin/products/{id}/restock` | `{ quantity }` | The product | *Restock* button |
+| `PUT /admin/products/{id}/price` | `{ price }` | The product | *Price* button |
+| `PUT /admin/products/{id}/availability` | `{ isActive }` | The product | *Available* switch |
+
+Already there and reused: `POST /products` (create), `PUT /products/{id}` (edit every field), `DELETE /products/{id}`
+(hide). The dashboard's disabled *Add product* button uses `POST /products` in this step.
+
+- [ ] Add `Product.Activate()` back (removed as unused in the simplification)
+- [ ] `AdminProductDto`: the product plus `isActive` and `createdAt`
+- [ ] Errors: unknown id 404, quantity below 1 or price 0 or less 400
+- [ ] Tests: restock adds to the stock, a hidden product leaves `GET /products` and comes back when activated, customer 403
+- [ ] Connect *Restock*, *Price*, *Available* and *Add product* in the dashboard
+
+### Step 2 — Admin orders API (UC-12, UC-13, UC-14)
+
+| Endpoint | Body | Answer | Used by |
+|---|---|---|---|
+| `GET /admin/orders?status=&from=&to=&search=&page=&pageSize=` | | Page of orders, newest first, with the customer's name and email | Recent orders, an orders page, *Export CSV* |
+| `GET /admin/orders/{id}` | | The order with its customer, shipping address, items and payment | Order details page |
+| `PUT /admin/orders/{id}/status` | `{ status }` | The order | *Next status* buttons |
+
+Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{id}/payment/sync` for the payment panel.
+
+- [ ] `PUT …/status` calls `Order.ChangeStatus`, so an illegal move (Delivered → Pending) is a 409
+- [ ] Moving to *Cancelled* uses `Order.Cancel()` so the stock comes back
+- [ ] The answer lists the next statuses the state machine allows, so the page only shows valid buttons
+- [ ] Client: `/admin/orders` page with filters and paging, `/admin/orders/:id` with the next status buttons and the
+      payment panel; *Export CSV* exports the filtered list
+- [ ] Tests: status moves, illegal move 409, cancel returns stock, customer 403
+
+### Step 3 — Admin stats API (UC-15)
+
+| Endpoint | Answer | Used by |
 |---|---|---|
-| `GET /admin/products` | Product table | All products **including hidden ones** (`GET /products` only lists active ones), paged |
-| `POST /admin/products/{id}/restock` `{ quantity }` | *Restock* button | `Product.Restock`, answer with the product |
-| `PUT /admin/products/{id}/price` `{ price }` | *Price* button | `Product.ChangePrice` |
-| `PUT /admin/products/{id}/availability` `{ isActive }` | *Available* switch | `Product.Activate` (add it back to the entity) / `Deactivate` |
-| `GET /admin/stats` | Stat cards and the orders chart | Revenue for 30 days, active orders, orders per day for the last 7 days |
-| `GET /admin/orders?status=&from=&to=&page=` | Recent orders and *Export CSV* | Paged, newest first, with the customer's name |
-| `PUT /admin/orders/{id}/status` `{ status }` | Order details (next) | `Order.ChangeStatus`, the state machine refuses illegal moves |
+| `GET /admin/stats?days=30` | Revenue and order count for the period, active orders, orders per day for the last 7 days, low stock products | Stat cards, *Orders this week*, *Low stock* |
 
-All under `[Authorize(Roles = Roles.Admin)]`, with HTTP tests that a customer gets 403.
+- [ ] Revenue counts only orders whose payment succeeded, or cash orders that were delivered
+- [ ] Remove `client/src/data/adminSample.js` once nothing reads it
+- [ ] Tests: the numbers for a few seeded orders
+
+### Optional — Users
+
+`GET /admin/users` and `PUT /admin/users/{id}/role` for the Stitch *Users & Roles* screen, if there is time.
 
 ### Do not forget, after the admin API exists
 
@@ -256,12 +304,8 @@ All under `[Authorize(Roles = Roles.Admin)]`, with HTTP tests that a customer ge
 - [ ] **Chart.js** (with `react-chartjs-2`) for the dashboard: replace the `div` bars of *Orders this week* in
       `AdminDashboard.jsx` with a bar chart fed by `GET /admin/stats`, then add revenue over time and sales by category.
 
-- [ ] Products: table, create / edit / deactivate, set stock and price (UC-11)
-- [ ] Orders: table with filter by status and date, paged (UC-12)
-- [ ] Order details: items, customer, payment, the *next status* buttons the state machine allows (UC-13)
-- [ ] Payment panel: the event log and a *Sync with gateway* button (UC-14)
-- [ ] Overview cards: today's sales, orders by status, low-stock products (UC-15)
-- [ ] API side: `/admin/products`, `/admin/orders`, `/admin/stats`, all paged, all `AsNoTracking` projections
+**Done when** every number and button on the dashboard comes from the API, a customer gets 403 on every `/admin`
+endpoint, and `ADMIN_API_CONNECTED` is true. Tag `v0.3.0`.
 
 ## Phase 6 — Caching + messaging · 1 week
 
