@@ -334,6 +334,22 @@ endpoint, and `ADMIN_API_CONNECTED` is true. Tag `v0.3.0`.
 - [ ] README: live link, screenshots, architecture diagram, *"hard problems and how I solved them"*, how to run
 - [ ] Make the repo public, pin it on your GitHub profile, add it to your CV
 
+**Load and security testing (before going public)**
+
+Run these against the deployed server, or one like it, never the dev laptop, so the numbers mean something.
+
+- [ ] **k6** scripts in `tests/load/`: `products.js` (browse the shop) and `checkout.js` (many users buy the same
+      product at once, so the `xmin` retry and the database connections are under pressure)
+- [ ] Find the capacity: raise the virtual users step by step (100, 200, 500) until p95 goes over 500 ms or errors
+      go over 1%; the last step that passed is how many users the site handles. Put the numbers in the README
+- [ ] Rate limiting with ASP.NET Core's `AddRateLimiter` on `/auth/login`, `/auth/register` and checkout, answering
+      429 when one IP sends too many requests
+- [ ] Lock an account for a few minutes after repeated failed logins (Identity `LockoutOptions`)
+- [ ] **OWASP ZAP** baseline scan against the running API and client; fix what it reports (security headers, CORS,
+      cookies)
+- [ ] Dependency checks: `dotnet list package --vulnerable` and `npm audit` in CI; turn on **Dependabot** and
+      **CodeQL** in the GitHub repo settings
+
 ---
 
 ## Interview story (fill in as you finish phases)
