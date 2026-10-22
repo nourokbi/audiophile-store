@@ -47,9 +47,10 @@ the admin API behind it. 37 tests pass on PostgreSQL, in GitHub Actions on every
 
 ### Next up, in this order
 
-Phase 5 is worked on the branch `phase-5/admin-api`, one commit per step, with a pull request whenever a step
-works end to end (API, tests and the dashboard connected). The steps and their endpoints are in Phase 5 below.
+Phase 5 is worked on the branch `phase-5/admin-api`, one commit per endpoint that works end to end (API, test and
+the dashboard connected). How to build each step, with hints and code sketches, is in Phase 5 below.
 
+0. **Shared stock retry**: move `RetryOnStockConflictAsync` out of `OrderService` so the admin services can use it.
 1. **Admin products API**: list with hidden products, restock, price, availability; connect the dashboard buttons.
 2. **Admin orders API**: list with filters, one order with its customer and payment, change the status; an orders page.
 3. **Admin stats API**: the stat cards and the chart, then **Chart.js**.
@@ -234,18 +235,60 @@ Same React app, under `/admin`, behind a route guard that checks the `Admin` rol
       chart and recent orders are sample data in `client/src/data/adminSample.js`, and the product actions only
       change the page, until the endpoints below exist
 
+### How to work through this phase
+
+1. Stay on the branch `phase-5/admin-api`. Commit after every endpoint that works, open the pull request at the end.
+2. Inside each step, build **one endpoint end to end** before starting the next, always in this order:
+   **entity → contracts → service → controller → test → client**. Start with the hardest one of the step.
+3. Try every endpoint by hand in `src/Audiophile.API/Audiophile.API.http` (log in as `admin@admin.com`, copy the
+   token), then write its test.
+4. After each step: `dotnet test` is green, then ask for a review (*"review my changes"*), then tick the boxes here.
+
 ### Rules for every admin endpoint
 
-- One `AdminController` route prefix, `/admin`, with `[Authorize(Roles = Roles.Admin)]` on the class.
-- Services in `Application/Admin/` (`AdminProductService`, `AdminOrderService`, `AdminStatsService`), shaped like
-  `OrderService`: the controller only reads the request and calls one method.
-- The rules stay in the entities (`Product.Restock`, `Order.ChangeStatus`); the services load, call and save.
-- Reads are `AsNoTracking` projections straight into DTOs; lists are paged like `GET /products`.
-- Stock changes go through the same `xmin` retry as checkout (`RetryOnStockConflictAsync`), because a restock and a
-  checkout can touch the same product at once.
-- Every endpoint gets an HTTP test for the admin and one that a customer gets **403**.
-- The dashboard's calls are all in `client/src/lib/adminApi.js`: replace each function body with its `api(...)` call
-  and set `ADMIN_API_CONNECTED = true` when the step is connected.
+- **One service per area, not one big `AdminService`**: `AdminProductService`, `AdminOrderService`,
+  `AdminStatsService` in `src/Audiophile.Application/Admin/`. Each admin action is one method in its area's service.
+  A single service would mix three jobs with different dependencies and keep growing.
+- **One controller per area** in `src/Audiophile.API/Controllers/`: `AdminProductsController` (`[Route("admin/products")]`),
+  `AdminOrdersController`, `AdminStatsController`, each with `[Authorize(Roles = Roles.Admin)]` on the class. Keep
+  the `_adminProductsService` naming. Each action is one line that calls one service method.
+- **Rules stay in the entities** (`Product.Restock`, `Order.ChangeStatus`); the services only load, call and save.
+- **Errors are already mapped** in `GlobalExceptionHandler`, so just throw:
+  `NotFoundException` → 404, `ArgumentException` (what `Guard` throws) → 400,
+  `ConflictException` and `InvalidOperationException` (what `ChangeStatus` throws) → 409.
+- **Reads** are `AsNoTracking` projections straight into DTOs (`.Select(p => new AdminProductDto(...))`), and every
+  list is paged with the `PagedResult<T>` from `Products/ProductContracts.cs`.
+- **Stock changes** (restock, admin cancel) go through the `xmin` retry, because a restock and a checkout can touch
+  the same product at once.
+- **Tests**: every endpoint gets an HTTP test as the admin and one that a customer gets **403**.
+- **Client**: every dashboard call lives in `client/src/lib/adminApi.js`, built on `api(path, { method, body })`
+  from `lib/api.js`.
+
+### Step 0 — Move the stock retry where both services can use it
+
+`RetryOnStockConflictAsync` is private inside `OrderService` (`Orders/OrderService.cs`), and restock needs it too.
+
+- [ ] Move it to `src/Audiophile.Application/Common/StockConflictRetry.cs` as an extension on `IAppDbContext`
+- [ ] `OrderService` calls the shared one, and its tests still pass
+
+```csharp
+// Runs the work once more on fresh data when another request changed the same stock, a second conflict becomes a 409
+public static class StockConflictRetry
+{
+  public static async Task<T> RetryOnStockConflictAsync<T>(this IAppDbContext db, Func<Task<T>> work)
+  {
+    try { return await work(); }
+    catch (DbUpdateConcurrencyException)
+    {
+      db.ChangeTracker.Clear();      // forget the stale product so the second try reads the new stock
+      return await work();
+    }
+  }
+}
+// Usage: return db.RetryOnStockConflictAsync(async () => { ...load, change, save... });
+```
+
+`IAppDbContext` already exposes `ChangeTracker`. The log line can move with it (pass an `ILogger`) or stay in the caller.
 
 ### Step 1 — Admin products API (UC-11)
 
@@ -259,11 +302,72 @@ Same React app, under `/admin`, behind a route guard that checks the `Admin` rol
 Already there and reused: `POST /products` (create), `PUT /products/{id}` (edit every field), `DELETE /products/{id}`
 (hide). The dashboard's disabled *Add product* button uses `POST /products` in this step.
 
-- [ ] Add `Product.Activate()` back (removed as unused in the simplification)
-- [ ] `AdminProductDto`: the product plus `isActive` and `createdAt`
-- [ ] Errors: unknown id 404, quantity below 1 or price 0 or less 400
-- [ ] Tests: restock adds to the stock, a hidden product leaves `GET /products` and comes back when activated, customer 403
-- [ ] Connect *Restock*, *Price*, *Available* and *Add product* in the dashboard
+**Build it in this order**
+
+- [ ] **Entity**: add `public void Activate() => IsActive = true;` to `Product.cs`, next to `Deactivate()`
+- [ ] **Contracts** in `Admin/AdminProductContracts.cs`:
+
+  ```csharp
+  public sealed record AdminProductQuery(string? Search = null, ProductCategory? Category = null,
+      bool? IsActive = null, int Page = 1, int PageSize = ProductQuery.DefaultPageSize);
+
+  public sealed record AdminProductDto(Guid Id, string Name, string Slug, decimal Price, int Stock,
+      ProductCategory Category, string? ImageUrl, bool IsActive, DateTime CreatedAt);
+
+  public sealed record RestockRequest(int Quantity);
+  public sealed record ChangePriceRequest(decimal Price);
+  public sealed record SetAvailabilityRequest(bool IsActive);
+  ```
+
+- [ ] **Service** `Admin/AdminProductService.cs`, registered in `Application/DependencyInjection.cs`:
+  - `ListAsync`: copy the checks and filters from `ProductService.ListAsync`, but **no** `Where(p => p.IsActive)`
+    unless `IsActive` is given. Order by name, project with `Select`
+  - `RestockAsync` **first** (it is the one that needs the retry), then `ChangePriceAsync`, then `SetAvailabilityAsync`
+  - Look products up by id **without** the `IsActive` check (the admin must reach hidden products), so a private
+    `FindAsync(id)` that throws `NotFoundException`
+
+  ```csharp
+  public Task<AdminProductDto> RestockAsync(Guid id, int quantity, CancellationToken ct) =>
+      db.RetryOnStockConflictAsync(async () =>
+      {
+        var product = await FindAsync(id, ct);
+        product.Restock(quantity);            // Guard throws for quantity below 1, which becomes a 400
+        await db.SaveChangesAsync(ct);
+        return AdminProductDto.From(product);
+      });
+  ```
+
+- [ ] **Controller** `AdminProductsController.cs`:
+
+  ```csharp
+  [ApiController]
+  [Route("admin/products")]
+  [Authorize(Roles = Roles.Admin)]
+  public sealed class AdminProductsController(AdminProductService _adminProductsService) : ControllerBase
+  {
+    [HttpPost("{id:guid}/restock")]
+    public async Task<IActionResult> Restock(Guid id, RestockRequest request, CancellationToken ct) =>
+        Ok(await _adminProductsService.RestockAsync(id, request.Quantity, ct));
+  }
+  ```
+
+- [ ] **Tests** in `tests/Audiophile.Tests/Api/AdminProductApiTests.cs` (copy the login and `CreateProductAsync`
+      helpers from `OrderApiTests`, the admin logs in with `ApiFactory.AdminEmail` / `AdminPassword`):
+  - restock 5 on a product with 3 gives 8
+  - a product hidden with `availability false` is gone from `GET /products`, still in `GET /admin/products`, and
+    comes back when set to `true`
+  - quantity 0 and price 0 give 400, an unknown id gives 404
+  - a customer gets 403 on all four endpoints
+- [ ] **Client**:
+  - `adminApi.js`: `listProducts(query)`, `restock`, `changePrice`, `setAvailability` call the real endpoints, e.g.
+    `` restock: (id, quantity) => api(`/admin/products/${id}/restock`, { method: 'POST', body: { quantity } }) ``
+  - `AdminDashboard.jsx`: the product table reads `GET /admin/products` instead of `catalog`, and the local `changes`
+    state goes away (after an action, replace that row with the product the API answered)
+  - Enable *Add product*: a dialog with the `ProductRequest` fields that calls `POST /products`
+  - `ADMIN_API_CONNECTED = true`
+
+Decide here: `PUT /products/{id}` uses `FindActiveAsync`, so a hidden product cannot be edited. Either accept it
+(activate, edit, hide) or let the admin edit hidden ones.
 
 ### Step 2 — Admin orders API (UC-12, UC-13, UC-14)
 
@@ -275,12 +379,48 @@ Already there and reused: `POST /products` (create), `PUT /products/{id}` (edit 
 
 Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{id}/payment/sync` for the payment panel.
 
-- [ ] `PUT …/status` calls `Order.ChangeStatus`, so an illegal move (Delivered → Pending) is a 409
-- [ ] Moving to *Cancelled* uses `Order.Cancel()` so the stock comes back
-- [ ] The answer lists the next statuses the state machine allows, so the page only shows valid buttons
-- [ ] Client: `/admin/orders` page with filters and paging, `/admin/orders/:id` with the next status buttons and the
-      payment panel; *Export CSV* exports the filtered list
-- [ ] Tests: status moves, illegal move 409, cancel returns stock, customer 403
+**Build it in this order**
+
+- [ ] **Entity**: `AllowedNextStatuses` in `Order.cs` is private. Add a public read of it, e.g.
+      `public IReadOnlyList<OrderStatus> NextStatuses => AllowedNextStatuses[Status];`
+- [ ] **Contracts** `Admin/AdminOrderContracts.cs`: `AdminOrderQuery(Status, From, To, Search, Page, PageSize)`,
+      `AdminOrderSummaryDto` for the list (id, created at, customer name and email, status, payment method and status,
+      total, item count) and `AdminOrderDto` for one order (everything plus `ShippingFullName…`, items and
+      `NextStatuses`), `ChangeStatusRequest(OrderStatus Status)`
+- [ ] **Service** `AdminOrderService`:
+  - `ListAsync`: `db.Orders.AsNoTracking()`, filter by status, `CreatedAt >= from` and `< to.AddDays(1)`, search on
+    `o.User.Name` / `o.User.Email`, `OrderByDescending(o => o.CreatedAt)`, page, then `Select` into the summary.
+    Count the items with `o.OrderItems.Count` inside the projection so it stays one SQL query
+  - `GetAsync`: include `User`, `Payment`, `OrderItems.Product`, 404 when missing
+  - `ChangeStatusAsync` **first** in this step:
+
+    ```csharp
+    public Task<AdminOrderDto> ChangeStatusAsync(Guid id, OrderStatus next, CancellationToken ct) =>
+        db.RetryOnStockConflictAsync(async () =>
+        {
+          var order = await OrderWithDetailsAsync(id, ct);
+          if (next == OrderStatus.Cancelled)
+            order.Cancel();                  // puts the stock back and fails a pending payment
+          else
+            order.ChangeStatus(next);         // an illegal move throws InvalidOperationException, which becomes a 409
+          await db.SaveChangesAsync(ct);
+          return AdminOrderDto.From(order);
+        });
+    ```
+
+  - Think about: a card order normally becomes *Confirmed* from the payment webhook, so the admin moving it to
+    Confirmed by hand only makes sense for cash on delivery. And cancelling a paid order means a manual refund;
+    decide whether to refuse it (409) like the customer cancel does, or allow it with a warning on the page
+- [ ] **Controller** `AdminOrdersController` with `[Route("admin/orders")]`
+- [ ] **Tests** `AdminOrderApiTests.cs`: Pending → Confirmed → Processing → Shipped → Delivered works,
+      Delivered → Pending is 409, admin cancel puts the stock back, the list filters by status and search,
+      a customer gets 403
+- [ ] **Client**:
+  - `/admin/orders` page (add the route under `<RequireAuth role='Admin'/>` in `App.jsx`): filters for status, date
+    range and search, the same pagination as the shop, *Export CSV* exports the filtered list with `downloadCsv`
+  - `/admin/orders/:id`: customer, address, items, totals, one button per `nextStatuses` entry, and a payment panel
+    with the event log and a *Sync with gateway* button
+  - *Recent orders* on the dashboard reads `GET /admin/orders?pageSize=5` instead of `SAMPLE_ORDERS`
 
 ### Step 3 — Admin stats API (UC-15)
 
@@ -288,13 +428,29 @@ Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{i
 |---|---|---|
 | `GET /admin/stats?days=30` | Revenue and order count for the period, active orders, orders per day for the last 7 days, low stock products | Stat cards, *Orders this week*, *Low stock* |
 
-- [ ] Revenue counts only orders whose payment succeeded, or cash orders that were delivered
-- [ ] Remove `client/src/data/adminSample.js` once nothing reads it
-- [ ] Tests: the numbers for a few seeded orders
+**Build it in this order**
+
+- [ ] **Contracts**: `AdminStatsDto(decimal Revenue, int OrderCount, int ActiveOrders,
+      IReadOnlyList<DailyOrders> OrdersPerDay, IReadOnlyList<AdminProductDto> LowStock)` and
+      `DailyOrders(DateOnly Day, int Count, decimal Revenue)`
+- [ ] **Service** `AdminStatsService.GetAsync(days)`, every query `AsNoTracking`:
+  - **Revenue**: orders in the period whose `Payment.Status == Succeeded`, **plus** cash orders that are `Delivered`;
+    cancelled orders never count. `SumAsync(o => o.TotalAmount)`
+  - **Active orders**: status is Pending, Confirmed, Processing or Shipped
+  - **Orders per day**: `GroupBy(o => o.CreatedAt.Date)` for the last 7 days, then fill the days with no orders with
+    0 in C#, so the chart always has 7 bars
+  - **Low stock**: active products with `Stock <= 8` (the same `LOW_STOCK` the page uses; make it one constant)
+  - Check `days` is between 1 and 365, otherwise `ArgumentException`
+- [ ] **Controller** `AdminStatsController` with `[Route("admin/stats")]`
+- [ ] **Tests**: seed a paid card order, a delivered cash order, a pending cash order and a cancelled one, and check
+      that the revenue is only the first two; a customer gets 403
+- [ ] **Client**: the stat cards, *Orders this week* and *Low stock* read from it; delete
+      `client/src/data/adminSample.js` once nothing imports it, and remove the sample data banner
 
 ### Optional — Users
 
 `GET /admin/users` and `PUT /admin/users/{id}/role` for the Stitch *Users & Roles* screen, if there is time.
+Use `UserManager` (`AddToRoleAsync` / `RemoveFromRoleAsync`), and refuse to remove the Admin role from yourself.
 
 ### Do not forget, after the admin API exists
 
