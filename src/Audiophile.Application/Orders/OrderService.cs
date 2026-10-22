@@ -13,11 +13,11 @@ public sealed class OrderService(IAppDbContext db, PaymentService payments, ILog
 {
   public Task<PlaceOrderResult> PlaceOrderAsync(
       Guid userId, PlaceOrderRequest request, string idempotencyKey, CancellationToken ct) =>
-      RetryOnStockConflictAsync(() => TryPlaceOrderAsync(userId, request, idempotencyKey, ct));
+      db.RetryOnStockConflictAsync(logger, () => TryPlaceOrderAsync(userId, request, idempotencyKey, ct));
 
   // The customer cancels their own order, a paid card order is refused because the refund is done by support
   public Task<OrderDto> CancelOrderAsync(Guid userId, Guid orderId, CancellationToken ct) =>
-      RetryOnStockConflictAsync(async () =>
+      db.RetryOnStockConflictAsync(logger, async () =>
       {
         var order = await OrdersWithDetails().FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId, ct)
             ?? throw new NotFoundException($"Order {orderId} was not found.");
@@ -95,21 +95,6 @@ public sealed class OrderService(IAppDbContext db, PaymentService payments, ILog
   {
     var orders = await OrdersWithDetails().Where(o => o.UserId == userId).ToListAsync(ct);
     return orders.OrderByDescending(o => o.CreatedAt).Select(OrderDto.From).ToList();
-  }
-
-  // Runs the work once more on fresh data when another request changed the same stock, a second conflict becomes a 409
-  private async Task<T> RetryOnStockConflictAsync<T>(Func<Task<T>> work)
-  {
-    try
-    {
-      return await work();
-    }
-    catch (DbUpdateConcurrencyException)
-    {
-      logger.LogInformation("Stock changed by another request, trying once more");
-      db.ChangeTracker.Clear();
-      return await work();
-    }
   }
 
   private IQueryable<Order> OrdersWithDetails() => db.Orders

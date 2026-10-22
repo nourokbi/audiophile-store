@@ -268,8 +268,8 @@ Same React app, under `/admin`, behind a route guard that checks the `Admin` rol
 
 `RetryOnStockConflictAsync` is private inside `OrderService` (`Orders/OrderService.cs`), and restock needs it too.
 
-- [ ] Move it to `src/Audiophile.Application/Common/StockConflictRetry.cs` as an extension on `IAppDbContext`
-- [ ] `OrderService` calls the shared one, and its tests still pass
+- [x] Move it to `src/Audiophile.Application/Common/StockConflictRetry.cs` as an extension on `IAppDbContext`
+- [x] `OrderService` calls the shared one, and its tests still pass
 
 ```csharp
 // Runs the work once more on fresh data when another request changed the same stock, a second conflict becomes a 409
