@@ -1,24 +1,25 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { PackagePlus, Tag } from 'lucide-react';
+import { PackagePlus, Search, Tag } from 'lucide-react';
 
 import Dialog from './Dialog';
+import Pagination from './Pagination';
 import { adminApi } from '../lib/adminApi';
 import { formatPrice } from '../lib/format';
 import { findCategory } from '../lib/navigation';
 
-// The admin product table with restock, change price and the available switch on each row
-const AdminProducts = ({ products, lowStock, onChange }) => {
+// The admin product table with search, paging, restock, change price and the available switch on each row
+const AdminProducts = ({ products, lowStock, onChange, search, onSearch, page, totalPages, onPage }) => {
 	const [dialog, setDialog] = React.useState(null); // { type: 'restock' or 'price', product }
 	const [busyId, setBusyId] = React.useState(null);
 	const [error, setError] = React.useState('');
 
-	const run = async (product, call, patch) => {
+	// Calls the API and swaps the row for the product the server answered, so the table shows what was saved
+	const run = async (product, call) => {
 		setBusyId(product.id);
 		setError('');
 		try {
-			await call();
-			onChange(product.id, patch);
+			onChange(await call());
 			setDialog(null);
 		} catch (e) {
 			setError(e.message);
@@ -27,12 +28,24 @@ const AdminProducts = ({ products, lowStock, onChange }) => {
 		}
 	};
 
-	const toggleAvailable = (p) =>
-		run(p, () => adminApi.setAvailability(p.id, !p.available), { available: !p.available });
+	const toggleAvailable = (p) => run(p, () => adminApi.setAvailability(p.id, !p.isActive));
 
 	return (
 		<section className='card flex flex-col gap-4 overflow-hidden p-6'>
-			<h2 className='text-[18px]'>Products</h2>
+			<div className='flex flex-wrap items-center justify-between gap-4'>
+				<h2 className='text-[18px]'>Products</h2>
+				<div className='relative flex w-full items-center sm:w-72'>
+					<Search size={18} className='pointer-events-none absolute left-4 text-muted' />
+					<input
+						type='search'
+						value={search}
+						onChange={(e) => onSearch(e.target.value)}
+						placeholder='Search name or description'
+						aria-label='Search products'
+						className='input pl-11'
+					/>
+				</div>
+			</div>
 			{error && <p className='text-[14px] font-bold text-red-600'>{error}</p>}
 
 			<div className='-mx-6 overflow-x-auto px-6'>
@@ -49,7 +62,7 @@ const AdminProducts = ({ products, lowStock, onChange }) => {
 					</thead>
 					<tbody>
 						{products.map((p) => (
-							<tr key={p.id} className={`border-t border-line ${p.available ? '' : 'opacity-60'}`}>
+							<tr key={p.id} className={`border-t border-line ${p.isActive ? '' : 'opacity-60'}`}>
 								<td className='py-3 pr-4'>
 									<Link to={`/${p.category}/${p.slug}`} className='flex items-center gap-3 font-bold hover:text-brand-dark'>
 										<img src={p.image.mobile} alt='' className='h-10 w-10 rounded object-cover' />
@@ -62,25 +75,31 @@ const AdminProducts = ({ products, lowStock, onChange }) => {
 								<td className='py-3 pr-4'>
 									<button
 										role='switch'
-										aria-checked={p.available}
+										aria-checked={p.isActive}
 										aria-label={`${p.name} available`}
 										disabled={busyId === p.id}
 										onClick={() => toggleAvailable(p)}
-										className={`relative h-6 w-11 rounded-full transition-colors ${p.available ? 'bg-brand' : 'bg-panel-strong'}`}
+										className={`relative h-6 w-11 rounded-full transition-colors ${p.isActive ? 'bg-brand' : 'bg-panel-strong'}`}
 									>
 										<span
 											className={`absolute left-[2px] top-[2px] h-5 w-5 rounded-full bg-white transition-transform ${
-												p.available ? 'translate-x-5' : ''
+												p.isActive ? 'translate-x-5' : ''
 											}`}
 										/>
 									</button>
 								</td>
 								<td className='py-3'>
 									<div className='flex justify-end gap-2'>
-										<button onClick={() => setDialog({ type: 'restock', product: p })} className='btn-secondary h-9 px-3 text-[11px]'>
+										<button
+											onClick={() => setDialog({ type: 'restock', product: p })}
+											className='btn-secondary h-9 px-3 text-[11px]'
+										>
 											<PackagePlus size={14} /> Restock
 										</button>
-										<button onClick={() => setDialog({ type: 'price', product: p })} className='btn-secondary h-9 px-3 text-[11px]'>
+										<button
+											onClick={() => setDialog({ type: 'price', product: p })}
+											className='btn-secondary h-9 px-3 text-[11px]'
+										>
 											<Tag size={14} /> Price
 										</button>
 									</div>
@@ -91,6 +110,11 @@ const AdminProducts = ({ products, lowStock, onChange }) => {
 				</table>
 			</div>
 
+			{products.length === 0 && (
+				<p className='text-[14px] text-muted'>{search ? `No products match "${search}".` : 'No products yet.'}</p>
+			)}
+			{totalPages > 1 && <Pagination current={page} pages={totalPages} onChange={onPage} />}
+
 			{dialog?.type === 'restock' && (
 				<NumberDialog
 					title={`Restock ${dialog.product.name}`}
@@ -100,9 +124,7 @@ const AdminProducts = ({ products, lowStock, onChange }) => {
 					busy={busyId === dialog.product.id}
 					preview={(n) => `Stock goes from ${dialog.product.stock} to ${dialog.product.stock + n}`}
 					onClose={() => setDialog(null)}
-					onSave={(n) =>
-						run(dialog.product, () => adminApi.restock(dialog.product.id, n), { stock: dialog.product.stock + n })
-					}
+					onSave={(n) => run(dialog.product, () => adminApi.restock(dialog.product.id, n))}
 				/>
 			)}
 
@@ -115,7 +137,7 @@ const AdminProducts = ({ products, lowStock, onChange }) => {
 					busy={busyId === dialog.product.id}
 					preview={(n) => `Was ${formatPrice(dialog.product.price)}, becomes ${formatPrice(n)}`}
 					onClose={() => setDialog(null)}
-					onSave={(n) => run(dialog.product, () => adminApi.changePrice(dialog.product.id, n), { price: n })}
+					onSave={(n) => run(dialog.product, () => adminApi.changePrice(dialog.product.id, n))}
 				/>
 			)}
 		</section>

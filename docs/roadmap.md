@@ -294,8 +294,8 @@ public static class StockConflictRetry
 
 | Endpoint | Body | Answer | Used by |
 |---|---|---|---|
-| `GET /products?includeHidden=true&page=&pageSize=` (already there) | | Page of products **including hidden ones**, admins only | Product table |
-| `GET /products/search?q=&includeHidden=true` (already there) | | Search, also with hidden ones | Table search box |
+| `GET /admin/products?page=&pageSize=` | | Page of products **including hidden ones** | Product table |
+| `GET /admin/products/search?q=&page=` | | Search, also with hidden ones | Table search box |
 | `POST /admin/products/{id}/restock` | `{ quantity }` | The product | *Restock* button |
 | `PUT /admin/products/{id}/price` | `{ price }` | The product | *Price* button |
 | `PUT /admin/products/{id}/availability` | `{ isActive }` | The product | *Available* switch |
@@ -307,9 +307,10 @@ Moved to `AdminProductsController` (done 2026-10-25): `POST /admin/products` (cr
 **Build it in this order**
 
 - [x] **Entity**: add `public void Activate() => IsActive = true;` to `Product.cs`, next to `Deactivate()`
-- [x] **List and search** (done 2026-10-22): no separate admin list. `GET /products` takes `includeHidden=true` for
-      admins (a customer gets 403), search moved to its own `GET /products/search?q=`, and `ProductDto` now has
-      `isActive` and `createdAt`, so the admin actions answer with the same `ProductDto`
+- [x] **List and search** (done 2026-10-22, moved 2026-10-25): search has its own `GET /products/search?q=`, the shop's
+      list and search show only products on sale, and `GET /admin/products` and `/admin/products/search` call the same
+      `ProductService` methods with hidden products included. `ProductDto` has `isActive` and `createdAt`, so every
+      admin answer uses the same `ProductDto`
 - [x] **Contracts** in `Products/ProductContracts.cs`, only the three request bodies:
 
   ```csharp
@@ -352,16 +353,27 @@ Moved to `AdminProductsController` (done 2026-10-25): `POST /admin/products` (cr
       helpers from `OrderApiTests`, the admin logs in with `ApiFactory.AdminEmail` / `AdminPassword`):
   - restock 5 on a product with 3 gives 8
   - a product hidden with `availability false` is gone from `GET /products`, still in
-    `GET /products?includeHidden=true`, and comes back when set to `true`
+    `GET /admin/products`, and comes back when set to `true`
   - quantity 0 and price 0 give 400, an unknown id gives 404
   - a customer gets 403 on all three endpoints
-- [ ] **Client**:
-  - `adminApi.js`: `listProducts(page)` (`GET /products?includeHidden=true`), `searchProducts(q)`, `restock`, `changePrice`, `setAvailability` call the real endpoints, e.g.
+- [ ] **Client**, in this order, run the API and `npm run dev` and check the page after each box:
+  - [x] **1. Calls** `client/src/lib/adminApi.js`: give every function a real body with `api(path, { method, body })`
+        and add `listProducts(page)`, `searchProducts(q, page)` and `createProduct(body)`
     `` restock: (id, quantity) => api(`/admin/products/${id}/restock`, { method: 'POST', body: { quantity } }) ``
-  - `AdminDashboard.jsx`: the product table reads `GET /products?includeHidden=true` instead of `catalog`, and the local `changes`
-    state goes away (after an action, replace that row with the product the API answered)
-  - Enable *Add product*: a dialog with the `ProductRequest` fields that calls `POST /admin/products`
-  - `ADMIN_API_CONNECTED = true`
+  - [x] **2. One product shape**: `export` `toProduct` from `CatalogContext.jsx`, add `isActive: p.isActive` to it, and use
+        `p.isActive` in `AdminProducts.jsx` where it says `p.available`
+  - [x] **3. The table loads its own data** `AdminDashboard.jsx`: a `products` state filled from
+        `adminApi.listProducts(page)` (`GET /admin/products`, already mapped with `toProduct`), so hidden products show up; `useCatalog`, the `changes`
+        state and the `catalog.map(...)` line go away
+  - [x] **4. Trust the server's answer** `AdminProducts.jsx`: `run(product, call)` keeps only `call`, and the product the API
+        sends back replaces that row, `onChange(toProduct(await call()))`; the `patch` arguments go away
+  - [x] **5. Paging and search**: *Previous* and *Next* under the table from `page` and `totalPages`, and a search box that
+        calls `searchProducts` about 300 ms after the last key
+  - [x] **6. Add product**: enable the button, a `Dialog` with the `ProductRequest` fields that calls `createProduct`, and the
+        400 message shown inside the dialog
+  - [x] **7. Switch off the placeholders**: delete `ADMIN_API_CONNECTED` and its sentence in the banner
+  - [ ] **8. Check by hand**: restock, change a price, hide a product (gone from the shop, faded in the table), show it again,
+        add a product, and refresh the page to see every change was saved
 
 - [x] **Decided** (2026-10-25): `PUT /admin/products/{id}` uses `FindAnyAsync`, so the admin can edit a hidden product
       and show it when it is ready. Only `GET /products/{id}` keeps `FindActiveAsync`.

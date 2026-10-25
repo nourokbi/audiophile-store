@@ -3,7 +3,7 @@ using Audiophile.Domain.Enums;
 
 namespace Audiophile.Application.Products;
 
-// Optional catalogue filters, IncludeHidden is for admins and the page size is capped so one request cannot ask for the whole table
+// Optional catalogue filters, IncludeHidden is set only by the admin endpoints and the page size is capped so one request cannot ask for the whole table
 public sealed record ProductQuery(
     ProductCategory? Category = null,
     decimal? MinPrice = null,

@@ -47,13 +47,16 @@ public sealed class ProductApiTests
         var customer = factory.CreateClient();
         Authorize(customer, await RegisterAsync(customer, "mona@example.com"));
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await customer.GetAsync("/products?includeHidden=true")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await customer.GetAsync("/products/search?q=hidden&includeHidden=true")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await customer.GetAsync("/admin/products")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await customer.GetAsync("/admin/products/search?q=hidden")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await factory.CreateClient().GetAsync("/admin/products")).StatusCode);
         Assert.DoesNotContain(id, Ids(await ReadAsync(await customer.GetAsync("/products?pageSize=50"))));
+        Assert.DoesNotContain(id, Ids(await ReadAsync(await customer.GetAsync("/products/search?q=hidden"))));
 
-        var all = await ReadAsync(await admin.GetAsync("/products?includeHidden=true&pageSize=50"));
+        var all = await ReadAsync(await admin.GetAsync("/admin/products?pageSize=50"));
         var hidden = all.GetProperty("items").EnumerateArray().Single(p => p.GetProperty("id").GetString() == id);
         Assert.False(hidden.GetProperty("isActive").GetBoolean());
+        Assert.Contains(id, Ids(await ReadAsync(await admin.GetAsync("/admin/products/search?q=hidden"))));
     }
 
     private static IEnumerable<string> Ids(JsonElement page) =>

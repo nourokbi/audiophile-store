@@ -1,11 +1,12 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, Boxes, Download, Info, Package, Plus, TrendingUp, Users, Wallet } from 'lucide-react';
 
 import AdminProducts from '../components/AdminProducts';
+import ProductDialog from '../components/ProductDialog';
 import { StatusBadge } from '../components/OrderParts';
 import { useCatalog } from '../context/CatalogContext';
 import { SAMPLE_ORDERS, SAMPLE_SALES_BY_DAY, SAMPLE_STATS } from '../data/adminSample';
-import { ADMIN_API_CONNECTED } from '../lib/adminApi';
+import { adminApi } from '../lib/adminApi';
 import { downloadCsv } from '../lib/csv';
 import { formatPrice } from '../lib/format';
 
@@ -18,15 +19,57 @@ const exportRecentOrders = () =>
 		...SAMPLE_ORDERS.map((o) => [o.id, o.customer, o.date, o.method, o.status, o.total]),
 	]);
 
-// The admin overview, the products are real and the sales and orders are sample data until the admin API exists
-// The chart is plain div bars for now, Chart.js replaces it once GET /admin/stats exists (see the roadmap)
+// The admin overview, products come from the API and the stats, chart and orders are sample data until Steps 2 and 3
 const AdminDashboard = () => {
-	const { products: catalog } = useCatalog();
-	const [changes, setChanges] = React.useState({}); // product id to { stock, price, available } edited on this page
+	const [products, setProducts] = useState([]);
+	const [page, setPage] = useState(1);
+	const [totalPages, setTotalPages] = useState(1);
+	const [search, setSearch] = useState(''); // what is typed in the box
+	const [query, setQuery] = useState(''); // what is searched, set 300 ms after the last key
+	const [reloadKey, setReloadKey] = useState(0); // bumped to load the table again, after a product is added
+	const [showAdd, setShowAdd] = useState(false);
 
-	const products = catalog.map((p) => ({ available: true, ...p, ...changes[p.id] }));
-	const onChange = (id, patch) => setChanges((all) => ({ ...all, [id]: { ...all[id], ...patch } }));
+	// Waits until typing stops so the API gets one request instead of one per letter, a new search starts on page 1
+	useEffect(() => {
+		const timer = setTimeout(() => {
+			setQuery(search.trim());
+			setPage(1);
+		}, 300);
+		return () => clearTimeout(timer);
+	}, [search]);
 
+	// Loads the page from the list or the search, an answer that arrives after a newer request is ignored
+	useEffect(() => {
+		let stale = false;
+		const load = query ? adminApi.searchProducts(query, page) : adminApi.listProducts(page);
+		load
+			.then((result) => {
+				if (stale) return;
+				setProducts(result.items);
+				setTotalPages(result.totalPages);
+			})
+			.catch(console.error);
+		return () => {
+			stale = true;
+		};
+	}, [page, query, reloadKey]);
+
+	const { reload: reloadShop } = useCatalog();
+
+	// Swaps in the product the server answered and reloads the shop's list so a shown or hidden product appears there at once
+	const onChange = (updated) => {
+		setProducts((all) => all.map((p) => (p.id === updated.id ? updated : p)));
+		reloadShop();
+	};
+
+	// A new product can land on any page, so the table goes back to the full list on page 1
+	const onCreated = () => {
+		setShowAdd(false);
+		setSearch('');
+		setPage(1);
+		setReloadKey((k) => k + 1);
+		reloadShop();
+	};
 	const lowStock = products.filter((p) => p.stock <= LOW_STOCK).sort((a, b) => a.stock - b.stock);
 	const unitsInStock = products.reduce((sum, p) => sum + p.stock, 0);
 	const busiestDay = Math.max(...SAMPLE_SALES_BY_DAY.map((d) => d.orders));
@@ -38,23 +81,38 @@ const AdminDashboard = () => {
 					<p className='eyebrow'>Admin</p>
 					<h1 className='title mt-2'>Dashboard</h1>
 				</div>
-				<button disabled className='btn-primary' title='Comes with the admin products API'>
+				<button onClick={() => setShowAdd(true)} className='btn-primary'>
 					<Plus size={16} /> Add product
 				</button>
 			</div>
 
 			<p className='flex items-center gap-3 rounded bg-brand-soft p-4 text-[14px] text-brand-dark'>
 				<Info size={18} className='shrink-0' />
-				Revenue, the sales chart and recent orders are sample data until the admin API is ready. Products and stock are
-				live.
-				{!ADMIN_API_CONNECTED && ' Restock, price and availability changes stay on this page and are not saved yet.'}
+				Revenue, the sales chart and recent orders are sample data until the orders and stats API is ready. Products and stock are
+				live and every change is saved.
 			</p>
 
 			<div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-				<Stat icon={Wallet} label='Revenue, 30 days' value={formatPrice(SAMPLE_STATS.revenue)} note={`+${SAMPLE_STATS.revenueChange}%`} />
-				<Stat icon={Package} label='Active orders' value={SAMPLE_STATS.activeOrders} note={`${SAMPLE_STATS.ordersThisWeek} this week`} />
+				<Stat
+					icon={Wallet}
+					label='Revenue, 30 days'
+					value={formatPrice(SAMPLE_STATS.revenue)}
+					note={`+${SAMPLE_STATS.revenueChange}%`}
+				/>
+				<Stat
+					icon={Package}
+					label='Active orders'
+					value={SAMPLE_STATS.activeOrders}
+					note={`${SAMPLE_STATS.ordersThisWeek} this week`}
+				/>
 				<Stat icon={Boxes} label='Units in stock' value={unitsInStock} note={`${products.length} products`} />
-				<Stat icon={AlertTriangle} label='Low stock' value={lowStock.length} note={`${LOW_STOCK} or fewer left`} warn={lowStock.length > 0} />
+				<Stat
+					icon={AlertTriangle}
+					label='Low stock'
+					value={lowStock.length}
+					note={`${LOW_STOCK} or fewer left`}
+					warn={lowStock.length > 0}
+				/>
 			</div>
 
 			<div className='grid grid-cols-1 items-start gap-6 lg:grid-cols-3'>
@@ -126,7 +184,18 @@ const AdminDashboard = () => {
 				</Table>
 			</section>
 
-			<AdminProducts products={products} lowStock={LOW_STOCK} onChange={onChange} />
+			<AdminProducts
+				products={products}
+				lowStock={LOW_STOCK}
+				onChange={onChange}
+				search={search}
+				onSearch={setSearch}
+				page={page}
+				totalPages={totalPages}
+				onPage={setPage}
+			/>
+
+			{showAdd && <ProductDialog onClose={() => setShowAdd(false)} onCreated={onCreated} />}
 		</div>
 	);
 };
@@ -150,10 +219,10 @@ const Table = ({ head, children }) => (
 		<table className='w-full min-w-[640px] text-left text-[14px]'>
 			<thead>
 				<tr>
-					{head.map((h, i) => (
+					{head.map((h) => (
 						<th
 							key={h}
-							className={`pb-3 text-[11px] font-bold uppercase tracking-wider text-muted ${i === head.length - 1 && h === 'Total' ? 'text-right' : ''}`}
+							className={`pb-3 text-[11px] font-bold uppercase tracking-wider text-muted ${h === 'Total' ? 'text-right' : ''}`}
 						>
 							{h}
 						</th>

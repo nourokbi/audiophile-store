@@ -1,16 +1,30 @@
 using Audiophile.Application.Common;
 using Audiophile.Application.Products;
+using Audiophile.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Audiophile.API.Controllers;
 
-// Every catalogue change is here for admins, the logic lives in ProductService and the table reads GET /products?includeHidden=true
+// The admin side of the catalogue, it lists hidden products too and holds every change, the logic lives in ProductService
 [ApiController]
 [Route("admin/products")]
 [Authorize(Roles = Roles.Admin)]
 public sealed class AdminProductsController(ProductService _productsService) : ControllerBase
 {
+  // The dashboard's product table, hidden products included, with the same filters and paging as the shop
+  [HttpGet]
+  public async Task<IActionResult> List(
+      ProductCategory? category, decimal? minPrice, decimal? maxPrice, CancellationToken ct,
+      int page = 1, int pageSize = ProductQuery.DefaultPageSize) =>
+      Ok(await _productsService.ListAsync(
+          new ProductQuery(category, minPrice, maxPrice, IncludeHidden: true, page, pageSize), ct));
+
+  [HttpGet("search")]
+  public async Task<IActionResult> Search(
+      string q, CancellationToken ct, int page = 1, int pageSize = ProductQuery.DefaultPageSize) =>
+      Ok(await _productsService.SearchAsync(new ProductSearch(q, IncludeHidden: true, page, pageSize), ct));
+
   [HttpPost]
   public async Task<IActionResult> Create(ProductRequest request, CancellationToken ct)
   {

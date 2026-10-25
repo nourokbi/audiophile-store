@@ -48,7 +48,7 @@ public sealed class AdminProductApiTests
         Assert.Equal(HttpStatusCode.OK, hidden.StatusCode);
         Assert.False((await ReadAsync(hidden)).GetProperty("isActive").GetBoolean());
         Assert.Equal(HttpStatusCode.NotFound, (await shopper.GetAsync($"/products/{id}")).StatusCode);
-        Assert.Contains(id, Ids(await ReadAsync(await admin.GetAsync("/products?includeHidden=true&pageSize=50"))));
+        Assert.Contains(id, Ids(await ReadAsync(await admin.GetAsync("/admin/products?pageSize=50"))));
 
         // A hidden product can still be restocked, so the admin can get it ready before showing it again
         (await admin.PostAsJsonAsync($"/admin/products/{id}/restock", new { quantity = 1 })).EnsureSuccessStatusCode();

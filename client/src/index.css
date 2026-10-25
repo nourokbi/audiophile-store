@@ -80,10 +80,6 @@
 		@apply btn bg-panel text-ink hover:bg-panel-strong;
 	}
 
-	.btn-dark {
-		@apply btn bg-ink text-page hover:opacity-90;
-	}
-
 	.input {
 		@apply h-12 w-full rounded bg-panel px-4 text-[15px] font-medium text-ink placeholder:text-muted/70 focus:bg-surface focus:outline-none focus:ring-1 focus:ring-brand disabled:text-muted;
 	}

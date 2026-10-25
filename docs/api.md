@@ -35,9 +35,11 @@ Rules:
 
 | Method | Path | Access | Success | Errors |
 |---|---|---|---|---|
-| GET | `/products?category=&minPrice=&maxPrice=&includeHidden=false&page=1&pageSize=12` | 🔓 | 200 page | 400 bad filter · 403 `includeHidden` without admin |
-| GET | `/products/search?q=&includeHidden=false&page=1&pageSize=12` | 🔓 | 200 page | 400 empty or long `q` · 403 `includeHidden` without admin |
+| GET | `/products?category=&minPrice=&maxPrice=&page=1&pageSize=12` | 🔓 | 200 page | 400 bad filter |
+| GET | `/products/search?q=&page=1&pageSize=12` | 🔓 | 200 page | 400 empty or long `q` |
 | GET | `/products/{id}` | 🔓 | 200 product | 404 |
+| GET | `/admin/products?category=&minPrice=&maxPrice=&page=1&pageSize=12` | 👑 | 200 page, hidden products included | 400 · 401 · 403 |
+| GET | `/admin/products/search?q=&page=1&pageSize=12` | 👑 | 200 page, hidden products included | 400 · 401 · 403 |
 | POST | `/admin/products` | 👑 | 201 product | 400 · 401 · 403 |
 | PUT | `/admin/products/{id}` | 👑 | 200 product | 400 · 401 · 403 · 404 |
 | DELETE | `/admin/products/{id}` | 👑 | 204 | 401 · 403 · 404 |
@@ -46,8 +48,8 @@ Rules:
 | PUT | `/admin/products/{id}/availability` | 👑 | 200 product | 401 · 403 · 404 |
 
 - A **page** is `{ items, page, pageSize, totalCount, totalPages }`. `pageSize` is 1–50, `q` ≤ 100 characters,
-  `minPrice` ≤ `maxPrice`. Only active products are listed, ordered by name; an admin adds hidden ones with
-  `includeHidden=true`, which is how the dashboard's product table reads the catalogue.
+  `minPrice` ≤ `maxPrice`. `/products` lists only active products, ordered by name; `/admin/products` lists hidden ones
+  too, which is how the dashboard's product table reads the catalogue.
 - **Search** matches name or description, case-insensitive. It is a contains search that works like
   `LIKE '%term%'` and reads every row; a `pg_trgm` or full text index can replace it when the catalogue grows.
 - A **product** is `{ id, name, description, features, price, stock, inStock, category, imageUrl, inTheBox, isActive, createdAt }`;
