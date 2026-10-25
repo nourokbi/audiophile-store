@@ -1,12 +1,17 @@
-// A labelled input with its error message, used by login, register and checkout
+// The label above a field with its error message on the right, shared by TextField and TextArea
+export const FieldHeader = ({ name, label, error }) => (
+	<div className='flex items-center justify-between'>
+		<label htmlFor={name} className={`field-label ${error ? 'text-red-600' : ''}`}>
+			{label}
+		</label>
+		{error && <span className='text-[12px] font-medium text-red-600'>{error}</span>}
+	</div>
+);
+
+// A labelled input with its error message, used by login, register, checkout and the admin forms
 const TextField = ({ label, name, error, icon: Icon, trailing, className = '', ...inputProps }) => (
 	<div className={`flex w-full flex-col gap-2 ${className}`}>
-		<div className='flex items-center justify-between'>
-			<label htmlFor={name} className={`text-[12px] font-bold uppercase tracking-wider ${error ? 'text-red-600' : ''}`}>
-				{label}
-			</label>
-			{error && <span className='text-[12px] font-medium text-red-600'>{error}</span>}
-		</div>
+		<FieldHeader name={name} label={label} error={error} />
 		<div className='relative flex items-center'>
 			{Icon && <Icon size={18} className='pointer-events-none absolute left-4 text-muted' />}
 			<input

@@ -27,12 +27,13 @@ A finished, deployed project beats a bigger unfinished one on a CV.
 
 ---
 
-## Where we are now (2026-10-19)
+## Where we are now (2026-10-25)
 
 **Phase 1 is done** (`v0.2.0`) and the **shop is redesigned** from the Stitch project (PR #6): light and dark theme,
 22 products in five categories, filters and pagination, a cart page, checkout with saved addresses, order tracking
-and cancel. The **admin dashboard page exists** but runs on sample data and page-only changes, so the next phase is
-the admin API behind it. 37 tests pass on PostgreSQL, in GitHub Actions on every push and pull request.
+and cancel. **Phase 5 is half done**: the dashboard has its own layout with a side menu and four pages, the products
+page is finished end to end, and the orders pages are built on sample data waiting for the admin orders API.
+49 tests pass on PostgreSQL, in GitHub Actions on every push and pull request.
 
 | Phase | Status |
 |---|---|
@@ -41,7 +42,7 @@ the admin API behind it. 37 tests pass on PostgreSQL, in GitHub Actions on every
 | 2 Pluggable payments | 🟡 Fawaterak is on (card only) and tested for real; **the pluggable design and fake-gateway tests left** |
 | 3 Login, roles, addresses | ✅ done |
 | 4 React client | ✅ every customer page, redesigned from Stitch with a dark theme; **guest cart and httpOnly cookie left** |
-| 5 Admin dashboard | 🟡 the page is built on sample data; **the admin API is next** (branch `phase-5/admin-api`) |
+| 5 Admin dashboard | 🟡 products done end to end, orders pages on sample data; **the admin orders API is next** (branch `phase-5/admin-api`) |
 | 6 Caching + messaging | ⬜ not started |
 | 7 Docker, CI, deploy | ⬜ not started (AWS was considered; the VPS + Neon plan still stands) |
 
@@ -50,13 +51,30 @@ the admin API behind it. 37 tests pass on PostgreSQL, in GitHub Actions on every
 Phase 5 is worked on the branch `phase-5/admin-api`, one commit per endpoint that works end to end (API, test and
 the dashboard connected). How to build each step, with hints and code sketches, is in Phase 5 below.
 
-0. **Shared stock retry**: move `RetryOnStockConflictAsync` out of `OrderService` so the admin services can use it.
-1. **Admin products API**: list with hidden products, restock, price, availability; connect the dashboard buttons.
-2. **Admin orders API**: list with filters, one order with its customer and payment, change the status; an orders page.
-3. **Admin stats API**: the stat cards and the chart, then **Chart.js**.
+**Done**
+
+- ✅ Step 0, the shared stock retry
+- ✅ Step 1, admin products: list with filters (search, category, availability, low stock, sort), add, **edit**,
+  restock, price, show and hide, every action from the dashboard, and the shop updates without a refresh
+- ✅ Client cleanup, the account dropdown, and the dashboard frame (sticky side menu that folds into icons)
+- ✅ The orders pages, built on sample orders shaped like the Step 2 answers
+
+**You build next** (the client is ready and waits for these)
+
+1. **Step 2, admin orders API**: `GET /admin/orders` with `statusCounts`, `GET /admin/orders/{id}`,
+   `PUT /admin/orders/{id}/status`. Then swap the sample orders for `adminApi` in three hooks (Step 2, *Connect it*).
+2. **Step 3, admin stats API**: revenue, active orders and orders per day for the overview cards and chart.
+3. **Income page** (part F): `GET /admin/stats/income` and the Chart.js charts.
 4. **React Query** across the client, now that every list has an API.
 5. Then Phase 4 leftovers (guest cart, httpOnly cookie), Phase 2 (pluggable payments, kept as a later refactor),
    and Phases 6 → 7.
+
+**Still missing in Phase 5** (each one is a box further down)
+
+- Orders: the real API, the payment panel on the order page (event log and *Sync with gateway*)
+- Overview: revenue, active orders, the chart and the customer count are still sample numbers
+- Income: the API and the charts
+- Products, optional: uploading a photo instead of typing a URL
 
 Dropped: `POST /orders/preview`. `GET /cart` already returns the totals the order will use.
 
@@ -230,10 +248,8 @@ chain, not every session) are a possible refinement; revoking everything is the 
 
 Same React app, under `/admin`, behind a route guard that checks the `Admin` role.
 
-- [x] The page itself (2026-10-19): stat cards, orders chart, low stock, recent orders with *Export CSV*, and the
-      product table with *Restock*, *Price* and an *Available* switch on every row. Products are live; revenue, the
-      chart and recent orders are sample data in `client/src/data/adminSample.js`, and the product actions only
-      change the page, until the endpoints below exist
+- [x] The page itself (2026-10-19), since split into `/admin` (overview), `/admin/products`, `/admin/orders`,
+      `/admin/orders/:id` and `/admin/income` inside `AdminLayout` (2026-10-25)
 
 ### How to work through this phase
 
@@ -261,8 +277,10 @@ Same React app, under `/admin`, behind a route guard that checks the `Admin` rol
 - **Stock changes** (restock, admin cancel) go through the `xmin` retry, because a restock and a checkout can touch
   the same product at once.
 - **Tests**: every endpoint gets an HTTP test as the admin and one that a customer gets **403**.
-- **Client**: every dashboard call lives in `client/src/lib/adminApi.js`, built on `api(path, { method, body })`
-  from `lib/api.js`.
+- **Client**: every dashboard call lives in `client/src/lib/api/admin.js`, built on `api(path, { method, body })`
+  from `lib/api/client.js`. Shop calls live next to it in `lib/api/` (`auth`, `cart`, `products`, `orders`, `addresses`).
+- **Order rules on the client** live in `client/src/lib/orders.js` (`canCancel`, `isActiveOrder`, `PAYMENT_LABELS`), so the
+  shop and the dashboard never write the same status list twice.
 
 ### Step 0 — Move the stock retry where both services can use it
 
@@ -290,7 +308,7 @@ public static class StockConflictRetry
 
 `IAppDbContext` already exposes `ChangeTracker`. The log line can move with it (pass an `ILogger`) or stay in the caller.
 
-### Step 1 — Admin products API (UC-11)
+### Step 1 — Admin products API (UC-11) · ✅ done 2026-10-25
 
 | Endpoint | Body | Answer | Used by |
 |---|---|---|---|
@@ -356,7 +374,7 @@ Moved to `AdminProductsController` (done 2026-10-25): `POST /admin/products` (cr
     `GET /admin/products`, and comes back when set to `true`
   - quantity 0 and price 0 give 400, an unknown id gives 404
   - a customer gets 403 on all three endpoints
-- [ ] **Client**, in this order, run the API and `npm run dev` and check the page after each box:
+- [x] **Client**, in this order, run the API and `npm run dev` and check the page after each box:
   - [x] **1. Calls** `client/src/lib/adminApi.js`: give every function a real body with `api(path, { method, body })`
         and add `listProducts(page)`, `searchProducts(q, page)` and `createProduct(body)`
     `` restock: (id, quantity) => api(`/admin/products/${id}/restock`, { method: 'POST', body: { quantity } }) ``
@@ -372,40 +390,140 @@ Moved to `AdminProductsController` (done 2026-10-25): `POST /admin/products` (cr
   - [x] **6. Add product**: enable the button, a `Dialog` with the `ProductRequest` fields that calls `createProduct`, and the
         400 message shown inside the dialog
   - [x] **7. Switch off the placeholders**: delete `ADMIN_API_CONNECTED` and its sentence in the banner
-  - [ ] **8. Check by hand**: restock, change a price, hide a product (gone from the shop, faded in the table), show it again,
-        add a product, and refresh the page to see every change was saved
+  - [x] **8. Check by hand** (passed 2026-10-25): restock, change a price, hide a product (gone from the shop, faded in the table), show it again,
+        add a product, and refresh the page to see every change was saved. After the client cleanup also click through
+        the shop once: home filters and pages, a product, the cart, checkout with a new address, my orders, settings
+  - [x] **9. Edit product**: an *Edit* button on every row opens the same dialog filled in, and saves with
+        `PUT /admin/products/{id}`
 
 - [x] **Decided** (2026-10-25): `PUT /admin/products/{id}` uses `FindAnyAsync`, so the admin can edit a hidden product
       and show it when it is ready. Only `GET /products/{id}` keeps `FindActiveAsync`.
+- [x] **Fixed** (2026-10-25): the edit took the stock from the request, so a form opened before a checkout would put
+      the old number back. The edit now has its own `UpdateProductRequest` without stock (stock only moves through
+      restock and orders), and `inTheBox` left out keeps the box as it is. A test covers both
+- [x] *In the box* in the add and edit dialog (2026-10-25): one row per item with its quantity and name, *Add an item*
+      and a remove button per row, filled in on edit; empty rows are skipped, a missing name, a quantity under 1 or the
+      same item twice is refused before saving
+- [ ] Optional: a photo upload instead of the URL field
+
+### Client cleanup (done 2026-10-25)
+
+- [x] Folders: `components/layout`, `components/ui`, `components/shop`, `components/checkout`, `components/orders`,
+      `components/admin`; every API call in `lib/api/`; `toProduct`, `productPath` and `stockLabel` in `lib/products.js`
+- [x] Shared pieces: `PriceSummary`, `Switch`, `Select`, `TextArea`, `EmptyState`, `AddressLines`, and the
+      `.field-label` and `.error-text` classes in `index.css`
+- [x] Big pages split: `Home` into `Hero`, `ShopFilters`, `PromiseStrip` and the `useShopFilters` hook; `Checkout` into
+      `AddressPicker`, `AddressForm` and `PaymentPicker`; `useAddresses` for checkout and settings
+- [x] `useAuth()` returns `isAdmin`, and `<RequireAuth adminOnly />` guards `/admin`
+- [x] Fixes: the shop loads every page of products (it stopped at 50), a catalogue error clears after a load that
+      works, free shipping reads `SHIPPING.freeFrom`, pagination shows `1 ... 4 5 6 ... 20`, the dashboard code loads
+      only on `/admin`
+- [x] `client/.prettierrc` (tabs, single quotes, width 130, `endOfLine: auto` so each file keeps its line endings)
+
+### Dashboard redesign (planned 2026-10-25)
+
+What changes, in the order to build it. Each part says which API it needs.
+
+| # | Part | Backend | Client |
+|---|---|---|---|
+| A | Account dropdown | none | `AccountMenu` replaces `UserDrawer` in the navbar |
+| B | Dashboard frame | none | `AdminLayout` with a side menu, nested routes under `/admin` |
+| C | Products page | filters on `GET /admin/products` | `/admin/products` with filters and paging |
+| D | Orders page | Step 2 below, plus counts per status | `/admin/orders`, `/admin/orders/:id`, status controls |
+| E | Overview | Step 3 below, whole business numbers | `/admin` cards and previews |
+| F | Income page | `GET /admin/stats/income` | `/admin/income` with Chart.js |
+
+**A. Account dropdown** (done 2026-10-25)
+- [x] `components/layout/AccountMenu.jsx`: a small menu under the user icon (My orders, Settings, Admin dashboard for
+      admins, the theme switch, Log out; Log in and Create account for visitors). It closes on a click outside or on Escape
+- [x] Delete `UserDrawer.jsx` once nothing imports it
+
+**B. Dashboard frame** (done 2026-10-25)
+- [x] `components/admin/AdminLayout.jsx`: the side menu that used to be the drawer (Overview, Products, Orders, Income),
+      sticky on the left under the header, the page on the right with `<Outlet />`. *Collapse* folds it into a bar of
+      icons and the choice is remembered in the browser; on a phone it always stays folded
+- [x] Routes in `App.jsx` under `<RequireAuth adminOnly />`: `/admin` (overview), `/admin/products`, `/admin/orders`,
+      `/admin/orders/:id`, `/admin/income`, each page loaded with `React.lazy`
+- [x] `pages/admin/` holds one page per route; `AdminDashboard.jsx` became `pages/admin/Products.jsx` and
+      `pages/admin/Overview.jsx` holds the cards and previews. Orders and Income show the sample data until their API exists
+- [x] The overview's *Products on sale* and *Low stock* cards and the low stock preview already count the whole
+      catalogue, from two small filtered pages of `GET /admin/products` (`useInventorySummary`), until Step 3
+
+**C. Products page** (done 2026-10-25)
+- [x] **Backend**: `GET /admin/products` takes `q`, `availability=All|OnSale|Hidden`, `lowStockOnly=true` and
+      `sort=Name|Newest|PriceLowToHigh|PriceHighToLow|StockLowToHigh`, all in `ProductQuery` (admin only, the shop
+      ignores them), `ProductQuery.LowStockLimit = 8` is the one low stock number, and two tests cover them
+- [x] **Client**: a filter bar above `ProductsTable` (category, availability, low stock only, sort, search), every filter
+      in the URL (`useSearchParams`) so a refresh keeps it, and the *Add product* button moves here
+
+**D. Orders page**: Step 2 below, plus
+- [ ] **Backend**: the order list answer also carries `statusCounts` (`{ Pending: 3, Confirmed: 5, ... }`) for the
+      filtered dates, so the page shows the numbers without a second call
+- [ ] **Order phases have their own logic**: the API decides the allowed moves (`Order.NextStatuses`) and every admin
+      order answer carries `nextStatuses`. The client never guesses: `lib/orders.js` only labels them, and
+      `components/admin/OrderStatusControl.jsx` draws one button per entry, with a confirm step for *Cancelled*
+- [x] **Client layout** (2026-10-25, on sample data): `useAdminOrders` and `useAdminProducts` share `useUrlFilters`;
+      `/admin/orders` has `OrderStatusTabs` with counts, `OrderFilters` (search, from and to dates), `OrdersTable` with a
+      quick *next step* button per row and *Export CSV*; `/admin/orders/:id` has the progress, items, customer, address,
+      `OrderStatusControl` and a `ConfirmDialog` before *Cancel*. The orders come from `data/adminOrdersSample.js`, a
+      pretend server with the planned answers (`statusCounts`, `nextStatuses`, a 409 for an illegal move)
+- [ ] **Connect it**: once the API exists, add `listOrders`, `getOrder` and `changeOrderStatus` to `lib/api/admin.js`,
+      import `adminApi` in `useAdminOrders`, `useAdminOrder` and `useRecentOrders`, and delete `data/adminOrdersSample.js`
+- [ ] The payment panel on the order page: the event log and *Sync with gateway*
+
+**E. Overview**: Step 3 below, and
+- [ ] The four cards count the **whole business**, never the page in view: products on sale, active orders, low stock
+      products, revenue in the last 30 days. `AdminStatsDto` gets `ProductCount` and `LowStockCount`
+- [ ] Previews under the cards, each with a *See all* link to its page: the last 5 orders, the 5 lowest stock
+      products, orders this week
+- [ ] `client/src/data/adminSample.js` is deleted
+
+**F. Income page** (last)
+- [ ] **Backend**: `GET /admin/stats/income?from=&to=` with revenue per day, per payment method and per category, using
+      the same revenue rule as Step 3 (paid card orders plus delivered cash orders)
+- [ ] **Client**: Chart.js (`react-chartjs-2`) line chart of revenue per day, bars per category, a date range picker,
+      and totals for the period
 
 ### Step 2 — Admin orders API (UC-12, UC-13, UC-14)
 
 | Endpoint | Body | Answer | Used by |
 |---|---|---|---|
-| `GET /admin/orders?status=&from=&to=&search=&page=&pageSize=` | | Page of orders, newest first, with the customer's name and email | Recent orders, an orders page, *Export CSV* |
+| `GET /admin/orders?status=&from=&to=&q=&page=&pageSize=` | | Page of orders, newest first, with the customer's name and email, plus `statusCounts` | Orders page, recent orders on the overview, *Export CSV* |
 | `GET /admin/orders/{id}` | | The order with its customer, shipping address, items and payment | Order details page |
 | `PUT /admin/orders/{id}/status` | `{ status }` | The order | *Next status* buttons |
 
 Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{id}/payment/sync` for the payment panel.
 
+**The client is already built for these answers** (`client/src/data/adminOrdersSample.js` shows them), so match these
+names and the pages work the moment you switch the import:
+
+- **Summary** in the list: `id, createdAt, updatedAt, customerName, customerEmail, status, paymentMethod,
+  paymentStatus, subTotal, shippingFee, totalAmount, itemCount` (the sum of the quantities) and `nextStatuses`
+- **One order**: the summary plus `shipping { fullName, phone, street, city, country, postalCode }` and
+  `items [{ productId, productName, productImageUrl, unitPrice, quantity, lineTotal }]`
+- **The list page**: `{ items, page, pageSize, totalCount, totalPages, statusCounts }`. `statusCounts` counts every
+  status for the search and dates but **ignores the status filter**, so every tab keeps its number
+- `q` searches the customer's name and email, and an order number typed from its start (the first 8 characters shown)
+- `from` and `to` are days like `2026-10-25`, and `to` includes the whole day
+
 **Build it in this order**
 
 - [ ] **Entity**: `AllowedNextStatuses` in `Order.cs` is private. Add a public read of it, e.g.
       `public IReadOnlyList<OrderStatus> NextStatuses => AllowedNextStatuses[Status];`
-- [ ] **Contracts** in `Orders/OrderContracts.cs`: `AdminOrderQuery(Status, From, To, Search, Page, PageSize)`,
-      `AdminOrderSummaryDto` for the list (id, created at, customer name and email, status, payment method and status,
-      total, item count) and `AdminOrderDto` for one order (everything plus `ShippingFullName…`, items and
-      `NextStatuses`), `ChangeStatusRequest(OrderStatus Status)`
+- [ ] **Contracts** in `Orders/OrderContracts.cs`: `AdminOrderQuery(Status, From, To, Q, Page, PageSize)`,
+      `AdminOrderSummaryDto` and `AdminOrderDto` with the fields above, `AdminOrderPage` (the paged list plus
+      `StatusCounts`), and `ChangeStatusRequest(OrderStatus Status)`
 - [ ] **Service**: the admin order methods go in `OrderService`:
   - `ListAsync`: `db.Orders.AsNoTracking()`, filter by status, `CreatedAt >= from` and `< to.AddDays(1)`, search on
     `o.User.Name` / `o.User.Email`, `OrderByDescending(o => o.CreatedAt)`, page, then `Select` into the summary.
-    Count the items with `o.OrderItems.Count` inside the projection so it stays one SQL query
+    Sum the quantities with `o.OrderItems.Sum(i => i.Quantity)` inside the projection so it stays one SQL query.
+    `StatusCounts`: the same query without the status filter, `GroupBy(o => o.Status).Select(g => new { g.Key, Count = g.Count() })`
   - `GetAsync`: include `User`, `Payment`, `OrderItems.Product`, 404 when missing
   - `ChangeStatusAsync` **first** in this step:
 
     ```csharp
     public Task<AdminOrderDto> ChangeStatusAsync(Guid id, OrderStatus next, CancellationToken ct) =>
-        db.RetryOnStockConflictAsync(async () =>
+        db.RetryOnStockConflictAsync(logger, async () =>
         {
           var order = await OrderWithDetailsAsync(id, ct);
           if (next == OrderStatus.Cancelled)
@@ -424,12 +542,9 @@ Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{i
 - [ ] **Tests** `AdminOrderApiTests.cs`: Pending → Confirmed → Processing → Shipped → Delivered works,
       Delivered → Pending is 409, admin cancel puts the stock back, the list filters by status and search,
       a customer gets 403
-- [ ] **Client**:
-  - `/admin/orders` page (add the route under `<RequireAuth role='Admin'/>` in `App.jsx`): filters for status, date
-    range and search, the same pagination as the shop, *Export CSV* exports the filtered list with `downloadCsv`
-  - `/admin/orders/:id`: customer, address, items, totals, one button per `nextStatuses` entry, and a payment panel
-    with the event log and a *Sync with gateway* button
-  - *Recent orders* on the dashboard reads `GET /admin/orders?pageSize=5` instead of `SAMPLE_ORDERS`
+- [x] **Client pages**: built on sample data, see part D of *Dashboard redesign* above
+- [ ] **Client, connect it**: the three boxes under part D (`adminApi` functions, switch the three hooks, delete the
+      sample file, then the payment panel)
 
 ### Step 3 — Admin stats API (UC-15)
 
@@ -439,7 +554,7 @@ Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{i
 
 **Build it in this order**
 
-- [ ] **Contracts**: `AdminStatsDto(decimal Revenue, int OrderCount, int ActiveOrders,
+- [ ] **Contracts**: `AdminStatsDto(decimal Revenue, int OrderCount, int ActiveOrders, int ProductCount, int LowStockCount,
       IReadOnlyList<DailyOrders> OrdersPerDay, IReadOnlyList<ProductDto> LowStock)` and
       `DailyOrders(DateOnly Day, int Count, decimal Revenue)`
 - [ ] **Service** `AdminStatsService.GetAsync(days)`, every query `AsNoTracking`:
@@ -453,8 +568,9 @@ Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{i
 - [ ] **Controller** `AdminStatsController` with `[Route("admin/stats")]`
 - [ ] **Tests**: seed a paid card order, a delivered cash order, a pending cash order and a cancelled one, and check
       that the revenue is only the first two; a customer gets 403
-- [ ] **Client**: the stat cards, *Orders this week* and *Low stock* read from it; delete
-      `client/src/data/adminSample.js` once nothing imports it, and remove the sample data banner
+- [ ] **Client**: `useAdminStats` feeds `StatCards` (revenue, active orders) and `OrdersChart` on `pages/admin/Overview.jsx`;
+      the product cards and the low stock list already read live data through `useInventorySummary`, which the stats
+      can replace; delete `client/src/data/adminSample.js` once nothing imports it, and the sample data notes
 
 ### Optional — Users
 
@@ -465,12 +581,12 @@ Use `UserManager` (`AddToRoleAsync` / `RemoveFromRoleAsync`), and refuse to remo
 
 - [ ] **TanStack Query (React Query)** for every server call: products, cart, orders and the admin lists. It brings
       caching, loading and error state, refetch after a change (restock, cancel) and polling (it replaces the
-      3 second timer in `OrderDetail.jsx`). Keep `lib/api.js` as the function each query calls; no need for axios.
-- [ ] **Chart.js** (with `react-chartjs-2`) for the dashboard: replace the `div` bars of *Orders this week* in
-      `AdminDashboard.jsx` with a bar chart fed by `GET /admin/stats`, then add revenue over time and sales by category.
+      3 second timer in `OrderDetail.jsx`). Keep `lib/api/client.js` as the function each query calls; no need for axios.
+- [ ] **Chart.js** (with `react-chartjs-2`) for the dashboard: replace the `div` bars in `components/admin/OrdersChart.jsx`
+      with a bar chart fed by `GET /admin/stats`, then the income page charts (part F).
 
-**Done when** every number and button on the dashboard comes from the API, a customer gets 403 on every `/admin`
-endpoint, and `ADMIN_API_CONNECTED` is true. Tag `v0.3.0`.
+**Done when** every number and button on the dashboard comes from the API (no file left in `client/src/data/admin*`),
+a customer gets 403 on every `/admin` endpoint, and a check by hand of every admin page passes. Tag `v0.3.0`.
 
 ## Phase 6 — Caching + messaging · 1 week
 

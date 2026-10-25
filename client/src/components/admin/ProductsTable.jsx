@@ -1,44 +1,39 @@
 import { Link } from 'react-router-dom';
-import { PackagePlus, Search, Tag } from 'lucide-react';
+import { PackagePlus, Pencil, Tag } from 'lucide-react';
 
-import Pagination from '../Pagination';
+import Pagination from '../ui/Pagination';
+import Switch from '../ui/Switch';
 import { formatPrice } from '../../lib/format';
 import { findCategory } from '../../lib/navigation';
+import { productPath } from '../../lib/productHelpers';
 
-// The product table with its search box and pages, every button only reports back to the dashboard
+// The product table and its pages, every button only reports back to the products page
 const ProductsTable = ({
 	products,
 	lowStockLimit,
 	savingProductId,
 	errorMessage,
-	searchText,
-	onSearchTextChange,
+	totalCount,
+	hasFilters,
 	currentPage,
 	totalPages,
 	onPageChange,
 	onToggleAvailability,
+	onEditClick,
 	onRestockClick,
 	onPriceClick,
 }) => (
 	<section className='card flex flex-col gap-4 overflow-hidden p-6'>
 		<div className='flex flex-wrap items-center justify-between gap-4'>
 			<h2 className='text-[18px]'>Products</h2>
-			<div className='relative flex w-full items-center sm:w-72'>
-				<Search size={18} className='pointer-events-none absolute left-4 text-muted' />
-				<input
-					type='search'
-					value={searchText}
-					onChange={(event) => onSearchTextChange(event.target.value)}
-					placeholder='Search name or description'
-					aria-label='Search products'
-					className='input pl-11'
-				/>
-			</div>
+			<span className='text-[14px] text-muted'>
+				{totalCount} {totalCount === 1 ? 'product' : 'products'}
+			</span>
 		</div>
-		{errorMessage && <p className='text-[14px] font-bold text-red-600'>{errorMessage}</p>}
+		{errorMessage && <p className='error-text'>{errorMessage}</p>}
 
 		<div className='-mx-6 overflow-x-auto px-6'>
-			<table className='w-full min-w-[820px] text-left text-[14px]'>
+			<table className='w-full min-w-[920px] text-left text-[14px]'>
 				<thead>
 					<tr className='text-[11px] font-bold uppercase tracking-wider text-muted'>
 						<th className='pb-3'>Product</th>
@@ -53,10 +48,7 @@ const ProductsTable = ({
 					{products.map((product) => (
 						<tr key={product.id} className={`border-t border-line ${product.isActive ? '' : 'opacity-60'}`}>
 							<td className='py-3 pr-4'>
-								<Link
-									to={`/${product.category}/${product.slug}`}
-									className='flex items-center gap-3 font-bold hover:text-brand-dark'
-								>
+								<Link to={productPath(product)} className='flex items-center gap-3 font-bold hover:text-brand-dark'>
 									<img src={product.image.mobile} alt='' className='h-10 w-10 rounded object-cover' />
 									{product.name}
 								</Link>
@@ -67,8 +59,8 @@ const ProductsTable = ({
 								{product.stock}
 							</td>
 							<td className='py-3 pr-4'>
-								<AvailabilitySwitch
-									isAvailable={product.isActive}
+								<Switch
+									isOn={product.isActive}
 									label={`${product.name} available`}
 									disabled={savingProductId === product.id}
 									onClick={() => onToggleAvailability(product)}
@@ -76,6 +68,9 @@ const ProductsTable = ({
 							</td>
 							<td className='py-3'>
 								<div className='flex justify-end gap-2'>
+									<button onClick={() => onEditClick(product)} className='btn-secondary h-9 px-3 text-[11px]'>
+										<Pencil size={14} /> Edit
+									</button>
 									<button onClick={() => onRestockClick(product)} className='btn-secondary h-9 px-3 text-[11px]'>
 										<PackagePlus size={14} /> Restock
 									</button>
@@ -91,25 +86,10 @@ const ProductsTable = ({
 		</div>
 
 		{products.length === 0 && (
-			<p className='text-[14px] text-muted'>{searchText ? `No products match "${searchText}".` : 'No products yet.'}</p>
+			<p className='text-[14px] text-muted'>{hasFilters ? 'No product matches these filters.' : 'No products yet.'}</p>
 		)}
-		{totalPages > 1 && <Pagination current={currentPage} pages={totalPages} onChange={onPageChange} />}
+		{totalPages > 1 && <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={onPageChange} />}
 	</section>
-);
-
-const AvailabilitySwitch = ({ isAvailable, label, disabled, onClick }) => (
-	<button
-		role='switch'
-		aria-checked={isAvailable}
-		aria-label={label}
-		disabled={disabled}
-		onClick={onClick}
-		className={`relative h-6 w-11 rounded-full transition-colors ${isAvailable ? 'bg-brand' : 'bg-panel-strong'}`}
-	>
-		<span
-			className={`absolute left-[2px] top-[2px] h-5 w-5 rounded-full bg-white transition-transform ${isAvailable ? 'translate-x-5' : ''}`}
-		/>
-	</button>
 );
 
 export default ProductsTable;

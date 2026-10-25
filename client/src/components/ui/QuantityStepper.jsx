@@ -3,7 +3,8 @@ import { Minus, Plus } from 'lucide-react';
 // The grey minus and plus box, it never goes below 1 or above max
 const QuantityStepper = ({ value, onChange, max = 100, label = 'product', small = false }) => {
 	const size = small ? 'h-9' : 'h-12';
-	const button = 'flex w-9 h-full items-center justify-center text-muted hover:text-ink disabled:opacity-30 disabled:hover:text-muted';
+	const button =
+		'flex w-9 h-full items-center justify-center text-muted hover:text-ink disabled:opacity-30 disabled:hover:text-muted';
 
 	return (
 		<div className={`flex shrink-0 items-center overflow-hidden rounded bg-panel ${size}`}>

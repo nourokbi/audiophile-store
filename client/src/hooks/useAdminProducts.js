@@ -1,73 +1,58 @@
 import React from 'react';
 
+import { useUrlFilters } from './useUrlFilters';
 import { useCatalog } from '../context/CatalogContext';
-import { adminApi } from '../lib/adminApi';
+import { adminApi } from '../lib/api/admin';
 
-const SEARCH_WAIT_MS = 300;
+const PRODUCT_FILTERS = { q: '', category: '', availability: 'All', lowStockOnly: false, sort: 'Name', page: 1 };
 
-// The page of products the dashboard shows, from the list or from a search, with hidden products included
+// The admin products page: one page of products, hidden ones included, for the filters in the address bar
 export function useAdminProducts() {
 	const { reload: reloadShopCatalog } = useCatalog();
-	const [products, setProducts] = React.useState([]);
-	const [currentPage, setCurrentPage] = React.useState(1);
-	const [totalPages, setTotalPages] = React.useState(1);
-	const [searchText, setSearchText] = React.useState(''); // what is typed in the box
-	const [searchTerm, setSearchTerm] = React.useState(''); // what is searched, set once typing stops
+	const urlFilters = useUrlFilters(PRODUCT_FILTERS);
+	const [productPage, setProductPage] = React.useState({ items: [], totalPages: 1, totalCount: 0 });
 	const [reloadCount, setReloadCount] = React.useState(0); // raised to load the same page again
 	const [loadError, setLoadError] = React.useState('');
 
-	// Waits until typing stops so the API gets one request instead of one per letter, a new search starts on page 1
-	React.useEffect(() => {
-		const searchTimer = setTimeout(() => {
-			setSearchTerm(searchText.trim());
-			setCurrentPage(1);
-		}, SEARCH_WAIT_MS);
-		return () => clearTimeout(searchTimer);
-	}, [searchText]);
-
 	// An answer that arrives after a newer request is ignored, so a slow old search never replaces a new one
+	const { filterQuery } = urlFilters;
 	React.useEffect(() => {
 		let isOutdated = false;
-		const pageRequest = searchTerm
-			? adminApi.searchProducts(searchTerm, currentPage)
-			: adminApi.listProducts(currentPage);
-		pageRequest
-			.then((productPage) => {
+		adminApi
+			.listProducts(Object.fromEntries(new URLSearchParams(filterQuery)))
+			.then((loadedPage) => {
 				if (isOutdated) return;
-				setProducts(productPage.items);
-				setTotalPages(productPage.totalPages);
+				setProductPage(loadedPage);
 				setLoadError('');
 			})
 			.catch((error) => !isOutdated && setLoadError(error.message));
 		return () => {
 			isOutdated = true;
 		};
-	}, [currentPage, searchTerm, reloadCount]);
+	}, [filterQuery, reloadCount]);
 
 	// Swaps in the product the server answered and reloads the shop so a shown or hidden product appears there at once
 	const replaceProduct = (updatedProduct) => {
-		setProducts((currentProducts) =>
-			currentProducts.map((product) => (product.id === updatedProduct.id ? updatedProduct : product)),
-		);
+		setProductPage((currentPage) => ({
+			...currentPage,
+			items: currentPage.items.map((product) => (product.id === updatedProduct.id ? updatedProduct : product)),
+		}));
 		reloadShopCatalog();
 	};
 
-	// A new product can land on any page, so the table goes back to the full list on page 1
+	// A new product can land on any page, so the table goes back to every product on page 1
 	const reloadFromFirstPage = () => {
-		setSearchText('');
-		setCurrentPage(1);
+		urlFilters.clearFilters();
 		setReloadCount((count) => count + 1);
 		reloadShopCatalog();
 	};
 
 	return {
-		products,
-		currentPage,
-		totalPages,
-		searchText,
+		...urlFilters,
+		products: productPage.items,
+		totalCount: productPage.totalCount,
+		totalPages: productPage.totalPages,
 		loadError,
-		setSearchText,
-		setCurrentPage,
 		replaceProduct,
 		reloadFromFirstPage,
 	};

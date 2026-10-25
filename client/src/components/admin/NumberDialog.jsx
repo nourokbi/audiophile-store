@@ -1,6 +1,6 @@
 import React from 'react';
 
-import Dialog from '../Dialog';
+import Dialog from '../ui/Dialog';
 
 // Asks for one positive number and shows what the change will do before it is saved
 const NumberDialog = ({ title, label, initialValue, minimum, isSaving, errorMessage, describeChange, onClose, onSave }) => {
@@ -17,7 +17,7 @@ const NumberDialog = ({ title, label, initialValue, minimum, isSaving, errorMess
 		<Dialog title={title} onClose={onClose}>
 			<form className='flex flex-col gap-4' onSubmit={submitForm}>
 				<label className='flex flex-col gap-2'>
-					<span className='text-[12px] font-bold uppercase tracking-wider'>{label}</span>
+					<span className='field-label'>{label}</span>
 					<input
 						type='number'
 						min={minimum}
@@ -30,7 +30,7 @@ const NumberDialog = ({ title, label, initialValue, minimum, isSaving, errorMess
 				<p className='text-[14px] text-muted'>
 					{isValid ? describeChange(enteredNumber) : `Enter a number of at least ${minimum}`}
 				</p>
-				{errorMessage && <p className='text-[14px] font-bold text-red-600'>{errorMessage}</p>}
+				{errorMessage && <p className='error-text'>{errorMessage}</p>}
 				<div className='flex justify-end gap-3'>
 					<button type='button' onClick={onClose} className='btn-secondary'>
 						Cancel

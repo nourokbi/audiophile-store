@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, AtSign, Eye, EyeOff, Lock, ShieldCheck, User } from 'lucide-react';
 
-import TextField from '../components/TextField';
+import TextField from '../components/ui/TextField';
 import { useAuth } from '../context/AuthContext';
 
 // Login and register share one card, register adds the name field, and success goes back to the redirect page
@@ -10,44 +10,44 @@ const AuthPage = ({ mode }) => {
 	const isRegister = mode === 'register';
 	const { login, register } = useAuth();
 	const navigate = useNavigate();
-	const [params] = useSearchParams();
-	const redirect = safeRedirect(params.get('redirect'));
+	const [searchParams] = useSearchParams();
+	const redirect = safeRedirect(searchParams.get('redirect'));
 
 	const [form, setForm] = React.useState({ name: '', email: '', password: '' });
 	const [showPassword, setShowPassword] = React.useState(false);
-	const [errors, setErrors] = React.useState({});
+	const [fieldErrors, setFieldErrors] = React.useState({});
 	const [serverError, setServerError] = React.useState('');
-	const [busy, setBusy] = React.useState(false);
+	const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-	const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+	const updateField = (event) => setForm({ ...form, [event.target.name]: event.target.value });
 
-	const validate = () => {
-		const next = {};
-		if (isRegister && form.name.trim().length < 3) next.name = 'At least 3 characters';
-		if (!/^\S+@\S+\.\S+$/.test(form.email)) next.email = 'Invalid email';
-		if (form.password.length < 8) next.password = 'At least 8 characters';
-		setErrors(next);
-		return Object.keys(next).length === 0;
+	const validateForm = () => {
+		const foundErrors = {};
+		if (isRegister && form.name.trim().length < 3) foundErrors.name = 'At least 3 characters';
+		if (!/^\S+@\S+\.\S+$/.test(form.email)) foundErrors.email = 'Invalid email';
+		if (form.password.length < 8) foundErrors.password = 'At least 8 characters';
+		setFieldErrors(foundErrors);
+		return Object.keys(foundErrors).length === 0;
 	};
 
-	const onSubmit = async (e) => {
-		e.preventDefault();
+	const submitForm = async (event) => {
+		event.preventDefault();
 		setServerError('');
-		if (!validate()) return;
+		if (!validateForm()) return;
 
-		setBusy(true);
+		setIsSubmitting(true);
 		try {
 			if (isRegister) await register(form.name.trim(), form.email.trim(), form.password);
 			else await login(form.email.trim(), form.password);
 			navigate(redirect, { replace: true });
-		} catch (err) {
-			setServerError(MESSAGES[err.status] ?? err.message);
+		} catch (error) {
+			setServerError(ERROR_MESSAGES[error.status] ?? error.message);
 		} finally {
-			setBusy(false);
+			setIsSubmitting(false);
 		}
 	};
 
-	const keepRedirect = params.get('redirect') ? `?redirect=${encodeURIComponent(redirect)}` : '';
+	const redirectQuery = searchParams.get('redirect') ? `?redirect=${encodeURIComponent(redirect)}` : '';
 
 	return (
 		<div className='flex justify-center px-6 py-16'>
@@ -66,7 +66,7 @@ const AuthPage = ({ mode }) => {
 						</p>
 					</div>
 
-					<form onSubmit={onSubmit} className='flex flex-col gap-5' noValidate>
+					<form onSubmit={submitForm} className='flex flex-col gap-5' noValidate>
 						{isRegister && (
 							<TextField
 								label='Name'
@@ -75,8 +75,8 @@ const AuthPage = ({ mode }) => {
 								autoComplete='name'
 								placeholder='Alexei Ward'
 								value={form.name}
-								onChange={onChange}
-								error={errors.name}
+								onChange={updateField}
+								error={fieldErrors.name}
 							/>
 						)}
 						<TextField
@@ -87,8 +87,8 @@ const AuthPage = ({ mode }) => {
 							autoComplete='email'
 							placeholder='alexei@mail.com'
 							value={form.email}
-							onChange={onChange}
-							error={errors.email}
+							onChange={updateField}
+							error={fieldErrors.email}
 						/>
 						<TextField
 							label='Password'
@@ -98,13 +98,13 @@ const AuthPage = ({ mode }) => {
 							autoComplete={isRegister ? 'new-password' : 'current-password'}
 							placeholder='At least 8 characters'
 							value={form.password}
-							onChange={onChange}
-							error={errors.password}
+							onChange={updateField}
+							error={fieldErrors.password}
 							trailing={
 								<button
 									type='button'
 									aria-label={showPassword ? 'Hide password' : 'Show password'}
-									onClick={() => setShowPassword((v) => !v)}
+									onClick={() => setShowPassword((isShown) => !isShown)}
 									className='text-muted hover:text-ink'
 								>
 									{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -113,14 +113,14 @@ const AuthPage = ({ mode }) => {
 						/>
 
 						{serverError && (
-							<p role='alert' className='text-[14px] font-bold text-red-600'>
+							<p role='alert' className='error-text'>
 								{serverError}
 							</p>
 						)}
 
-						<button type='submit' disabled={busy} className='btn-primary w-full'>
-							{busy ? 'Please wait...' : isRegister ? 'Create account' : 'Log in'}
-							{!busy && <ArrowRight size={16} />}
+						<button type='submit' disabled={isSubmitting} className='btn-primary w-full'>
+							{isSubmitting ? 'Please wait...' : isRegister ? 'Create account' : 'Log in'}
+							{!isSubmitting && <ArrowRight size={16} />}
 						</button>
 					</form>
 				</div>
@@ -129,7 +129,7 @@ const AuthPage = ({ mode }) => {
 					<p className='text-[15px]'>
 						{isRegister ? 'Already have an account? ' : 'New to Audiophile? '}
 						<Link
-							to={(isRegister ? '/login' : '/register') + keepRedirect}
+							to={(isRegister ? '/login' : '/register') + redirectQuery}
 							className='label text-brand-dark underline-offset-4 hover:underline'
 						>
 							{isRegister ? 'Log in' : 'Create an account'}
@@ -144,7 +144,7 @@ const AuthPage = ({ mode }) => {
 	);
 };
 
-const MESSAGES = {
+const ERROR_MESSAGES = {
 	409: 'An account with this email already exists. Log in instead.',
 	401: 'Wrong email or password.',
 	429: 'Too many attempts. Wait a minute and try again.',

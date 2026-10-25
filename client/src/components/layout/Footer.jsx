@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { Headphones, Speaker, AudioLines } from 'lucide-react';
 
 import Logo from './Logo';
-import { CATEGORIES, navLinkClass } from '../lib/navigation';
+import { CATEGORIES, navLinkClass } from '../../lib/navigation';
 
 const LINKS = [
 	{ to: '/', label: 'Home' },
@@ -24,8 +24,8 @@ const Footer = () => (
 				</nav>
 			</div>
 			<p className='max-w-xl text-[15px] leading-relaxed text-muted'>
-				Audiophile is an all in one stop to fulfill your audio needs. We are a small team of music lovers and sound
-				specialists devoted to helping you get the most out of personal audio.
+				Audiophile is an all in one stop to fulfill your audio needs. We are a small team of music lovers and sound specialists
+				devoted to helping you get the most out of personal audio.
 			</p>
 			<div className='flex flex-col items-center justify-between gap-4 sm:flex-row'>
 				<p className='text-[13px] text-muted'>Copyright {new Date().getFullYear()}. All rights reserved.</p>
