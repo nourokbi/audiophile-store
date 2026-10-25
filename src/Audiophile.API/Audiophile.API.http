@@ -48,7 +48,7 @@ GET {{base}}/products?category=Headphones&minPrice=1000&page=1&pageSize=12
 GET {{base}}/products/{{productId}}
 
 ### Add a product, admin only so log in as the admin first or get 403
-POST {{base}}/products
+POST {{base}}/admin/products
 Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 

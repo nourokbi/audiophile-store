@@ -246,17 +246,17 @@ Same React app, under `/admin`, behind a route guard that checks the `Admin` rol
 
 ### Rules for every admin endpoint
 
-- **One service per area, not one big `AdminService`**: `AdminProductService`, `AdminOrderService`,
-  `AdminStatsService` in `src/Audiophile.Application/Admin/`. Each admin action is one method in its area's service.
-  A single service would mix three jobs with different dependencies and keep growing.
+- **Logic lives in the entity's own service, not in an `AdminService`**: product actions go in `ProductService`,
+  order actions in `OrderService`. Who calls a method (shop or admin) does not decide where it lives; only a job
+  with no home of its own, like the dashboard stats, gets a new service.
 - **One controller per area** in `src/Audiophile.API/Controllers/`: `AdminProductsController` (`[Route("admin/products")]`),
   `AdminOrdersController`, `AdminStatsController`, each with `[Authorize(Roles = Roles.Admin)]` on the class. Keep
-  the `_adminProductsService` naming. Each action is one line that calls one service method.
+  the `_productsService` naming. Each action is one line that calls one service method.
 - **Rules stay in the entities** (`Product.Restock`, `Order.ChangeStatus`); the services only load, call and save.
 - **Errors are already mapped** in `GlobalExceptionHandler`, so just throw:
   `NotFoundException` → 404, `ArgumentException` (what `Guard` throws) → 400,
   `ConflictException` and `InvalidOperationException` (what `ChangeStatus` throws) → 409.
-- **Reads** are `AsNoTracking` projections straight into DTOs (`.Select(p => new AdminProductDto(...))`), and every
+- **Reads** are `AsNoTracking` projections straight into DTOs (`.Select(p => new ProductDto(...))`), and every
   list is paged with the `PagedResult<T>` from `Products/ProductContracts.cs`.
 - **Stock changes** (restock, admin cancel) go through the `xmin` retry, because a restock and a checkout can touch
   the same product at once.
@@ -294,80 +294,77 @@ public static class StockConflictRetry
 
 | Endpoint | Body | Answer | Used by |
 |---|---|---|---|
-| `GET /admin/products?search=&category=&isActive=&page=&pageSize=` | | Page of products **including hidden ones** | Product table |
+| `GET /products?includeHidden=true&page=&pageSize=` (already there) | | Page of products **including hidden ones**, admins only | Product table |
+| `GET /products/search?q=&includeHidden=true` (already there) | | Search, also with hidden ones | Table search box |
 | `POST /admin/products/{id}/restock` | `{ quantity }` | The product | *Restock* button |
 | `PUT /admin/products/{id}/price` | `{ price }` | The product | *Price* button |
 | `PUT /admin/products/{id}/availability` | `{ isActive }` | The product | *Available* switch |
 
-Already there and reused: `POST /products` (create), `PUT /products/{id}` (edit every field), `DELETE /products/{id}`
-(hide). The dashboard's disabled *Add product* button uses `POST /products` in this step.
+Moved to `AdminProductsController` (done 2026-10-25): `POST /admin/products` (create), `PUT /admin/products/{id}`
+(edit every field), `DELETE /admin/products/{id}` (hide), so every admin URL starts with `/admin` and
+`ProductsController` only browses. The dashboard's disabled *Add product* button uses `POST /admin/products` in this step.
 
 **Build it in this order**
 
-- [ ] **Entity**: add `public void Activate() => IsActive = true;` to `Product.cs`, next to `Deactivate()`
-- [ ] **Contracts** in `Admin/AdminProductContracts.cs`:
+- [x] **Entity**: add `public void Activate() => IsActive = true;` to `Product.cs`, next to `Deactivate()`
+- [x] **List and search** (done 2026-10-22): no separate admin list. `GET /products` takes `includeHidden=true` for
+      admins (a customer gets 403), search moved to its own `GET /products/search?q=`, and `ProductDto` now has
+      `isActive` and `createdAt`, so the admin actions answer with the same `ProductDto`
+- [x] **Contracts** in `Products/ProductContracts.cs`, only the three request bodies:
 
   ```csharp
-  public sealed record AdminProductQuery(string? Search = null, ProductCategory? Category = null,
-      bool? IsActive = null, int Page = 1, int PageSize = ProductQuery.DefaultPageSize);
-
-  public sealed record AdminProductDto(Guid Id, string Name, string Slug, decimal Price, int Stock,
-      ProductCategory Category, string? ImageUrl, bool IsActive, DateTime CreatedAt);
-
   public sealed record RestockRequest(int Quantity);
   public sealed record ChangePriceRequest(decimal Price);
   public sealed record SetAvailabilityRequest(bool IsActive);
   ```
 
-- [ ] **Service** `Admin/AdminProductService.cs`, registered in `Application/DependencyInjection.cs`:
-  - `ListAsync`: copy the checks and filters from `ProductService.ListAsync`, but **no** `Where(p => p.IsActive)`
-    unless `IsActive` is given. Order by name, project with `Select`
-  - `RestockAsync` **first** (it is the one that needs the retry), then `ChangePriceAsync`, then `SetAvailabilityAsync`
-  - Look products up by id **without** the `IsActive` check (the admin must reach hidden products), so a private
-    `FindAsync(id)` that throws `NotFoundException`
+- [x] **Service**: the three methods live in `ProductService` (no separate admin service)
+  - [x] `SetAvailabilityAsync` returns the product, and `DELETE /admin/products/{id}` calls it with `false`
+  - [x] `FindAnyAsync(id)` looks a product up **without** the `IsActive` check, so the admin reaches hidden ones
+  - [x] `RestockAsync` (needs the retry), then `ChangePriceAsync`
 
   ```csharp
-  public Task<AdminProductDto> RestockAsync(Guid id, int quantity, CancellationToken ct) =>
-      db.RetryOnStockConflictAsync(async () =>
+  public Task<ProductDto> RestockAsync(Guid id, int quantity, CancellationToken ct) =>
+      db.RetryOnStockConflictAsync(logger, async () =>
       {
-        var product = await FindAsync(id, ct);
+        var product = await FindAnyAsync(id, ct);
         product.Restock(quantity);            // Guard throws for quantity below 1, which becomes a 400
         await db.SaveChangesAsync(ct);
-        return AdminProductDto.From(product);
+        return ProductDto.From(product);
       });
   ```
 
-- [ ] **Controller** `AdminProductsController.cs`:
+- [x] **Controller** `AdminProductsController.cs` holds every `/admin/products` route and calls `ProductService`:
 
   ```csharp
   [ApiController]
   [Route("admin/products")]
   [Authorize(Roles = Roles.Admin)]
-  public sealed class AdminProductsController(AdminProductService _adminProductsService) : ControllerBase
+  public sealed class AdminProductsController(ProductService _productsService) : ControllerBase
   {
     [HttpPost("{id:guid}/restock")]
     public async Task<IActionResult> Restock(Guid id, RestockRequest request, CancellationToken ct) =>
-        Ok(await _adminProductsService.RestockAsync(id, request.Quantity, ct));
+        Ok(await _productsService.RestockAsync(id, request.Quantity, ct));
   }
   ```
 
-- [ ] **Tests** in `tests/Audiophile.Tests/Api/AdminProductApiTests.cs` (copy the login and `CreateProductAsync`
+- [x] **Tests** in `tests/Audiophile.Tests/Api/AdminProductApiTests.cs` (copy the login and `CreateProductAsync`
       helpers from `OrderApiTests`, the admin logs in with `ApiFactory.AdminEmail` / `AdminPassword`):
   - restock 5 on a product with 3 gives 8
-  - a product hidden with `availability false` is gone from `GET /products`, still in `GET /admin/products`, and
-    comes back when set to `true`
+  - a product hidden with `availability false` is gone from `GET /products`, still in
+    `GET /products?includeHidden=true`, and comes back when set to `true`
   - quantity 0 and price 0 give 400, an unknown id gives 404
-  - a customer gets 403 on all four endpoints
+  - a customer gets 403 on all three endpoints
 - [ ] **Client**:
-  - `adminApi.js`: `listProducts(query)`, `restock`, `changePrice`, `setAvailability` call the real endpoints, e.g.
+  - `adminApi.js`: `listProducts(page)` (`GET /products?includeHidden=true`), `searchProducts(q)`, `restock`, `changePrice`, `setAvailability` call the real endpoints, e.g.
     `` restock: (id, quantity) => api(`/admin/products/${id}/restock`, { method: 'POST', body: { quantity } }) ``
-  - `AdminDashboard.jsx`: the product table reads `GET /admin/products` instead of `catalog`, and the local `changes`
+  - `AdminDashboard.jsx`: the product table reads `GET /products?includeHidden=true` instead of `catalog`, and the local `changes`
     state goes away (after an action, replace that row with the product the API answered)
-  - Enable *Add product*: a dialog with the `ProductRequest` fields that calls `POST /products`
+  - Enable *Add product*: a dialog with the `ProductRequest` fields that calls `POST /admin/products`
   - `ADMIN_API_CONNECTED = true`
 
-Decide here: `PUT /products/{id}` uses `FindActiveAsync`, so a hidden product cannot be edited. Either accept it
-(activate, edit, hide) or let the admin edit hidden ones.
+- [x] **Decided** (2026-10-25): `PUT /admin/products/{id}` uses `FindAnyAsync`, so the admin can edit a hidden product
+      and show it when it is ready. Only `GET /products/{id}` keeps `FindActiveAsync`.
 
 ### Step 2 — Admin orders API (UC-12, UC-13, UC-14)
 
@@ -383,11 +380,11 @@ Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{i
 
 - [ ] **Entity**: `AllowedNextStatuses` in `Order.cs` is private. Add a public read of it, e.g.
       `public IReadOnlyList<OrderStatus> NextStatuses => AllowedNextStatuses[Status];`
-- [ ] **Contracts** `Admin/AdminOrderContracts.cs`: `AdminOrderQuery(Status, From, To, Search, Page, PageSize)`,
+- [ ] **Contracts** in `Orders/OrderContracts.cs`: `AdminOrderQuery(Status, From, To, Search, Page, PageSize)`,
       `AdminOrderSummaryDto` for the list (id, created at, customer name and email, status, payment method and status,
       total, item count) and `AdminOrderDto` for one order (everything plus `ShippingFullName…`, items and
       `NextStatuses`), `ChangeStatusRequest(OrderStatus Status)`
-- [ ] **Service** `AdminOrderService`:
+- [ ] **Service**: the admin order methods go in `OrderService`:
   - `ListAsync`: `db.Orders.AsNoTracking()`, filter by status, `CreatedAt >= from` and `< to.AddDays(1)`, search on
     `o.User.Name` / `o.User.Email`, `OrderByDescending(o => o.CreatedAt)`, page, then `Select` into the summary.
     Count the items with `o.OrderItems.Count` inside the projection so it stays one SQL query
@@ -431,7 +428,7 @@ Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{i
 **Build it in this order**
 
 - [ ] **Contracts**: `AdminStatsDto(decimal Revenue, int OrderCount, int ActiveOrders,
-      IReadOnlyList<DailyOrders> OrdersPerDay, IReadOnlyList<AdminProductDto> LowStock)` and
+      IReadOnlyList<DailyOrders> OrdersPerDay, IReadOnlyList<ProductDto> LowStock)` and
       `DailyOrders(DateOnly Day, int Count, decimal Revenue)`
 - [ ] **Service** `AdminStatsService.GetAsync(days)`, every query `AsNoTracking`:
   - **Revenue**: orders in the period whose `Payment.Status == Succeeded`, **plus** cash orders that are `Delivered`;

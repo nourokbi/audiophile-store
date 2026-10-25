@@ -31,28 +31,38 @@ Rules:
 - **New accounts** get the `Customer` role and an empty cart. The `Admin` account comes from configuration
   (`Admin:Email` / `Admin:Password`) and is created at startup if missing.
 
-## Products — `ProductsController`
+## Products — `ProductsController` (browsing) and `AdminProductsController` (changes)
 
 | Method | Path | Access | Success | Errors |
 |---|---|---|---|---|
-| GET | `/products?search=&category=&minPrice=&maxPrice=&page=1&pageSize=12` | 🔓 | 200 page | 400 bad filter |
+| GET | `/products?category=&minPrice=&maxPrice=&includeHidden=false&page=1&pageSize=12` | 🔓 | 200 page | 400 bad filter · 403 `includeHidden` without admin |
+| GET | `/products/search?q=&includeHidden=false&page=1&pageSize=12` | 🔓 | 200 page | 400 empty or long `q` · 403 `includeHidden` without admin |
 | GET | `/products/{id}` | 🔓 | 200 product | 404 |
-| POST | `/products` | 👑 | 201 product | 400 · 401 · 403 |
-| PUT | `/products/{id}` | 👑 | 200 product | 400 · 401 · 403 · 404 |
-| DELETE | `/products/{id}` | 👑 | 204 | 401 · 403 · 404 |
+| POST | `/admin/products` | 👑 | 201 product | 400 · 401 · 403 |
+| PUT | `/admin/products/{id}` | 👑 | 200 product | 400 · 401 · 403 · 404 |
+| DELETE | `/admin/products/{id}` | 👑 | 204 | 401 · 403 · 404 |
+| POST | `/admin/products/{id}/restock` | 👑 | 200 product | 400 quantity below 1 · 401 · 403 · 404 |
+| PUT | `/admin/products/{id}/price` | 👑 | 200 product | 400 price not positive · 401 · 403 · 404 |
+| PUT | `/admin/products/{id}/availability` | 👑 | 200 product | 401 · 403 · 404 |
 
-- A **page** is `{ items, page, pageSize, totalCount, totalPages }`. `pageSize` is 1–50, search ≤ 100 characters,
-  `minPrice` ≤ `maxPrice`. Only active products are listed, ordered by name.
-- **Search** matches name or description, case-insensitive.
-- A **product** is `{ id, name, description, features, price, stock, inStock, category, imageUrl, inTheBox }`;
+- A **page** is `{ items, page, pageSize, totalCount, totalPages }`. `pageSize` is 1–50, `q` ≤ 100 characters,
+  `minPrice` ≤ `maxPrice`. Only active products are listed, ordered by name; an admin adds hidden ones with
+  `includeHidden=true`, which is how the dashboard's product table reads the catalogue.
+- **Search** matches name or description, case-insensitive. It is a contains search that works like
+  `LIKE '%term%'` and reads every row; a `pg_trgm` or full text index can replace it when the catalogue grows.
+- A **product** is `{ id, name, description, features, price, stock, inStock, category, imageUrl, inTheBox, isActive, createdAt }`;
   `category` is `Headphones`, `Speakers`, `Earphones`, `Amplifiers` or `Accessories`;
   `inTheBox` is an object like `{ "Headphone unit": 1, "User manual": 1 }`.
 - **Create/update body:** `{ name, description, features?, price, stock, category, imageUrl?, inTheBox? }`. Update replaces
   every field, including setting the stock count.
 - Every product has a **`slug`**, its address in the shop (`/headphones/xx59-headphones`). It is unique, made
-  from the name when `POST /products` leaves it out, and never changed by an update. The client matches its
+  from the name when `POST /admin/products` leaves it out, and never changed by an update. The client matches its
   pages to the API's products by slug.
 - **DELETE deactivates** the product (it disappears from the shop) instead of deleting it, because past orders point at it.
+  It is the same as `availability` with `{ isActive: false }`, which can also bring it back with `true`.
+- **Restock, price and availability** reach hidden products too, with bodies `{ quantity }`, `{ price }` and `{ isActive }`.
+  Restock adds to the stock and retries once when a checkout changes the same product at the same moment.
+  So does `PUT /admin/products/{id}`, and editing never changes whether a product is shown.
 
 ## Addresses — `AddressesController` (all 🔑)
 
