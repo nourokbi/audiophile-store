@@ -65,12 +65,35 @@ public sealed class AdminProductApiTests
         var id = await CreateProductAsync(admin, stock: 3);
         (await admin.DeleteAsync($"/admin/products/{id}")).EnsureSuccessStatusCode();
 
-        var response = await admin.PutAsJsonAsync($"/admin/products/{id}", NewProduct(stock: 7));
+        var response = await admin.PutAsJsonAsync($"/admin/products/{id}", EditedProduct("Renamed Speaker"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var product = await ReadAsync(response);
-        Assert.Equal(7, product.GetProperty("stock").GetInt32());
+        Assert.Equal("Renamed Speaker", product.GetProperty("name").GetString());
         Assert.False(product.GetProperty("isActive").GetBoolean());
+    }
+
+    [Fact]
+    public async Task An_edit_never_changes_the_stock_and_keeps_the_box_when_it_is_left_out()
+    {
+        using var factory = new ApiFactory();
+        var admin = await AdminClientAsync(factory);
+        var id = await CreateProductAsync(admin, stock: 3);
+        (await admin.PutAsJsonAsync($"/admin/products/{id}", EditedProduct("Boxed Speaker", new Dictionary<string, int> { ["Speaker"] = 2, ["Cable"] = 1 })))
+            .EnsureSuccessStatusCode();
+
+        // An edit that still sends the old stock number, as a form opened before a checkout would
+        var response = await admin.PutAsJsonAsync($"/admin/products/{id}", new
+        {
+            name = "Boxed Speaker", description = "A speaker made for the tests.", features = (string?)null,
+            price = 1200m, stock = 99, category = "Speakers", imageUrl = (string?)null,
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var product = await ReadAsync(response);
+        Assert.Equal(3, product.GetProperty("stock").GetInt32());
+        Assert.Equal(1200m, product.GetProperty("price").GetDecimal());
+        Assert.Equal(2, product.GetProperty("inTheBox").GetProperty("Speaker").GetInt32());
     }
 
     [Fact]
@@ -109,6 +132,43 @@ public sealed class AdminProductApiTests
         }
     }
 
+    [Fact]
+    public async Task The_admin_list_filters_by_availability_and_low_stock()
+    {
+        using var factory = new ApiFactory();
+        var admin = await AdminClientAsync(factory);
+        var hiddenLowStock = await CreateProductAsync(admin, stock: 3, name: "Filter Hidden Speaker");
+        var onSaleStocked = await CreateProductAsync(admin, stock: 20, name: "Filter Stocked Speaker");
+        (await admin.DeleteAsync($"/admin/products/{hiddenLowStock}")).EnsureSuccessStatusCode();
+
+        var hidden = Ids(await ReadAsync(await admin.GetAsync("/admin/products?availability=Hidden&pageSize=50")));
+        var onSale = Ids(await ReadAsync(await admin.GetAsync("/admin/products?availability=OnSale&pageSize=50")));
+        var lowStock = Ids(await ReadAsync(await admin.GetAsync("/admin/products?lowStockOnly=true&pageSize=50")));
+
+        Assert.Contains(hiddenLowStock, hidden);
+        Assert.DoesNotContain(onSaleStocked, hidden);
+        Assert.Contains(onSaleStocked, onSale);
+        Assert.DoesNotContain(hiddenLowStock, onSale);
+        Assert.Contains(hiddenLowStock, lowStock);
+        Assert.DoesNotContain(onSaleStocked, lowStock);
+    }
+
+    [Fact]
+    public async Task The_admin_list_searches_and_sorts_and_refuses_an_unknown_sort()
+    {
+        using var factory = new ApiFactory();
+        var admin = await AdminClientAsync(factory);
+        var expensive = await CreateProductAsync(admin, stock: 5, name: "Sorter Alpha Speaker", price: 3000m);
+        var cheap = await CreateProductAsync(admin, stock: 5, name: "Sorter Beta Speaker", price: 1000m);
+
+        var lowToHigh = Ids(await ReadAsync(await admin.GetAsync("/admin/products?q=sorter&sort=PriceLowToHigh")));
+        var highToLow = Ids(await ReadAsync(await admin.GetAsync("/admin/products?q=sorter&sort=PriceHighToLow")));
+
+        Assert.Equal([cheap, expensive], lowToHigh);
+        Assert.Equal([expensive, cheap], highToLow);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.GetAsync("/admin/products?sort=Banana")).StatusCode);
+    }
+
     private static IEnumerable<string> Ids(JsonElement page) =>
         page.GetProperty("items").EnumerateArray().Select(p => p.GetProperty("id").GetString()!).ToList();
 
@@ -120,15 +180,21 @@ public sealed class AdminProductApiTests
         return admin;
     }
 
-    private static object NewProduct(int stock) => new
+    private static object NewProduct(int stock, string name = "Test Speaker", decimal price = 1000m) => new
     {
-        name = "Test Speaker", description = "A speaker made for the tests.", features = (string?)null,
-        price = 1000m, stock, category = "Speakers", imageUrl = (string?)null, inTheBox = (object?)null,
+        name, description = "A speaker made for the tests.", features = (string?)null,
+        price, stock, category = "Speakers", imageUrl = (string?)null, inTheBox = (object?)null,
     };
 
-    private static async Task<string> CreateProductAsync(HttpClient admin, int stock)
+    private static object EditedProduct(string name, object? inTheBox = null) => new
     {
-        var response = await admin.PostAsJsonAsync("/admin/products", NewProduct(stock));
+        name, description = "A speaker made for the tests.", features = (string?)null,
+        price = 1000m, category = "Speakers", imageUrl = (string?)null, inTheBox,
+    };
+
+    private static async Task<string> CreateProductAsync(HttpClient admin, int stock, string name = "Test Speaker", decimal price = 1000m)
+    {
+        var response = await admin.PostAsJsonAsync("/admin/products", NewProduct(stock, name, price));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.Contains("/products/", response.Headers.Location!.ToString());
         return (await ReadAsync(response)).GetProperty("id").GetString()!;

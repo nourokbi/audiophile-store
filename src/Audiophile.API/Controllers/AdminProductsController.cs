@@ -12,13 +12,14 @@ namespace Audiophile.API.Controllers;
 [Authorize(Roles = Roles.Admin)]
 public sealed class AdminProductsController(ProductService _productsService) : ControllerBase
 {
-  // The dashboard's product table, hidden products included, with the same filters and paging as the shop
+  // The admin products page, hidden products included, with the shop's filters plus search, availability, low stock and sort
   [HttpGet]
   public async Task<IActionResult> List(
-      ProductCategory? category, decimal? minPrice, decimal? maxPrice, CancellationToken ct,
-      int page = 1, int pageSize = ProductQuery.DefaultPageSize) =>
+      ProductCategory? category, decimal? minPrice, decimal? maxPrice, string? q, CancellationToken ct,
+      ProductAvailability availability = ProductAvailability.All, bool lowStockOnly = false,
+      ProductSort sort = ProductSort.Name, int page = 1, int pageSize = ProductQuery.DefaultPageSize) =>
       Ok(await _productsService.ListAsync(
-          new ProductQuery(category, minPrice, maxPrice, IncludeHidden: true, page, pageSize), ct));
+          new ProductQuery(category, minPrice, maxPrice, IncludeHidden: true, page, pageSize, q, availability, lowStockOnly, sort), ct));
 
   [HttpGet("search")]
   public async Task<IActionResult> Search(
@@ -33,7 +34,7 @@ public sealed class AdminProductsController(ProductService _productsService) : C
   }
 
   [HttpPut("{id:guid}")]
-  public async Task<IActionResult> Update(Guid id, ProductRequest request, CancellationToken ct) =>
+  public async Task<IActionResult> Update(Guid id, UpdateProductRequest request, CancellationToken ct) =>
       Ok(await _productsService.UpdateAsync(id, request, ct));
 
   // Takes the product off sale while past orders keep pointing at it

@@ -3,19 +3,29 @@ using Audiophile.Domain.Enums;
 
 namespace Audiophile.Application.Products;
 
-// Optional catalogue filters, IncludeHidden is set only by the admin endpoints and the page size is capped so one request cannot ask for the whole table
+// Optional catalogue filters, IncludeHidden and the filters after PageSize are set only by the admin endpoints, and the page size is capped so one request cannot ask for the whole table
 public sealed record ProductQuery(
     ProductCategory? Category = null,
     decimal? MinPrice = null,
     decimal? MaxPrice = null,
     bool IncludeHidden = false,
     int Page = 1,
-    int PageSize = ProductQuery.DefaultPageSize)
+    int PageSize = ProductQuery.DefaultPageSize,
+    string? Search = null,
+    ProductAvailability Availability = ProductAvailability.All,
+    bool LowStockOnly = false,
+    ProductSort Sort = ProductSort.Name)
 {
   public const int DefaultPageSize = 12;
   public const int MaxPageSize = 50;
   public const int MaxSearchLength = 100;
+  public const int LowStockLimit = 8;
 }
+
+// Which products the admin list shows, the shop always sees only the ones on sale
+public enum ProductAvailability { All, OnSale, Hidden }
+
+public enum ProductSort { Name, Newest, PriceLowToHigh, PriceHighToLow, StockLowToHigh }
 
 // A search on name and description, paged like the list
 public sealed record ProductSearch(
@@ -24,7 +34,7 @@ public sealed record ProductSearch(
     int Page = 1,
     int PageSize = ProductQuery.DefaultPageSize);
 
-// Create and update share one shape and an update replaces every field
+// A new product with its first stock count
 public sealed record ProductRequest(
     string Name,
     string Description,
@@ -34,7 +44,18 @@ public sealed record ProductRequest(
     ProductCategory Category,
     string? ImageUrl,
     Dictionary<string, int>? InTheBox,
-    string? Slug = null);       // used on create only and made from the name when left out
+    string? Slug = null);       // made from the name when left out, and never changed afterwards
+
+// An edit of a product's details, stock is left out on purpose because it only changes through restock and orders,
+// so an edit made with an old stock number cannot undo a checkout, and InTheBox left out keeps the current contents
+public sealed record UpdateProductRequest(
+    string Name,
+    string Description,
+    string? Features,
+    decimal Price,
+    ProductCategory Category,
+    string? ImageUrl,
+    Dictionary<string, int>? InTheBox);
 
 public sealed record ProductDto(
     Guid Id,

@@ -38,7 +38,7 @@ Rules:
 | GET | `/products?category=&minPrice=&maxPrice=&page=1&pageSize=12` | 🔓 | 200 page | 400 bad filter |
 | GET | `/products/search?q=&page=1&pageSize=12` | 🔓 | 200 page | 400 empty or long `q` |
 | GET | `/products/{id}` | 🔓 | 200 product | 404 |
-| GET | `/admin/products?category=&minPrice=&maxPrice=&page=1&pageSize=12` | 👑 | 200 page, hidden products included | 400 · 401 · 403 |
+| GET | `/admin/products?category=&minPrice=&maxPrice=&q=&availability=All&lowStockOnly=false&sort=Name&page=1&pageSize=12` | 👑 | 200 page, hidden products included | 400 · 401 · 403 |
 | GET | `/admin/products/search?q=&page=1&pageSize=12` | 👑 | 200 page, hidden products included | 400 · 401 · 403 |
 | POST | `/admin/products` | 👑 | 201 product | 400 · 401 · 403 |
 | PUT | `/admin/products/{id}` | 👑 | 200 product | 400 · 401 · 403 · 404 |
@@ -50,13 +50,18 @@ Rules:
 - A **page** is `{ items, page, pageSize, totalCount, totalPages }`. `pageSize` is 1–50, `q` ≤ 100 characters,
   `minPrice` ≤ `maxPrice`. `/products` lists only active products, ordered by name; `/admin/products` lists hidden ones
   too, which is how the dashboard's product table reads the catalogue.
+- **Admin filters** on `GET /admin/products`: `availability` is `All`, `OnSale` or `Hidden`; `lowStockOnly=true` keeps
+  products with 8 or fewer left; `sort` is `Name`, `Newest`, `PriceLowToHigh`, `PriceHighToLow` or `StockLowToHigh`
+  (ties sorted by name); `q` searches like `/search`. An unknown `availability` or `sort` is a 400.
 - **Search** matches name or description, case-insensitive. It is a contains search that works like
   `LIKE '%term%'` and reads every row; a `pg_trgm` or full text index can replace it when the catalogue grows.
 - A **product** is `{ id, name, description, features, price, stock, inStock, category, imageUrl, inTheBox, isActive, createdAt }`;
   `category` is `Headphones`, `Speakers`, `Earphones`, `Amplifiers` or `Accessories`;
   `inTheBox` is an object like `{ "Headphone unit": 1, "User manual": 1 }`.
-- **Create/update body:** `{ name, description, features?, price, stock, category, imageUrl?, inTheBox? }`. Update replaces
-  every field, including setting the stock count.
+- **Create body:** `{ name, description, features?, price, stock, category, imageUrl?, inTheBox?, slug? }`.
+- **Update body:** `{ name, description, features?, price, category, imageUrl?, inTheBox? }`. It never changes the
+  stock, which only moves through restock and orders, so an edit made with an old number cannot undo a checkout.
+  `inTheBox` left out keeps the current contents, an empty object empties the box.
 - Every product has a **`slug`**, its address in the shop (`/headphones/xx59-headphones`). It is unique, made
   from the name when `POST /admin/products` leaves it out, and never changed by an update. The client matches its
   pages to the API's products by slug.

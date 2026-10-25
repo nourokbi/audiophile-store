@@ -47,6 +47,10 @@ GET {{base}}/products?category=Headphones&minPrice=1000&page=1&pageSize=12
 ### One product
 GET {{base}}/products/{{productId}}
 
+### The admin products page, hidden ones included, every filter is optional
+GET {{base}}/admin/products?availability=Hidden&lowStockOnly=true&sort=StockLowToHigh&q=speaker
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
 ### Add a product, admin only so log in as the admin first or get 403
 POST {{base}}/admin/products
 Authorization: Bearer {{login.response.body.$.accessToken}}

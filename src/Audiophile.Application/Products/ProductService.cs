@@ -22,8 +22,16 @@ public sealed class ProductService(IAppDbContext db, ILogger<ProductService> log
       query = query.Where(p => p.Price >= min);
     if (q.MaxPrice is { } max)
       query = query.Where(p => p.Price <= max);
+    if (!string.IsNullOrWhiteSpace(q.Search))
+      query = Matching(query, q.Search);
+    if (q.IncludeHidden && q.Availability == ProductAvailability.OnSale)
+      query = query.Where(p => p.IsActive);
+    if (q.IncludeHidden && q.Availability == ProductAvailability.Hidden)
+      query = query.Where(p => !p.IsActive);
+    if (q.LowStockOnly)
+      query = query.Where(p => p.Stock <= ProductQuery.LowStockLimit);
 
-    return PageAsync(query, q.Page, q.PageSize, ct);
+    return PageAsync(Sorted(query, q.Sort), q.Page, q.PageSize, ct);
   }
 
   // A case insensitive contains search that works like SQL LIKE '%term%', it reads every row so a pg_trgm or full text index should replace it when the catalogue grows
@@ -31,14 +39,8 @@ public sealed class ProductService(IAppDbContext db, ILogger<ProductService> log
   {
     if (string.IsNullOrWhiteSpace(s.Term))
       throw new ArgumentException("q is required.");
-    if (s.Term.Length > ProductQuery.MaxSearchLength)
-      throw new ArgumentException($"q cannot be longer than {ProductQuery.MaxSearchLength} characters.");
 
-    var term = s.Term.Trim().ToLower();
-    var query = Catalogue(s.IncludeHidden)
-        .Where(p => p.Name.ToLower().Contains(term) || p.Description.ToLower().Contains(term));
-
-    return PageAsync(query, s.Page, s.PageSize, ct);
+    return PageAsync(Sorted(Matching(Catalogue(s.IncludeHidden), s.Term), ProductSort.Name), s.Page, s.PageSize, ct);
   }
 
   public async Task<ProductDto> GetAsync(Guid id, CancellationToken ct) =>
@@ -60,16 +62,16 @@ public sealed class ProductService(IAppDbContext db, ILogger<ProductService> log
     return ProductDto.From(product);
   }
 
-  public async Task<ProductDto> UpdateAsync(Guid id, ProductRequest r, CancellationToken ct)
+  public async Task<ProductDto> UpdateAsync(Guid id, UpdateProductRequest r, CancellationToken ct)
   {
     // An admin can edit a hidden product and get it ready before showing it again
     var product = await FindAnyAsync(id, ct);
 
     product.UpdateDetails(r.Name, r.Description, r.Category, r.Features);
     product.ChangePrice(r.Price);
-    product.CorrectStock(r.Stock);
     product.SetImage(r.ImageUrl);
-    product.ReplaceBoxContents(r.InTheBox ?? []);
+    if (r.InTheBox is not null)
+      product.ReplaceBoxContents(r.InTheBox);
 
     await db.SaveChangesAsync(ct);
     return ProductDto.From(product);
@@ -112,8 +114,27 @@ public sealed class ProductService(IAppDbContext db, ILogger<ProductService> log
     return includeHidden ? products : products.Where(p => p.IsActive);
   }
 
+  private static IQueryable<Product> Matching(IQueryable<Product> query, string search)
+  {
+    if (search.Length > ProductQuery.MaxSearchLength)
+      throw new ArgumentException($"q cannot be longer than {ProductQuery.MaxSearchLength} characters.");
+
+    var term = search.Trim().ToLower();
+    return query.Where(p => p.Name.ToLower().Contains(term) || p.Description.ToLower().Contains(term));
+  }
+
+  // The name breaks ties, so a page never shows the same product twice when many share a price or a stock
+  private static IOrderedQueryable<Product> Sorted(IQueryable<Product> query, ProductSort sort) => sort switch
+  {
+    ProductSort.Newest => query.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Name),
+    ProductSort.PriceLowToHigh => query.OrderBy(p => p.Price).ThenBy(p => p.Name),
+    ProductSort.PriceHighToLow => query.OrderByDescending(p => p.Price).ThenBy(p => p.Name),
+    ProductSort.StockLowToHigh => query.OrderBy(p => p.Stock).ThenBy(p => p.Name),
+    _ => query.OrderBy(p => p.Name),
+  };
+
   private static async Task<PagedResult<ProductDto>> PageAsync(
-      IQueryable<Product> query, int page, int pageSize, CancellationToken ct)
+      IOrderedQueryable<Product> query, int page, int pageSize, CancellationToken ct)
   {
     if (page < 1)
       throw new ArgumentException("page must be 1 or more.");
@@ -122,7 +143,6 @@ public sealed class ProductService(IAppDbContext db, ILogger<ProductService> log
 
     var total = await query.CountAsync(ct);
     var products = await query
-        .OrderBy(p => p.Name)
         .Skip((page - 1) * pageSize)
         .Take(pageSize)
         .ToListAsync(ct);
