@@ -93,8 +93,9 @@ The ngrok inspector (`http://127.0.0.1:4040`) shows every webhook and our respon
 - A failed webhook (non-2xx) is retried by Fawaterak about 40 seconds later.
 - `pay_load` comes back as a JSON string; the parser accepts string or object.
 - `paidAmount` is in the webhook but outside the signature, so the lookup stays the source of truth.
-- There is no public refund API; refunds are made in the dashboard. The refund webhook is unsigned
-  and is logged, never applied.
+- The API key API used here has no refund call, so refunds are made in the dashboard. The refund webhook
+  is unsigned and is logged, never applied. Fawaterak's newer API (v3, OAuth2) seems to list *Refund APIs*;
+  see *Future improvements* in `roadmap.md` (checked 2026-10-27, not confirmed yet).
 
 ## Known gaps
 

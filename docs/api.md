@@ -116,6 +116,25 @@ the cart increases that line. Quantity per line is 1–100. Shipping is 50 EGP, 
 - Two checkouts for the last unit at the same moment: one gets the order, the other a 409 (`xmin` plus one retry).
 - The full journey, step by step, is in `src/Audiophile.API/checkout-flow.http`; `docs/checkout-flow.md` follows it through the code.
 
+## Admin orders — `AdminOrdersController` (all 👑)
+
+| Method | Path | Success | Errors |
+|---|---|---|---|
+| GET | `/admin/orders?status=&from=&to=&q=&page=1&pageSize=10` | 200 page plus `statusCounts` | 400 · 401 · 403 |
+| GET | `/admin/orders/{id}` | 200 order with `shipping` and `items` | 401 · 403 · 404 |
+| PUT | `/admin/orders/{id}/status` | 200 the changed order | 400 unknown status · 401 · 403 · 404 · 409 not a next status, or Confirmed before the card payment succeeded |
+
+- Every customer's orders, newest first. A row has `customerName`, `customerEmail`, `paymentStatus`, `itemCount`
+  (the sum of the quantities) and `nextStatuses`, the buttons the dashboard shows.
+- **Filters**: `status` is one status; `from` and `to` are UTC days like `2026-10-25`, and `to` includes its whole day;
+  `q` (up to 100 characters) matches the customer's name or email, or an order id typed from its start.
+- `statusCounts` is `{ "Pending": 0, "Confirmed": 3, ... }` for the search and dates but **not** the status, so every tab
+  keeps its number while one tab is open.
+- **Status body**: `{ "status": "Shipped" }`. The steps are Pending → Confirmed → Processing → Shipped → Delivered, and
+  Cancelled from any step before Shipped. `Cancelled` returns the stock and fails a payment still pending; a paid card
+  order can be cancelled here, and its refund is then made by hand on Fawaterak. A card order leaves `Confirmed` out of
+  its `nextStatuses` until the payment succeeded, the webhook or *Sync with gateway* confirms it.
+
 ## Other
 
 | Method | Path | Access | Notes |

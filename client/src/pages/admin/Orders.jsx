@@ -47,10 +47,7 @@ const Orders = () => {
 
 	return (
 		<div className='flex flex-col gap-6'>
-			<AdminPageHeader
-				title='Orders'
-				sampleDataNote='Sample orders, a status change lasts until the page reloads. The admin orders API (Step 2) makes them real.'
-			>
+			<AdminPageHeader title='Orders'>
 				<button onClick={() => exportOrders(orderList.orders)} disabled={orderList.orders.length === 0} className='btn-secondary'>
 					<Download size={16} /> Export CSV
 				</button>

@@ -53,7 +53,7 @@ const OrderDetail = () => {
 	return (
 		<div className='flex flex-col gap-6'>
 			<BackLink />
-			<AdminPageHeader title={`Order #${shortId(order.id)}`} sampleDataNote='A sample order until the admin orders API (Step 2).'>
+			<AdminPageHeader title={`Order #${shortId(order.id)}`}>
 				<StatusBadge status={order.status} />
 			</AdminPageHeader>
 			<p className='-mt-3 text-[14px] text-muted'>

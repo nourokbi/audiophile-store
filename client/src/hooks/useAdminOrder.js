@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { sampleOrdersApi as ordersSource } from '../data/adminOrdersSample';
+import { adminApi } from '../lib/api/admin';
 
 // One order for the admin order page, with the status change that answers the updated order
 export function useAdminOrder(id) {
@@ -9,7 +9,7 @@ export function useAdminOrder(id) {
 
 	React.useEffect(() => {
 		let isOutdated = false;
-		ordersSource
+		adminApi
 			.getOrder(id)
 			.then((loadedOrder) => !isOutdated && setOrder(loadedOrder))
 			.catch((error) => !isOutdated && setLoadError(error.status === 404 ? 'This order does not exist.' : error.message));
@@ -18,7 +18,7 @@ export function useAdminOrder(id) {
 		};
 	}, [id]);
 
-	const changeStatus = async (nextStatus) => setOrder(await ordersSource.changeOrderStatus(id, nextStatus));
+	const changeStatus = async (nextStatus) => setOrder(await adminApi.changeOrderStatus(id, nextStatus));
 
 	return { order, loadError, changeStatus };
 }

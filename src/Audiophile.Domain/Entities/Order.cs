@@ -49,6 +49,15 @@ public sealed class Order
 
     public bool CanBeCancelled => AllowedNextStatuses[Status].Contains(OrderStatus.Cancelled);
 
+    // The statuses this order may move to now, so the payment must be loaded
+    public IReadOnlyList<OrderStatus> NextStatuses => NextStatusesFor(Status, PaymentMethod, Payment?.Status);
+
+    // A card order waits for its payment before it can be confirmed, static so a database query can call it with its columns
+    public static IReadOnlyList<OrderStatus> NextStatusesFor(OrderStatus status, PaymentMethod paymentMethod, PaymentStatus? paymentStatus) =>
+        paymentMethod == PaymentMethod.Card && paymentStatus != PaymentStatus.Succeeded
+            ? AllowedNextStatuses[status].Where(s => s != OrderStatus.Confirmed).ToList()
+            : AllowedNextStatuses[status];
+
     // Creates the order with its payment, copies the address, and takes every item out of stock
     public static Order Place(
         Guid userId,
@@ -105,8 +114,10 @@ public sealed class Order
 
     public void ChangeStatus(OrderStatus next)
     {
-        if (!AllowedNextStatuses[Status].Contains(next))
-            throw new InvalidOperationException($"An order that is {Status} cannot become {next}.");
+        if (!NextStatuses.Contains(next))
+            throw new InvalidOperationException(AllowedNextStatuses[Status].Contains(next)
+                ? "This card order is not paid yet, it is confirmed once the payment succeeds."
+                : $"An order that is {Status} cannot become {next}.");
 
         Status = next;
         UpdatedAt = DateTime.UtcNow;

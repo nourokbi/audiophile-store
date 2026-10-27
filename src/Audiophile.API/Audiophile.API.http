@@ -121,5 +121,20 @@ Idempotency-Key: {{codOrder.request.headers.Idempotency-Key}}
 GET {{base}}/orders
 Authorization: Bearer {{login.response.body.$.accessToken}}
 
+### Every customer's orders, admin only, every filter is optional and statusCounts ignores the status filter
+GET {{base}}/admin/orders?status=Confirmed&from=2026-10-01&to=2026-10-31&q=mona&page=1&pageSize=10
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### One order with its customer, address and items, admin only
+GET {{base}}/admin/orders/{{codOrder.response.body.$.id}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Move an order one step, only a status in its nextStatuses is accepted, Cancelled returns the stock
+PUT {{base}}/admin/orders/{{codOrder.response.body.$.id}}/status
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "status": "Processing" }
+
 ### Health
 GET {{base}}/health

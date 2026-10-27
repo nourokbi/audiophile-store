@@ -1,7 +1,7 @@
 import { api } from './client';
 import { toProduct } from '../productHelpers';
 
-// Every call the admin dashboard makes, each answer is turned into the shop's product shape so a row can be swapped in
+// Every call the admin dashboard makes, each product answer is turned into the shop's product shape so a row can be swapped in
 const toPage = (page) => ({ ...page, items: page.items.map(toProduct) });
 
 // Leaves out the empty filters so the API uses its defaults for them
@@ -30,4 +30,14 @@ export const adminApi = {
 	// PUT /admin/products/{id}/availability with { isActive }, a hidden product is not sold in the shop
 	setAvailability: async (id, isActive) =>
 		toProduct(await api(`/admin/products/${id}/availability`, { method: 'PUT', body: { isActive } })),
+
+	// GET /admin/orders with status, q, from, to, page and pageSize, newest first,
+	// answers { items, page, pageSize, totalCount, totalPages, statusCounts }, the counts ignore the status filter
+	listOrders: (filters = {}) => api(`/admin/orders?${toQueryString(filters)}`),
+
+	// GET /admin/orders/{id}, the summary plus shipping and items
+	getOrder: (id) => api(`/admin/orders/${id}`),
+
+	// PUT /admin/orders/{id}/status with { status }, only a status in the order's nextStatuses is accepted, any other is a 409
+	changeOrderStatus: (id, status) => api(`/admin/orders/${id}/status`, { method: 'PUT', body: { status } }),
 };

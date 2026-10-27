@@ -32,8 +32,8 @@ A finished, deployed project beats a bigger unfinished one on a CV.
 **Phase 1 is done** (`v0.2.0`) and the **shop is redesigned** from the Stitch project (PR #6): light and dark theme,
 22 products in five categories, filters and pagination, a cart page, checkout with saved addresses, order tracking
 and cancel. **Phase 5 is half done**: the dashboard has its own layout with a side menu and four pages, the products
-page is finished end to end, and the orders pages are built on sample data waiting for the admin orders API.
-49 tests pass on PostgreSQL, in GitHub Actions on every push and pull request.
+page is finished end to end, and the orders pages run on the admin orders API.
+57 tests pass on PostgreSQL, in GitHub Actions on every push and pull request.
 
 | Phase | Status |
 |---|---|
@@ -42,7 +42,7 @@ page is finished end to end, and the orders pages are built on sample data waiti
 | 2 Pluggable payments | 🟡 Fawaterak is on (card only) and tested for real; **the pluggable design and fake-gateway tests left** |
 | 3 Login, roles, addresses | ✅ done |
 | 4 React client | ✅ every customer page, redesigned from Stitch with a dark theme; **guest cart and httpOnly cookie left** |
-| 5 Admin dashboard | 🟡 products done end to end, orders pages on sample data; **the admin orders API is next** (branch `phase-5/admin-api`) |
+| 5 Admin dashboard | 🟡 products and orders done end to end; **the stats API is next** (branch `phase-5/admin-api`) |
 | 6 Caching + messaging | ⬜ not started |
 | 7 Docker, CI, deploy | ⬜ not started (AWS was considered; the VPS + Neon plan still stands) |
 
@@ -57,12 +57,12 @@ the dashboard connected). How to build each step, with hints and code sketches, 
 - ✅ Step 1, admin products: list with filters (search, category, availability, low stock, sort), add, **edit**,
   restock, price, show and hide, every action from the dashboard, and the shop updates without a refresh
 - ✅ Client cleanup, the account dropdown, and the dashboard frame (sticky side menu that folds into icons)
-- ✅ The orders pages, built on sample orders shaped like the Step 2 answers
+- ✅ Step 2, admin orders: the list with status, date and search filters and a count per status, one order, and the
+  status controls, connected to the orders pages and the recent orders on the overview (2026-10-27)
 
 **You build next** (the client is ready and waits for these)
 
-1. **Step 2, admin orders API**: `GET /admin/orders` with `statusCounts`, `GET /admin/orders/{id}`,
-   `PUT /admin/orders/{id}/status`. Then swap the sample orders for `adminApi` in three hooks (Step 2, *Connect it*).
+1. **Payment panel** on the order page: the event log and *Sync with gateway*, on the two endpoints that exist.
 2. **Step 3, admin stats API**: revenue, active orders and orders per day for the overview cards and chart.
 3. **Income page** (part F): `GET /admin/stats/income` and the Chart.js charts.
 4. **React Query** across the client, now that every list has an API.
@@ -71,8 +71,8 @@ the dashboard connected). How to build each step, with hints and code sketches, 
 
 **Still missing in Phase 5** (each one is a box further down)
 
-- Orders: the real API, the payment panel on the order page (event log and *Sync with gateway*)
-- Overview: revenue, active orders, the chart and the customer count are still sample numbers
+- Orders: the payment panel on the order page (event log and *Sync with gateway*), and the check by hand in the browser
+- Overview: revenue, active orders and the chart are still sample numbers
 - Income: the API and the charts
 - Products, optional: uploading a photo instead of typing a URL
 
@@ -457,19 +457,20 @@ What changes, in the order to build it. Each part says which API it needs.
       in the URL (`useSearchParams`) so a refresh keeps it, and the *Add product* button moves here
 
 **D. Orders page**: Step 2 below, plus
-- [ ] **Backend**: the order list answer also carries `statusCounts` (`{ Pending: 3, Confirmed: 5, ... }`) for the
+- [x] **Backend**: the order list answer also carries `statusCounts` (`{ Pending: 3, Confirmed: 5, ... }`) for the
       filtered dates, so the page shows the numbers without a second call
-- [ ] **Order phases have their own logic**: the API decides the allowed moves (`Order.NextStatuses`) and every admin
-      order answer carries `nextStatuses`. The client never guesses: `lib/orders.js` only labels them, and
+- [x] **Order phases have their own logic**: the API decides the allowed moves (`Order.NextStatuses`) and every admin
+      order answer carries `nextStatuses`. The client never guesses: `lib/orderHelpers.js` only labels them, and
       `components/admin/OrderStatusControl.jsx` draws one button per entry, with a confirm step for *Cancelled*
 - [x] **Client layout** (2026-10-25, on sample data): `useAdminOrders` and `useAdminProducts` share `useUrlFilters`;
       `/admin/orders` has `OrderStatusTabs` with counts, `OrderFilters` (search, from and to dates), `OrdersTable` with a
       quick *next step* button per row and *Export CSV*; `/admin/orders/:id` has the progress, items, customer, address,
       `OrderStatusControl` and a `ConfirmDialog` before *Cancel*. The orders come from `data/adminOrdersSample.js`, a
       pretend server with the planned answers (`statusCounts`, `nextStatuses`, a 409 for an illegal move)
-- [ ] **Connect it**: once the API exists, add `listOrders`, `getOrder` and `changeOrderStatus` to `lib/api/admin.js`,
-      import `adminApi` in `useAdminOrders`, `useAdminOrder` and `useRecentOrders`, and delete `data/adminOrdersSample.js`
-- [ ] The payment panel on the order page: the event log and *Sync with gateway*
+- [x] **Connect it** (2026-10-27): `listOrders`, `getOrder` and `changeOrderStatus` in `lib/api/admin.js`, the three
+      hooks read `adminApi`, and `data/adminOrdersSample.js` is deleted
+- [ ] The payment panel on the order page: the event log, *Sync with gateway*, and a *Refund needed* badge on a
+      cancelled order whose payment is still `Succeeded`
 
 **E. Overview**: Step 3 below, and
 - [ ] The four cards count the **whole business**, never the page in view: products on sale, active orders, low stock
@@ -484,7 +485,7 @@ What changes, in the order to build it. Each part says which API it needs.
 - [ ] **Client**: Chart.js (`react-chartjs-2`) line chart of revenue per day, bars per category, a date range picker,
       and totals for the period
 
-### Step 2 — Admin orders API (UC-12, UC-13, UC-14)
+### Step 2 — Admin orders API (UC-12, UC-13, UC-14) · ✅ done 2026-10-27, except the payment panel
 
 | Endpoint | Body | Answer | Used by |
 |---|---|---|---|
@@ -494,8 +495,7 @@ What changes, in the order to build it. Each part says which API it needs.
 
 Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{id}/payment/sync` for the payment panel.
 
-**The client is already built for these answers** (`client/src/data/adminOrdersSample.js` shows them), so match these
-names and the pages work the moment you switch the import:
+**The answers** the client reads:
 
 - **Summary** in the list: `id, createdAt, updatedAt, customerName, customerEmail, status, paymentMethod,
   paymentStatus, subTotal, shippingFee, totalAmount, itemCount` (the sum of the quantities) and `nextStatuses`
@@ -508,21 +508,21 @@ names and the pages work the moment you switch the import:
 
 **Build it in this order**
 
-- [ ] **Entity**: `AllowedNextStatuses` in `Order.cs` is private. Add a public read of it, e.g.
-      `public IReadOnlyList<OrderStatus> NextStatuses => AllowedNextStatuses[Status];`
-- [ ] **Contracts** in `Orders/OrderContracts.cs`: `AdminOrderQuery(Status, From, To, Q, Page, PageSize)`,
+- [x] **Entity**: `Order.NextStatuses`, and `Order.NextStatusesFor(status)` that the list query calls with only the
+      status column
+- [x] **Contracts** in `Orders/OrderContracts.cs`: `AdminOrderQuery(Status, From, To, Search, Page, PageSize)`,
       `AdminOrderSummaryDto` and `AdminOrderDto` with the fields above, `AdminOrderPage` (the paged list plus
       `StatusCounts`), and `ChangeStatusRequest(OrderStatus Status)`
-- [ ] **Service**: the admin order methods go in `OrderService`:
-  - `ListAsync`: `db.Orders.AsNoTracking()`, filter by status, `CreatedAt >= from` and `< to.AddDays(1)`, search on
+- [x] **Service**: the admin order methods go in `OrderService`:
+  - `ListAllOrdersAsync`: `db.Orders.AsNoTracking()`, filter by status, `CreatedAt >= from` and `< to.AddDays(1)`, search on
     `o.User.Name` / `o.User.Email`, `OrderByDescending(o => o.CreatedAt)`, page, then `Select` into the summary.
     Sum the quantities with `o.OrderItems.Sum(i => i.Quantity)` inside the projection so it stays one SQL query.
     `StatusCounts`: the same query without the status filter, `GroupBy(o => o.Status).Select(g => new { g.Key, Count = g.Count() })`
-  - `GetAsync`: include `User`, `Payment`, `OrderItems.Product`, 404 when missing
-  - `ChangeStatusAsync` **first** in this step:
+  - `GetAnyOrderAsync`: include `User`, `Payment`, `OrderItems.Product`, 404 when missing
+  - `ChangeOrderStatusAsync` **first** in this step:
 
     ```csharp
-    public Task<AdminOrderDto> ChangeStatusAsync(Guid id, OrderStatus next, CancellationToken ct) =>
+    public Task<AdminOrderDto> ChangeOrderStatusAsync(Guid id, OrderStatus next, CancellationToken ct) =>
         db.RetryOnStockConflictAsync(logger, async () =>
         {
           var order = await OrderWithDetailsAsync(id, ct);
@@ -535,16 +535,18 @@ names and the pages work the moment you switch the import:
         });
     ```
 
-  - Think about: a card order normally becomes *Confirmed* from the payment webhook, so the admin moving it to
-    Confirmed by hand only makes sense for cash on delivery. And cancelling a paid order means a manual refund;
-    decide whether to refuse it (409) like the customer cancel does, or allow it with a warning on the page
-- [ ] **Controller** `AdminOrdersController` with `[Route("admin/orders")]`
-- [ ] **Tests** `AdminOrderApiTests.cs`: Pending → Confirmed → Processing → Shipped → Delivered works,
-      Delivered → Pending is 409, admin cancel puts the stock back, the list filters by status and search,
-      a customer gets 403
+  - **Decided** (2026-10-27): a cash order is already Confirmed when it is placed, so only card orders are ever Pending.
+    `Order` itself keeps `Confirmed` out of a card order's `nextStatuses` until its payment succeeded, so the page shows
+    no *Confirm* button and the API answers 409; the webhook or *Sync with gateway* confirms it.
+    The admin **can** cancel a paid card order, the page warns first and the refund is made by hand on Fawaterak
+- [x] **Controller** `AdminOrdersController` with `[Route("admin/orders")]`
+- [x] **Tests** `AdminOrderApiTests.cs` (7): Confirmed → Processing → Shipped → Delivered works, a status that is not
+      next is 409, an unpaid card order cannot be confirmed but can be cancelled (with a fake gateway), admin cancel
+      puts the stock back, one order has its address and items, the list filters by status, search and dates and
+      counts every status, a customer gets 403
 - [x] **Client pages**: built on sample data, see part D of *Dashboard redesign* above
-- [ ] **Client, connect it**: the three boxes under part D (`adminApi` functions, switch the three hooks, delete the
-      sample file, then the payment panel)
+- [x] **Client, connect it**: see part D
+- [ ] The payment panel (part D), and the check by hand: filter, open an order, walk it to Delivered, cancel one
 
 ### Step 3 — Admin stats API (UC-15)
 
@@ -630,6 +632,34 @@ Run these against the deployed server, or one like it, never the dev laptop, so 
       cookies)
 - [ ] Dependency checks: `dotnet list package --vulnerable` and `npm audit` in CI; turn on **Dependabot** and
       **CodeQL** in the GitHub repo settings
+
+---
+
+## Future improvements (after Phase 7)
+
+Ideas kept out of scope on purpose, each one is worth doing only once the store is live.
+
+### Refunds through the Fawaterak API
+
+Today a cancel never moves money. A paid card order cancelled by the admin keeps its payment `Succeeded`, and the refund
+is made by hand in the Fawaterak dashboard. The API this project uses (API key, `FawaterakGateway`) has no refund call.
+
+Found on 2026-10-27, **not confirmed yet**: Fawaterak's official documentation lists a *Refund APIs* section, and an
+unofficial SDK for **API v3** (OAuth2 client credentials) creates, lists and cancels refund requests for an invoice or a
+transaction; only a pending request can be cancelled, an approved refund is final, and Fawaterak calls a refund webhook
+once it is approved.
+
+- [ ] **Confirm first**: read the *Refund APIs* page logged in, and ask Fawaterak support whether this account can use
+      API v3 and its refunds
+- [ ] **Gateway**: `RefundAsync(payment, amount, reason)` on the payment gateway (it fits the `IPaymentGateway` of
+      Phase 2), plus the v3 OAuth2 token
+- [ ] **Domain**: `Refunded` payment status and `Payment.MarkRefunded()`; a refund request that is still pending shows
+      as *Refund requested*
+- [ ] **Flow**: the admin cancel of a paid card order asks for the refund, the signed refund webhook (or a lookup, like
+      *Sync with gateway*) marks it `Refunded`, every step recorded as a `PaymentEvent`
+- [ ] **Tests** with the fake gateway: refund asked once, webhook twice, refund refused
+- [ ] **Until then**: a *Refund needed* badge on cancelled orders whose payment is still `Succeeded` (part of the
+      payment panel in Phase 5)
 
 ---
 

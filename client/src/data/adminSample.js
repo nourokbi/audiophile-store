@@ -1,4 +1,4 @@
-// Sample numbers for the overview and income pages until GET /admin/stats exists, the sample orders are in adminOrdersSample.js
+// Sample numbers for the overview and income pages until GET /admin/stats exists
 export const SAMPLE_STATS = {
 	revenue: 128450,
 	revenueChange: 14.2,

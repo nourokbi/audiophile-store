@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { sampleOrdersApi as ordersSource } from '../data/adminOrdersSample';
+import { adminApi } from '../lib/api/admin';
 
 // The newest orders for the overview preview
 export function useRecentOrders(count) {
@@ -8,7 +8,7 @@ export function useRecentOrders(count) {
 
 	React.useEffect(() => {
 		let isOutdated = false;
-		ordersSource
+		adminApi
 			.listOrders({ pageSize: count })
 			.then((orderPage) => !isOutdated && setRecentOrders(orderPage.items))
 			.catch(() => !isOutdated && setRecentOrders([]));

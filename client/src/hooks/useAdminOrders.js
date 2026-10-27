@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { useUrlFilters } from './useUrlFilters';
-import { sampleOrdersApi as ordersSource } from '../data/adminOrdersSample';
+import { adminApi } from '../lib/api/admin';
 
 const ORDER_FILTERS = { status: '', q: '', from: '', to: '', page: 1 };
 const EMPTY_PAGE = { items: [], totalPages: 1, totalCount: 0, statusCounts: {} };
@@ -17,7 +17,7 @@ export function useAdminOrders() {
 	React.useEffect(() => {
 		let isOutdated = false;
 		setIsLoading(true);
-		ordersSource
+		adminApi
 			.listOrders(Object.fromEntries(new URLSearchParams(filterQuery)))
 			.then((loadedPage) => {
 				if (isOutdated) return;
@@ -55,7 +55,7 @@ export function useAdminOrders() {
 		statusCounts: orderPage.statusCounts,
 		isLoading,
 		loadError,
-		changeOrderStatus: ordersSource.changeOrderStatus,
+		changeOrderStatus: adminApi.changeOrderStatus,
 		replaceOrder,
 	};
 }

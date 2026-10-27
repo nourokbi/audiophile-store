@@ -20,7 +20,7 @@ const Overview = () => {
 		<div className='flex flex-col gap-6'>
 			<AdminPageHeader
 				title='Overview'
-				sampleDataNote='Revenue, active orders, the chart and recent orders are sample data until the orders and stats API is ready. The product numbers are live.'
+				sampleDataNote='Revenue, active orders and the chart are sample numbers until the stats API (Step 3). Products and recent orders are live.'
 			/>
 			{inventory.loadError && <p className='error-text'>{inventory.loadError}</p>}
 
