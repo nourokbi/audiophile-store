@@ -1,22 +1,23 @@
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CreditCard, MapPin, User } from 'lucide-react';
+import { ArrowLeft, MapPin, User } from 'lucide-react';
 
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import OrderStatusControl from '../../components/admin/OrderStatusControl';
+import PaymentPanel from '../../components/admin/PaymentPanel';
 import OrderItems from '../../components/orders/OrderItems';
 import OrderProgress from '../../components/orders/OrderProgress';
 import StatusBadge from '../../components/orders/StatusBadge';
-import PriceSummary from '../../components/shop/PriceSummary';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { useAdminOrder } from '../../hooks/useAdminOrder';
+import { usePaymentPanel } from '../../hooks/usePaymentPanel';
 import { formatDate, shortId } from '../../lib/format';
-import { PAYMENT_LABELS } from '../../lib/orderHelpers';
 
-// One order for the admin: where it is, who it goes to, what is in it, and the buttons that move it on
+// One order for the admin: where it is, who it goes to, what is in it, its payment, and the buttons that move it on
 const OrderDetail = () => {
 	const { id } = useParams();
-	const { order, loadError, changeStatus } = useAdminOrder(id);
+	const { order, loadError, changeStatus, reload } = useAdminOrder(id);
+	const payment = usePaymentPanel(id, order?.paymentMethod === 'Card', reload);
 	const [isSaving, setIsSaving] = React.useState(false);
 	const [saveError, setSaveError] = React.useState('');
 	const [isCancelDialogOpen, setIsCancelDialogOpen] = React.useState(false);
@@ -99,16 +100,14 @@ const OrderDetail = () => {
 						onCancelClick={openCancelDialog}
 					/>
 
-					<section className='card flex flex-col gap-4 p-6'>
-						<h2 className='flex items-center gap-2 text-[18px]'>
-							<CreditCard size={18} className='text-brand' /> Payment
-						</h2>
-						<p className='text-[14px]'>
-							{PAYMENT_LABELS[order.paymentMethod]}, <span className='font-bold'>{order.paymentStatus.toLowerCase()}</span>
-						</p>
-						<PriceSummary subTotal={order.subTotal} shippingFee={order.shippingFee} total={order.totalAmount} />
-						<p className='text-[13px] text-muted'>The payment events and a sync with Fawaterak come with Step 2.</p>
-					</section>
+					<PaymentPanel
+						order={order}
+						events={payment.events}
+						loadError={payment.loadError}
+						isSyncing={payment.isSyncing}
+						syncError={payment.syncError}
+						onSync={payment.syncWithGateway}
+					/>
 				</aside>
 			</div>
 

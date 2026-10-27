@@ -40,4 +40,10 @@ export const adminApi = {
 
 	// PUT /admin/orders/{id}/status with { status }, only a status in the order's nextStatuses is accepted, any other is a 409
 	changeOrderStatus: (id, status) => api(`/admin/orders/${id}/status`, { method: 'PUT', body: { status } }),
+
+	// GET /orders/{id}/payment/events, what Fawaterak sent about the order, oldest first
+	listPaymentEvents: (orderId) => api(`/orders/${orderId}/payment/events`),
+
+	// POST /orders/{id}/payment/sync, asks Fawaterak for the invoice and applies it, a 409 when the order has no invoice
+	syncPayment: (orderId) => api(`/orders/${orderId}/payment/sync`, { method: 'POST' }),
 };

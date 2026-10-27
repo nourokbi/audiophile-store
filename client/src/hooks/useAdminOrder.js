@@ -2,7 +2,7 @@ import React from 'react';
 
 import { adminApi } from '../lib/api/admin';
 
-// One order for the admin order page, with the status change that answers the updated order
+// One order for the admin order page, with the status change that answers the updated order and a reload
 export function useAdminOrder(id) {
 	const [order, setOrder] = React.useState(null);
 	const [loadError, setLoadError] = React.useState('');
@@ -19,6 +19,7 @@ export function useAdminOrder(id) {
 	}, [id]);
 
 	const changeStatus = async (nextStatus) => setOrder(await adminApi.changeOrderStatus(id, nextStatus));
+	const reload = async () => setOrder(await adminApi.getOrder(id));
 
-	return { order, loadError, changeStatus };
+	return { order, loadError, changeStatus, reload };
 }

@@ -62,16 +62,15 @@ the dashboard connected). How to build each step, with hints and code sketches, 
 
 **You build next** (the client is ready and waits for these)
 
-1. **Payment panel** on the order page: the event log and *Sync with gateway*, on the two endpoints that exist.
-2. **Step 3, admin stats API**: revenue, active orders and orders per day for the overview cards and chart.
-3. **Income page** (part F): `GET /admin/stats/income` and the Chart.js charts.
-4. **React Query** across the client, now that every list has an API.
-5. Then Phase 4 leftovers (guest cart, httpOnly cookie), Phase 2 (pluggable payments, kept as a later refactor),
+1. **Step 3, admin stats API**: revenue, active orders and orders per day for the overview cards and chart.
+2. **Income page** (part F): `GET /admin/stats/income` and the Chart.js charts.
+3. **React Query** across the client, now that every list has an API.
+4. Then Phase 4 leftovers (guest cart, httpOnly cookie), Phase 2 (pluggable payments, kept as a later refactor),
    and Phases 6 → 7.
 
 **Still missing in Phase 5** (each one is a box further down)
 
-- Orders: the payment panel on the order page (event log and *Sync with gateway*), and the check by hand in the browser
+- Orders: the check by hand in the browser
 - Overview: revenue, active orders and the chart are still sample numbers
 - Income: the API and the charts
 - Products, optional: uploading a photo instead of typing a URL
@@ -469,8 +468,9 @@ What changes, in the order to build it. Each part says which API it needs.
       pretend server with the planned answers (`statusCounts`, `nextStatuses`, a 409 for an illegal move)
 - [x] **Connect it** (2026-10-27): `listOrders`, `getOrder` and `changeOrderStatus` in `lib/api/admin.js`, the three
       hooks read `adminApi`, and `data/adminOrdersSample.js` is deleted
-- [ ] The payment panel on the order page: the event log, *Sync with gateway*, and a *Refund needed* badge on a
-      cancelled order whose payment is still `Succeeded`
+- [x] The payment panel on the order page (2026-10-27): `components/admin/PaymentPanel.jsx` with `usePaymentPanel`,
+      the messages from Fawaterak newest first with the raw message folded, *Sync with gateway* for card orders (then
+      the order is read again), and a *Refund needed* note on a cancelled order whose payment is still `Succeeded`
 
 **E. Overview**: Step 3 below, and
 - [ ] The four cards count the **whole business**, never the page in view: products on sale, active orders, low stock
@@ -485,7 +485,7 @@ What changes, in the order to build it. Each part says which API it needs.
 - [ ] **Client**: Chart.js (`react-chartjs-2`) line chart of revenue per day, bars per category, a date range picker,
       and totals for the period
 
-### Step 2 — Admin orders API (UC-12, UC-13, UC-14) · ✅ done 2026-10-27, except the payment panel
+### Step 2 — Admin orders API (UC-12, UC-13, UC-14) · ✅ done 2026-10-27, except the check by hand
 
 | Endpoint | Body | Answer | Used by |
 |---|---|---|---|
@@ -546,7 +546,8 @@ Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{i
       counts every status, a customer gets 403
 - [x] **Client pages**: built on sample data, see part D of *Dashboard redesign* above
 - [x] **Client, connect it**: see part D
-- [ ] The payment panel (part D), and the check by hand: filter, open an order, walk it to Delivered, cancel one
+- [x] The payment panel (part D)
+- [ ] The check by hand: filter, open an order, walk it to Delivered, cancel one, sync a card order
 
 ### Step 3 — Admin stats API (UC-15)
 
@@ -658,7 +659,7 @@ once it is approved.
 - [ ] **Flow**: the admin cancel of a paid card order asks for the refund, the signed refund webhook (or a lookup, like
       *Sync with gateway*) marks it `Refunded`, every step recorded as a `PaymentEvent`
 - [ ] **Tests** with the fake gateway: refund asked once, webhook twice, refund refused
-- [ ] **Until then**: a *Refund needed* badge on cancelled orders whose payment is still `Succeeded` (part of the
+- [x] **Until then**: a *Refund needed* badge on cancelled orders whose payment is still `Succeeded` (part of the
       payment panel in Phase 5)
 
 ---
