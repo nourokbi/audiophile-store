@@ -121,6 +121,7 @@ the cart increases that line. Quantity per line is 1–100. Shipping is 50 EGP, 
 | Method | Path | Success | Errors |
 |---|---|---|---|
 | GET | `/admin/orders?status=&from=&to=&q=&page=1&pageSize=10` | 200 page plus `statusCounts` | 400 · 401 · 403 |
+| GET | `/admin/orders/stats?days=30` | 200 the overview numbers | 400 days not 1–365 · 401 · 403 |
 | GET | `/admin/orders/{id}` | 200 order with `shipping` and `items` | 401 · 403 · 404 |
 | PUT | `/admin/orders/{id}/status` | 200 the changed order | 400 unknown status · 401 · 403 · 404 · 409 not a next status, or Confirmed before the card payment succeeded |
 
@@ -133,7 +134,19 @@ the cart increases that line. Quantity per line is 1–100. Shipping is 50 EGP, 
 - **Status body**: `{ "status": "Shipped" }`. The steps are Pending → Confirmed → Processing → Shipped → Delivered, and
   Cancelled from any step before Shipped. `Cancelled` returns the stock and fails a payment still pending; a paid card
   order can be cancelled here, and its refund is then made by hand on Fawaterak. A card order leaves `Confirmed` out of
-  its `nextStatuses` until the payment succeeded, the webhook or *Sync with gateway* confirms it.
+  its `nextStatuses` until the payment succeeded, the webhook or *Sync with gateway* confirms it. A cash order's
+  payment becomes `Succeeded` when the order is `Delivered`, the courier collected the cash.
+- **Stats**: the period is `days` whole **Cairo days** ending today (`Africa/Cairo`, summer time included).
+  - `revenue`: the total of orders placed in the period whose payment `Succeeded` and that are not `Cancelled`;
+    `previousRevenue` is the same for the `days` days before; `paidOrderCount` is how many orders that is
+  - `orderCount`: every order placed in the period; `activeOrders`: every order now Pending, Confirmed, Processing or
+    Shipped whatever its date; `customerCount`: everyone who ever placed an order
+  - `perDay`: one `{ day, orders, revenue }` per day of the period, oldest first, today last, empty days as 0
+  - `byPaymentMethod` `{ paymentMethod, orders, revenue }` and `byCategory` `{ category, unitsSold, revenue }`, every
+    method and category listed; `topProducts` the 5 best `{ productId, productName, unitsSold, revenue }`. Category and
+    product revenue add up the items, so they leave the shipping out
+  - `statusCounts`: the orders placed in the period by their status now, every status listed
+- The `from` and `to` filters of `GET /admin/orders` are Cairo days too.
 
 ## Other
 

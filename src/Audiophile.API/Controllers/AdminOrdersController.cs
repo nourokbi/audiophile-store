@@ -18,6 +18,11 @@ public sealed class AdminOrdersController(OrderService _ordersService) : Control
       int page = 1, int pageSize = AdminOrderQuery.DefaultPageSize) =>
       Ok(await _ordersService.ListAllOrdersAsync(new AdminOrderQuery(status, from, to, q, page, pageSize), ct));
 
+  // The overview and income numbers for the last days, days is 1 to 365
+  [HttpGet("stats")]
+  public async Task<IActionResult> Stats(CancellationToken ct, int days = 30) =>
+      Ok(await _ordersService.GetOrderStatsAsync(days, ct));
+
   [HttpGet("{id:guid}")]
   public async Task<IActionResult> Get(Guid id, CancellationToken ct) =>
       Ok(await _ordersService.GetAnyOrderAsync(id, ct));

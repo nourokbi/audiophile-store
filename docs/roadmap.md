@@ -33,7 +33,7 @@ A finished, deployed project beats a bigger unfinished one on a CV.
 22 products in five categories, filters and pagination, a cart page, checkout with saved addresses, order tracking
 and cancel. **Phase 5 is half done**: the dashboard has its own layout with a side menu and four pages, the products
 page is finished end to end, and the orders pages run on the admin orders API.
-57 tests pass on PostgreSQL, in GitHub Actions on every push and pull request.
+62 tests pass on PostgreSQL, in GitHub Actions on every push and pull request.
 
 | Phase | Status |
 |---|---|
@@ -42,7 +42,7 @@ page is finished end to end, and the orders pages run on the admin orders API.
 | 2 Pluggable payments | 🟡 Fawaterak is on (card only) and tested for real; **the pluggable design and fake-gateway tests left** |
 | 3 Login, roles, addresses | ✅ done |
 | 4 React client | ✅ every customer page, redesigned from Stitch with a dark theme; **guest cart and httpOnly cookie left** |
-| 5 Admin dashboard | 🟡 products and orders done end to end; **the stats API is next** (branch `phase-5/admin-api`) |
+| 5 Admin dashboard | 🟡 every page done end to end; **the check by hand and `v0.3.0` are next** (branch `phase-5/admin-api`) |
 | 6 Caching + messaging | ⬜ not started |
 | 7 Docker, CI, deploy | ⬜ not started (AWS was considered; the VPS + Neon plan still stands) |
 
@@ -59,19 +59,22 @@ the dashboard connected). How to build each step, with hints and code sketches, 
 - ✅ Client cleanup, the account dropdown, and the dashboard frame (sticky side menu that folds into icons)
 - ✅ Step 2, admin orders: the list with status, date and search filters and a count per status, one order, and the
   status controls, connected to the orders pages and the recent orders on the overview (2026-10-27)
+- ✅ The payment panel on the order page: messages from Fawaterak, *Sync with gateway*, *Refund needed* (2026-10-27)
+- ✅ Step 3, the overview numbers: revenue against the period before, active orders, customers, orders per day,
+  and a delivered cash order now counts as paid (2026-10-27)
+- ✅ Part F, the income page: Chart.js charts for revenue and orders per day, revenue by category, top products,
+  payment method and status, for 7, 30, 90 days or a year, all on Cairo days (2026-10-27)
 
 **You build next** (the client is ready and waits for these)
 
-1. **Step 3, admin stats API**: revenue, active orders and orders per day for the overview cards and chart.
-2. **Income page** (part F): `GET /admin/stats/income` and the Chart.js charts.
-3. **React Query** across the client, now that every list has an API.
-4. Then Phase 4 leftovers (guest cart, httpOnly cookie), Phase 2 (pluggable payments, kept as a later refactor),
+1. **The check by hand** of every admin page, then tag `v0.3.0` and merge `phase-5/admin-api`.
+2. **React Query** across the client, now that every list has an API.
+3. Then Phase 4 leftovers (guest cart, httpOnly cookie), Phase 2 (pluggable payments, kept as a later refactor),
    and Phases 6 → 7.
 
 **Still missing in Phase 5** (each one is a box further down)
 
-- Orders: the check by hand in the browser
-- Overview: revenue, active orders and the chart are still sample numbers
+- The check by hand in the browser: orders, the overview and the income page
 - Income: the API and the charts
 - Products, optional: uploading a photo instead of typing a URL
 
@@ -430,7 +433,7 @@ What changes, in the order to build it. Each part says which API it needs.
 | C | Products page | filters on `GET /admin/products` | `/admin/products` with filters and paging |
 | D | Orders page | Step 2 below, plus counts per status | `/admin/orders`, `/admin/orders/:id`, status controls |
 | E | Overview | Step 3 below, whole business numbers | `/admin` cards and previews |
-| F | Income page | `GET /admin/stats/income` | `/admin/income` with Chart.js |
+| F | Income page | `GET /admin/orders/stats` | `/admin/income` with Chart.js |
 
 **A. Account dropdown** (done 2026-10-25)
 - [x] `components/layout/AccountMenu.jsx`: a small menu under the user icon (My orders, Settings, Admin dashboard for
@@ -477,13 +480,15 @@ What changes, in the order to build it. Each part says which API it needs.
       products, revenue in the last 30 days. `AdminStatsDto` gets `ProductCount` and `LowStockCount`
 - [ ] Previews under the cards, each with a *See all* link to its page: the last 5 orders, the 5 lowest stock
       products, orders this week
-- [ ] `client/src/data/adminSample.js` is deleted
+- [x] `client/src/data/adminSample.js` is deleted
 
-**F. Income page** (last)
-- [ ] **Backend**: `GET /admin/stats/income?from=&to=` with revenue per day, per payment method and per category, using
-      the same revenue rule as Step 3 (paid card orders plus delivered cash orders)
-- [ ] **Client**: Chart.js (`react-chartjs-2`) line chart of revenue per day, bars per category, a date range picker,
-      and totals for the period
+**F. Income page** (last) · ✅ done 2026-10-27
+- [x] **Backend**: the same `GET /admin/orders/stats?days=` grew instead of a second endpoint: revenue and orders for
+      every day of the period, by payment method, by category, the top 5 products, and the statuses
+- [x] **Client**: Chart.js 4 with `react-chartjs-2` 5, only the pieces used registered in `lib/charts.js`.
+      `components/charts/` has `BarChart`, `LineChart` and `ChartCard` (title, summary, and *Show the numbers* as a
+      table). Every chart is one series in the brand orange (`#d87d4a`, `#c96f3e` on the dark card, both validated),
+      one axis, a tooltip on hover. The income page has a period switch (7, 30, 90 days, a year) kept in the URL
 
 ### Step 2 — Admin orders API (UC-12, UC-13, UC-14) · ✅ done 2026-10-27, except the check by hand
 
@@ -549,31 +554,32 @@ Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{i
 - [x] The payment panel (part D)
 - [ ] The check by hand: filter, open an order, walk it to Delivered, cancel one, sync a card order
 
-### Step 3 — Admin stats API (UC-15)
+### Step 3 — Admin stats API (UC-15) · ✅ done 2026-10-27, except the check by hand
 
 | Endpoint | Answer | Used by |
 |---|---|---|
-| `GET /admin/stats?days=30` | Revenue and order count for the period, active orders, orders per day for the last 7 days, low stock products | Stat cards, *Orders this week*, *Low stock* |
+| `GET /admin/orders/stats?days=30` | Revenue for the period and the one before, orders placed and paid, active orders, customers, every day of the period, payment method, category, top products, statuses | Stat cards, the orders chart, customer count, the income page |
 
-**Build it in this order**
+**Decided** (2026-10-27): the stats are order numbers, so they live in `OrderService` and `AdminOrdersController`, not
+in a separate stats service. The product cards and the low stock list keep reading the products API through
+`useInventorySummary`. A cash order's payment becomes `Succeeded` when it is delivered (`Payment.MarkCashCollected`,
+called by `Order.ChangeStatus`), so revenue has one rule: **paid and not cancelled**.
 
-- [ ] **Contracts**: `AdminStatsDto(decimal Revenue, int OrderCount, int ActiveOrders, int ProductCount, int LowStockCount,
-      IReadOnlyList<DailyOrders> OrdersPerDay, IReadOnlyList<ProductDto> LowStock)` and
-      `DailyOrders(DateOnly Day, int Count, decimal Revenue)`
-- [ ] **Service** `AdminStatsService.GetAsync(days)`, every query `AsNoTracking`:
-  - **Revenue**: orders in the period whose `Payment.Status == Succeeded`, **plus** cash orders that are `Delivered`;
-    cancelled orders never count. `SumAsync(o => o.TotalAmount)`
-  - **Active orders**: status is Pending, Confirmed, Processing or Shipped
-  - **Orders per day**: `GroupBy(o => o.CreatedAt.Date)` for the last 7 days, then fill the days with no orders with
-    0 in C#, so the chart always has 7 bars
-  - **Low stock**: active products with `Stock <= 8` (the same `LOW_STOCK` the page uses; make it one constant)
-  - Check `days` is between 1 and 365, otherwise `ArgumentException`
-- [ ] **Controller** `AdminStatsController` with `[Route("admin/stats")]`
-- [ ] **Tests**: seed a paid card order, a delivered cash order, a pending cash order and a cancelled one, and check
-      that the revenue is only the first two; a customer gets 403
-- [ ] **Client**: `useAdminStats` feeds `StatCards` (revenue, active orders) and `OrdersChart` on `pages/admin/Overview.jsx`;
-      the product cards and the low stock list already read live data through `useInventorySummary`, which the stats
-      can replace; delete `client/src/data/adminSample.js` once nothing imports it, and the sample data notes
+- [x] **Domain**: `Payment.MarkCashCollected()`, a delivered cash order is paid, and a test
+- [x] **Contracts**: `OrderStatsDto` with `DailySales`, `PaymentMethodSales`, `CategorySales` and `ProductSales`
+- [x] **Service** `OrderService.GetOrderStatsAsync(days)`: `days` 1–365, the revenue rule written once in the domain
+      (`Order.CountsAsRevenue`), one light query for the period's orders grouped by Cairo day in C#, one for what the
+      paid orders sold, and the empty days filled with 0
+- [x] **Controller**: `GET /admin/orders/stats` on `AdminOrdersController`
+- [x] **Tests**: a delivered cash order is the only revenue next to a confirmed cash order, a cancelled one and an
+      unpaid card order, and every breakdown; 30 days with today last; `days=0` is 400; a customer gets 403
+- [x] **Client**: `useOrderStats` feeds `StatCards`, the orders per day chart and the customer count on the overview,
+      and the income page (part F); `client/src/data/adminSample.js` is deleted
+- [x] **Cairo days** (2026-10-27): `Application/Common/ShopTime` turns a UTC moment into its Cairo day and a Cairo day
+      into the UTC moment it starts, summer time included (the day it starts begins at 1 a.m.). The stats and the
+      orders page date filter both use it, with three tests. A constant for now; a `Shop:TimeZone` setting if the shop
+      ever sells in another country
+- [ ] The check by hand: the cards and the charts match the orders page
 
 ### Optional — Users
 
@@ -585,8 +591,7 @@ Use `UserManager` (`AddToRoleAsync` / `RemoveFromRoleAsync`), and refuse to remo
 - [ ] **TanStack Query (React Query)** for every server call: products, cart, orders and the admin lists. It brings
       caching, loading and error state, refetch after a change (restock, cancel) and polling (it replaces the
       3 second timer in `OrderDetail.jsx`). Keep `lib/api/client.js` as the function each query calls; no need for axios.
-- [ ] **Chart.js** (with `react-chartjs-2`) for the dashboard: replace the `div` bars in `components/admin/OrdersChart.jsx`
-      with a bar chart fed by `GET /admin/stats`, then the income page charts (part F).
+- [x] **Chart.js** (with `react-chartjs-2`) for the dashboard, see part F (2026-10-27)
 
 **Done when** every number and button on the dashboard comes from the API (no file left in `client/src/data/admin*`),
 a customer gets 403 on every `/admin` endpoint, and a check by hand of every admin page passes. Tag `v0.3.0`.

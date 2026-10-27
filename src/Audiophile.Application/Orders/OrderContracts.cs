@@ -131,3 +131,31 @@ public sealed record AdminOrderPage(
 }
 
 public sealed record ChangeStatusRequest(OrderStatus Status);
+
+// The business numbers for the admin overview and income pages, every period is whole Cairo days ending today
+// Revenue counts paid orders that were not cancelled, the category and product totals leave the shipping out
+public sealed record OrderStatsDto(
+    int Days,
+    decimal Revenue,
+    decimal PreviousRevenue,
+    int OrderCount,
+    int PaidOrderCount,
+    int ActiveOrders,
+    int CustomerCount,
+    IReadOnlyList<DailySales> PerDay,
+    IReadOnlyList<PaymentMethodSales> ByPaymentMethod,
+    IReadOnlyList<CategorySales> ByCategory,
+    IReadOnlyList<ProductSales> TopProducts,
+    IReadOnlyDictionary<OrderStatus, int> StatusCounts)
+{
+  public const int MaxDays = 365;
+  public const int TopProductCount = 5;
+}
+
+public sealed record DailySales(DateOnly Day, int Orders, decimal Revenue);
+
+public sealed record PaymentMethodSales(PaymentMethod PaymentMethod, int Orders, decimal Revenue);
+
+public sealed record CategorySales(ProductCategory Category, int UnitsSold, decimal Revenue);
+
+public sealed record ProductSales(Guid ProductId, string ProductName, int UnitsSold, decimal Revenue);

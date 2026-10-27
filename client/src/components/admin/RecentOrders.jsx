@@ -7,13 +7,14 @@ import { formatDate, formatPrice, shortId } from '../../lib/format';
 import { PAYMENT_LABELS } from '../../lib/orderHelpers';
 
 // The latest orders on the overview, each opens its order page, the table scrolls sideways on small screens
+// customerCount is everyone who ever placed an order
 const RecentOrders = ({ orders, customerCount, seeAllTo }) => (
 	<section className='card flex flex-col gap-4 overflow-hidden p-6'>
 		<div className='flex items-center justify-between gap-4'>
 			<h2 className='text-[18px]'>Recent orders</h2>
 			<div className='flex items-center gap-4'>
 				<span className='hidden items-center gap-2 text-[13px] text-muted sm:flex'>
-					<Users size={16} /> {customerCount} customers
+					<Users size={16} /> {customerCount ?? '-'} customers
 				</span>
 				{seeAllTo && <SeeAllLink to={seeAllTo} />}
 			</div>

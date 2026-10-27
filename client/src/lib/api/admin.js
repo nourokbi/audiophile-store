@@ -41,6 +41,9 @@ export const adminApi = {
 	// PUT /admin/orders/{id}/status with { status }, only a status in the order's nextStatuses is accepted, any other is a 409
 	changeOrderStatus: (id, status) => api(`/admin/orders/${id}/status`, { method: 'PUT', body: { status } }),
 
+	// GET /admin/orders/stats?days=, revenue for the days and the days before them, active orders, customers, the last seven days
+	getOrderStats: (days) => api(`/admin/orders/stats?days=${days}`),
+
 	// GET /orders/{id}/payment/events, what Fawaterak sent about the order, oldest first
 	listPaymentEvents: (orderId) => api(`/orders/${orderId}/payment/events`),
 

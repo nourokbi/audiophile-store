@@ -58,6 +58,10 @@ public sealed class Order
             ? AllowedNextStatuses[status].Where(s => s != OrderStatus.Confirmed).ToList()
             : AllowedNextStatuses[status];
 
+    // Income is a paid order that was not cancelled, a cancelled paid card order is waiting for its refund
+    public static bool CountsAsRevenue(OrderStatus status, PaymentStatus? paymentStatus) =>
+        status != OrderStatus.Cancelled && paymentStatus == PaymentStatus.Succeeded;
+
     // Creates the order with its payment, copies the address, and takes every item out of stock
     public static Order Place(
         Guid userId,
@@ -121,5 +125,8 @@ public sealed class Order
 
         Status = next;
         UpdatedAt = DateTime.UtcNow;
+
+        if (next == OrderStatus.Delivered && PaymentMethod == PaymentMethod.CashOnDelivery)
+            Payment!.MarkCashCollected();
     }
 }

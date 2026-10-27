@@ -107,15 +107,15 @@ public sealed class OrderService(IAppDbContext db, PaymentService payments, ILog
 
     var query = db.Orders.AsNoTracking();
 
-    // The days are UTC days, and To moves to the start of the next day so its whole day is included
+    // The days are Cairo days, and To moves to the start of the next day so its whole day is included
     if (q.From is { } from)
     {
-      var start = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+      var start = ShopTime.StartOf(from);
       query = query.Where(o => o.CreatedAt >= start);
     }
     if (q.To is { } to)
     {
-      var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+      var end = ShopTime.StartOf(to.AddDays(1));
       query = query.Where(o => o.CreatedAt < end);
     }
 
@@ -184,6 +184,80 @@ public sealed class OrderService(IAppDbContext db, PaymentService payments, ILog
         await db.SaveChangesAsync(ct);
         return AdminOrderDto.From(order);
       });
+
+  // The business over the last days: revenue against the days before, sales per day, payment method, category and
+  // product, and the work still open
+  public async Task<OrderStatsDto> GetOrderStatsAsync(int days, CancellationToken ct)
+  {
+    if (days is < 1 or > OrderStatsDto.MaxDays)
+      throw new ArgumentException($"days must be between 1 and {OrderStatsDto.MaxDays}.");
+
+    // Whole Cairo days ending today, and the same number of days before them to compare with
+    var today = ShopTime.DayOf(DateTime.UtcNow);
+    var firstDay = today.AddDays(1 - days);
+    var periodStart = ShopTime.StartOf(firstDay);
+    var previousStart = ShopTime.StartOf(firstDay.AddDays(-days));
+
+    // One light row per order of both periods, grouped by Cairo day here since the database counts UTC days
+    var placed = await db.Orders.AsNoTracking()
+        .Where(o => o.CreatedAt >= previousStart)
+        .Select(o => new
+        {
+          o.Id,
+          o.CreatedAt,
+          o.Status,
+          o.PaymentMethod,
+          o.TotalAmount,
+          IsRevenue = Order.CountsAsRevenue(o.Status, o.Payment == null ? null : o.Payment.Status),
+        })
+        .ToListAsync(ct);
+    var period = placed.Where(o => o.CreatedAt >= periodStart).ToList();
+    var paid = period.Where(o => o.IsRevenue).ToList();
+    var previousRevenue = placed.Where(o => o.CreatedAt < periodStart && o.IsRevenue).Sum(o => o.TotalAmount);
+
+    // Every day of the period is listed, a day without orders as 0, so a chart never skips a day
+    var byDay = period.ToLookup(o => ShopTime.DayOf(o.CreatedAt));
+    var perDay = Enumerable.Range(0, days)
+        .Select(i => firstDay.AddDays(i))
+        .Select(day => new DailySales(day, byDay[day].Count(), byDay[day].Where(o => o.IsRevenue).Sum(o => o.TotalAmount)))
+        .ToList();
+    var byPaymentMethod = Enum.GetValues<PaymentMethod>()
+        .Select(method => new PaymentMethodSales(
+            method,
+            paid.Count(o => o.PaymentMethod == method),
+            paid.Where(o => o.PaymentMethod == method).Sum(o => o.TotalAmount)))
+        .ToList();
+    var statusCounts = Enum.GetValues<OrderStatus>().ToDictionary(s => s, s => period.Count(o => o.Status == s));
+
+    // What the paid orders sold, the item totals leave the shipping out
+    var paidIds = paid.Select(o => o.Id).ToList();
+    var sold = await db.Orders.AsNoTracking()
+        .Where(o => paidIds.Contains(o.Id))
+        .SelectMany(o => o.OrderItems)
+        .Select(i => new { i.ProductId, i.ProductName, i.Product.Category, i.Quantity, Total = i.UnitPrice * i.Quantity })
+        .ToListAsync(ct);
+    var byCategory = Enum.GetValues<ProductCategory>()
+        .Select(category => new CategorySales(
+            category,
+            sold.Where(i => i.Category == category).Sum(i => i.Quantity),
+            sold.Where(i => i.Category == category).Sum(i => i.Total)))
+        .ToList();
+    var topProducts = sold
+        .GroupBy(i => i.ProductId)
+        .Select(g => new ProductSales(g.Key, g.First().ProductName, g.Sum(i => i.Quantity), g.Sum(i => i.Total)))
+        .OrderByDescending(p => p.Revenue)
+        .Take(OrderStatsDto.TopProductCount)
+        .ToList();
+
+    var activeOrders = await db.Orders.CountAsync(o => ActiveStatuses.Contains(o.Status), ct);
+    var customerCount = await db.Orders.Select(o => o.UserId).Distinct().CountAsync(ct);
+
+    return new OrderStatsDto(days, paid.Sum(o => o.TotalAmount), previousRevenue, period.Count, paid.Count, activeOrders,
+        customerCount, perDay, byPaymentMethod, byCategory, topProducts, statusCounts);
+  }
+
+  private static readonly OrderStatus[] ActiveStatuses =
+      [OrderStatus.Pending, OrderStatus.Confirmed, OrderStatus.Processing, OrderStatus.Shipped];
 
   private IQueryable<Order> OrdersWithDetails() => db.Orders
       .Include(o => o.Payment)

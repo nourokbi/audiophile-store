@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Audiophile.Application.Common;
 using Audiophile.Application.Payments;
 using Audiophile.Domain.Entities;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -68,8 +69,7 @@ public sealed class AdminOrderApiTests
     public async Task An_unpaid_card_order_cannot_be_confirmed_by_hand_but_can_be_cancelled()
     {
         using var baseFactory = new ApiFactory();
-        using var factory = baseFactory.WithWebHostBuilder(builder =>
-            builder.ConfigureTestServices(services => services.AddSingleton<IFawaterakGateway, FakeGateway>()));
+        using var factory = WithFakeGateway(baseFactory);
         var admin = await AdminClientAsync(factory);
         var productId = await CreateProductAsync(admin, stock: 5);
         var orderId = await PlaceOrderAsync(factory, "mona@example.com", productId, quantity: 1, paymentMethod: "Card");
@@ -134,9 +134,59 @@ public sealed class AdminOrderApiTests
         Assert.Equal(1, counts.GetProperty("Cancelled").GetInt32());
         Assert.Equal(0, counts.GetProperty("Pending").GetInt32());
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = ShopTime.DayOf(DateTime.UtcNow);
         Assert.Equal(2, (await ListAsync(admin, $"?from={today:yyyy-MM-dd}&to={today:yyyy-MM-dd}")).GetProperty("totalCount").GetInt32());
         Assert.Equal(0, (await ListAsync(admin, $"?to={today.AddDays(-1):yyyy-MM-dd}")).GetProperty("totalCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task Stats_count_only_paid_orders_that_were_not_cancelled_as_revenue()
+    {
+        using var baseFactory = new ApiFactory();
+        using var factory = WithFakeGateway(baseFactory);
+        var admin = await AdminClientAsync(factory);
+        var productId = await CreateProductAsync(admin, stock: 20); // 1000 each, 50 shipping
+
+        var deliveredId = await PlaceOrderAsync(factory, "mona@example.com", productId, quantity: 1);
+        foreach (var status in new[] { "Processing", "Shipped", "Delivered" })
+            (await ChangeStatusAsync(admin, deliveredId, status)).EnsureSuccessStatusCode();
+        await PlaceOrderAsync(factory, "omar@example.com", productId, quantity: 2);
+        var cancelledId = await PlaceOrderAsync(factory, "sara@example.com", productId, quantity: 3);
+        (await ChangeStatusAsync(admin, cancelledId, "Cancelled")).EnsureSuccessStatusCode();
+        await PlaceOrderAsync(factory, "nour@example.com", productId, quantity: 1, paymentMethod: "Card");
+
+        var response = await admin.GetAsync("/admin/orders/stats");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var stats = await ReadAsync(response);
+        Assert.Equal(1050m, stats.GetProperty("revenue").GetDecimal());
+        Assert.Equal(0m, stats.GetProperty("previousRevenue").GetDecimal());
+        Assert.Equal(4, stats.GetProperty("orderCount").GetInt32());
+        Assert.Equal(1, stats.GetProperty("paidOrderCount").GetInt32());
+        Assert.Equal(2, stats.GetProperty("activeOrders").GetInt32());
+        Assert.Equal(4, stats.GetProperty("customerCount").GetInt32());
+
+        var days = stats.GetProperty("perDay");
+        Assert.Equal(30, days.GetArrayLength());
+        Assert.Equal(ShopTime.DayOf(DateTime.UtcNow).ToString("yyyy-MM-dd"), days[29].GetProperty("day").GetString());
+        Assert.Equal(4, days[29].GetProperty("orders").GetInt32());
+        Assert.Equal(1050m, days[29].GetProperty("revenue").GetDecimal());
+        Assert.Equal(0, days[0].GetProperty("orders").GetInt32());
+
+        var cash = stats.GetProperty("byPaymentMethod").EnumerateArray().Single(m => m.GetProperty("paymentMethod").GetString() == "CashOnDelivery");
+        Assert.Equal(1050m, cash.GetProperty("revenue").GetDecimal());
+        var speakers = stats.GetProperty("byCategory").EnumerateArray().Single(c => c.GetProperty("category").GetString() == "Speakers");
+        Assert.Equal(1, speakers.GetProperty("unitsSold").GetInt32());
+        Assert.Equal(1000m, speakers.GetProperty("revenue").GetDecimal());
+        var topProduct = Assert.Single(stats.GetProperty("topProducts").EnumerateArray());
+        Assert.Equal("Test Speaker", topProduct.GetProperty("productName").GetString());
+        var statusCounts = stats.GetProperty("statusCounts");
+        Assert.Equal(1, statusCounts.GetProperty("Delivered").GetInt32());
+        Assert.Equal(1, statusCounts.GetProperty("Cancelled").GetInt32());
+        Assert.Equal(1, statusCounts.GetProperty("Pending").GetInt32());
+        Assert.Equal(0, statusCounts.GetProperty("Shipped").GetInt32());
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.GetAsync("/admin/orders/stats?days=0")).StatusCode);
     }
 
     [Fact]
@@ -148,9 +198,14 @@ public sealed class AdminOrderApiTests
         var id = Guid.NewGuid();
 
         Assert.Equal(HttpStatusCode.Forbidden, (await customer.GetAsync("/admin/orders")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await customer.GetAsync("/admin/orders/stats")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await customer.GetAsync($"/admin/orders/{id}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await ChangeStatusAsync(customer, id.ToString(), "Shipped")).StatusCode);
     }
+
+    private static WebApplicationFactory<Program> WithFakeGateway(ApiFactory factory) =>
+        factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services => services.AddSingleton<IFawaterakGateway, FakeGateway>()));
 
     // Gives a card order a payment page without calling Fawaterak, nothing else is used by these tests
     private sealed class FakeGateway : IFawaterakGateway

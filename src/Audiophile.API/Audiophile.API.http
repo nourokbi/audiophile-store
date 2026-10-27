@@ -125,6 +125,10 @@ Authorization: Bearer {{login.response.body.$.accessToken}}
 GET {{base}}/admin/orders?status=Confirmed&from=2026-10-01&to=2026-10-31&q=mona&page=1&pageSize=10
 Authorization: Bearer {{login.response.body.$.accessToken}}
 
+### The overview numbers, admin only, days is 1 to 365
+GET {{base}}/admin/orders/stats?days=30
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
 ### One order with its customer, address and items, admin only
 GET {{base}}/admin/orders/{{codOrder.response.body.$.id}}
 Authorization: Bearer {{login.response.body.$.accessToken}}
