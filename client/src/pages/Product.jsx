@@ -2,13 +2,16 @@ import React from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ShoppingBag } from 'lucide-react';
 
-import Picture from '../components/Picture';
-import ProductCard from '../components/ProductCard';
-import QuantityStepper from '../components/QuantityStepper';
+import ProductCard from '../components/shop/ProductCard';
+import Picture from '../components/ui/Picture';
+import QuantityStepper from '../components/ui/QuantityStepper';
 import { useCatalog } from '../context/CatalogContext';
 import { useAddToCart } from '../hooks/useAddToCart';
 import { formatPrice } from '../lib/format';
 import { findCategory } from '../lib/navigation';
+import { isFewLeft, stockLabel } from '../lib/productHelpers';
+
+const RELATED_COUNT = 3;
 
 const Product = () => {
 	const { slug } = useParams();
@@ -24,16 +27,17 @@ const Product = () => {
 	const product = findBySlug(slug);
 	if (!product) return <Navigate to='/' replace />;
 
-	const soldOut = !product.inStock;
+	const isSoldOut = !product.inStock;
 	const category = findCategory(product.category);
 
-	// Three more products, from the same category first
-	const related = [...products]
-		.filter((p) => p.slug !== product.slug)
-		.sort((a, b) => Number(b.category === product.category) - Number(a.category === product.category))
-		.slice(0, 3);
+	// More products, from the same category first
+	const isSameCategory = (otherProduct) => Number(otherProduct.category === product.category);
+	const relatedProducts = products
+		.filter((otherProduct) => otherProduct.slug !== product.slug)
+		.sort((a, b) => isSameCategory(b) - isSameCategory(a))
+		.slice(0, RELATED_COUNT);
 
-	const onAdd = async () => {
+	const addAndResetQuantity = async () => {
 		if (await addToCart(product.id, quantity)) setQuantity(1);
 	};
 
@@ -54,20 +58,16 @@ const Product = () => {
 						<p className='text-[15px] leading-relaxed text-muted'>{product.description}</p>
 						<p className='flex items-baseline gap-4'>
 							<span className='text-[24px] font-bold'>{formatPrice(product.price)}</span>
-							{product.stock > 0 && product.stock <= 5 && (
-								<span className='text-[13px] font-bold text-brand-dark'>Only {product.stock} left</span>
-							)}
+							{isFewLeft(product) && <span className='text-[13px] font-bold text-brand-dark'>{stockLabel(product)}</span>}
 						</p>
 						<div className='flex gap-3'>
 							<QuantityStepper value={quantity} onChange={setQuantity} max={Math.max(1, product.stock)} label={product.name} />
-							<button onClick={onAdd} disabled={soldOut || busy} className='btn-primary'>
+							<button onClick={addAndResetQuantity} disabled={isSoldOut || busy} className='btn-primary'>
 								<ShoppingBag size={18} />
-								{busy ? 'Adding...' : soldOut ? 'Out of stock' : 'Add to cart'}
+								{busy ? 'Adding...' : isSoldOut ? 'Out of stock' : 'Add to cart'}
 							</button>
 						</div>
-						{notice && (
-							<p className={`text-[14px] font-bold ${notice.ok ? 'text-brand-dark' : 'text-red-600'}`}>{notice.text}</p>
-						)}
+						{notice && <p className={`text-[14px] font-bold ${notice.ok ? 'text-brand-dark' : 'text-red-600'}`}>{notice.text}</p>}
 					</div>
 				</section>
 			</div>
@@ -105,8 +105,8 @@ const Product = () => {
 			<section className='flex flex-col gap-10'>
 				<h2 className='text-center text-[24px] md:text-[32px]'>You may also like</h2>
 				<div className='grid grid-cols-1 gap-6 md:grid-cols-3'>
-					{related.map((p) => (
-						<ProductCard key={p.slug} product={p} />
+					{relatedProducts.map((relatedProduct) => (
+						<ProductCard key={relatedProduct.slug} product={relatedProduct} />
 					))}
 				</div>
 			</section>

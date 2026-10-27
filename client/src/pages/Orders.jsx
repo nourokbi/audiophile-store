@@ -2,41 +2,47 @@ import React from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ShoppingBag, User } from 'lucide-react';
 
-import { OrderItems, OrderProgress, StatusBadge } from '../components/OrderParts';
+import OrderItems from '../components/orders/OrderItems';
+import OrderProgress from '../components/orders/OrderProgress';
+import StatusBadge from '../components/orders/StatusBadge';
+import EmptyState from '../components/ui/EmptyState';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../lib/api';
-import { formatPrice, shortId } from '../lib/format';
+import { ordersApi } from '../lib/api/orders';
+import { formatDate, formatPrice, shortId } from '../lib/format';
+import { isActiveOrder, PAYMENT_LABELS } from '../lib/orderHelpers';
 
 const TABS = [
 	{ key: 'all', label: 'All orders', matches: () => true },
-	{ key: 'active', label: 'Active', matches: (o) => !['Delivered', 'Cancelled'].includes(o.status) },
-	{ key: 'delivered', label: 'Delivered', matches: (o) => o.status === 'Delivered' },
-	{ key: 'cancelled', label: 'Cancelled', matches: (o) => o.status === 'Cancelled' },
+	{ key: 'active', label: 'Active', matches: isActiveOrder },
+	{ key: 'delivered', label: 'Delivered', matches: (order) => order.status === 'Delivered' },
+	{ key: 'cancelled', label: 'Cancelled', matches: (order) => order.status === 'Cancelled' },
 ];
 
 // My orders, also where Fawaterak's return redirect lands, which is forwarded to that order's own page
 const Orders = () => {
 	const { user } = useAuth();
-	const [params] = useSearchParams();
-	const fromPayment = params.get('orderId');
+	const [searchParams] = useSearchParams();
+	const paidOrderId = searchParams.get('orderId');
 	const [orders, setOrders] = React.useState(null);
-	const [error, setError] = React.useState('');
-	const [tab, setTab] = React.useState('all');
+	const [loadError, setLoadError] = React.useState('');
+	const [selectedTab, setSelectedTab] = React.useState('all');
 
 	React.useEffect(() => {
-		if (fromPayment) return;
-		api('/orders')
+		if (paidOrderId) return;
+		ordersApi
+			.list()
 			.then(setOrders)
-			.catch((e) => setError(e.message));
-	}, [fromPayment]);
+			.catch((error) => setLoadError(error.message));
+	}, [paidOrderId]);
 
-	if (fromPayment) {
-		const result = params.get('result') ?? 'pending';
-		return <Navigate to={`/orders/${fromPayment}?result=${encodeURIComponent(result)}`} replace />;
+	if (paidOrderId) {
+		const paymentResult = searchParams.get('result') ?? 'pending';
+		return <Navigate to={`/orders/${paidOrderId}?result=${encodeURIComponent(paymentResult)}`} replace />;
 	}
 
-	const shown = orders?.filter(TABS.find((t) => t.key === tab).matches) ?? [];
-	const spent = orders?.filter((o) => o.status !== 'Cancelled').reduce((sum, o) => sum + o.totalAmount, 0) ?? 0;
+	const shownOrders = orders?.filter(TABS.find((tab) => tab.key === selectedTab).matches) ?? [];
+	const totalSpent =
+		orders?.filter((order) => order.status !== 'Cancelled').reduce((sum, order) => sum + order.totalAmount, 0) ?? 0;
 
 	return (
 		<div className='page flex flex-col gap-8 pb-24 pt-10'>
@@ -49,43 +55,37 @@ const Orders = () => {
 			<div className='grid grid-cols-1 items-start gap-8 lg:grid-cols-3'>
 				<div className='flex flex-col gap-6 lg:col-span-2'>
 					<div className='flex flex-wrap gap-2'>
-						{TABS.map((t) => {
-							const count = orders?.filter(t.matches).length ?? 0;
-							return (
-								<button
-									key={t.key}
-									onClick={() => setTab(t.key)}
-									className={`chip rounded-full ${tab === t.key ? 'bg-brand text-white' : 'bg-surface shadow-sm hover:bg-panel'}`}
-								>
-									{t.label} <span className='ml-1 opacity-70'>{count}</span>
-								</button>
-							);
-						})}
+						{TABS.map((tab) => (
+							<button
+								key={tab.key}
+								onClick={() => setSelectedTab(tab.key)}
+								className={`chip rounded-full ${
+									selectedTab === tab.key ? 'bg-brand text-white' : 'bg-surface shadow-sm hover:bg-panel'
+								}`}
+							>
+								{tab.label} <span className='ml-1 opacity-70'>{orders?.filter(tab.matches).length ?? 0}</span>
+							</button>
+						))}
 					</div>
 
-					{error && <p className='card p-6 text-red-600'>{error}</p>}
-					{!orders && !error && <p className='card p-6 text-muted'>Loading your orders...</p>}
+					{loadError && <p className='card p-6 text-red-600'>{loadError}</p>}
+					{!orders && !loadError && <p className='card p-6 text-muted'>Loading your orders...</p>}
 					{orders?.length === 0 && (
-						<div className='card flex flex-col items-center gap-4 p-10 text-center'>
-							<ShoppingBag size={32} className='text-muted' />
-							<p className='text-muted'>You have not placed an order yet.</p>
+						<EmptyState icon={ShoppingBag} text='You have not placed an order yet.'>
 							<Link to='/' className='btn-primary'>
 								Start shopping
 							</Link>
-						</div>
+						</EmptyState>
 					)}
-					{orders?.length > 0 && shown.length === 0 && (
-						<p className='card p-6 text-muted'>No orders in this list.</p>
-					)}
+					{orders?.length > 0 && shownOrders.length === 0 && <p className='card p-6 text-muted'>No orders in this list.</p>}
 
-					{shown.map((order) => (
+					{shownOrders.map((order) => (
 						<article key={order.id} className='card flex flex-col gap-5 p-6'>
 							<div className='flex flex-wrap items-start justify-between gap-3'>
 								<div>
 									<p className='text-[18px] font-bold'>Order #{shortId(order.id)}</p>
 									<p className='text-[13px] text-muted'>
-										{new Date(order.createdAt).toLocaleString()} -{' '}
-										{order.paymentMethod === 'Card' ? 'Card' : 'Cash on delivery'}
+										{formatDate(order.createdAt)} - {PAYMENT_LABELS[order.paymentMethod]}
 									</p>
 								</div>
 								<StatusBadge status={order.status} />
@@ -116,12 +116,12 @@ const Orders = () => {
 					</div>
 					<div className='grid grid-cols-2 gap-3'>
 						<div className='rounded bg-panel p-4'>
-							<p className='text-[11px] font-bold uppercase tracking-wider text-muted'>Orders</p>
+							<p className='field-label text-[11px] text-muted'>Orders</p>
 							<p className='mt-1 text-[22px] font-bold'>{orders?.length ?? '-'}</p>
 						</div>
 						<div className='rounded bg-panel p-4'>
-							<p className='text-[11px] font-bold uppercase tracking-wider text-muted'>Spent</p>
-							<p className='mt-1 text-[16px] font-bold'>{formatPrice(spent)}</p>
+							<p className='field-label text-[11px] text-muted'>Spent</p>
+							<p className='mt-1 text-[16px] font-bold'>{formatPrice(totalSpent)}</p>
 						</div>
 					</div>
 				</aside>

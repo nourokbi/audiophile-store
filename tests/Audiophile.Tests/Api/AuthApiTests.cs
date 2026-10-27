@@ -124,10 +124,10 @@ public sealed class AuthApiTests
         };
 
         Authorize(client, (await RegisterAsync(client, "mona@example.com")).Access);
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/products", product)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/admin/products", product)).StatusCode);
 
         Authorize(client, (await LoginAsync(client, ApiFactory.AdminEmail, ApiFactory.AdminPassword)).Access);
-        var created = await client.PostAsJsonAsync("/products", product);
+        var created = await client.PostAsJsonAsync("/admin/products", product);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
         var body = await ReadAsync(created);

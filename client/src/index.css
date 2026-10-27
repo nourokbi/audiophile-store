@@ -35,7 +35,7 @@
 	}
 
 	body {
-		@apply bg-page text-ink font-sans antialiased;
+		@apply bg-page font-sans text-ink antialiased;
 	}
 
 	h1,
@@ -64,6 +64,14 @@
 		@apply text-[12px] font-bold uppercase tracking-[0.25em] text-brand-dark;
 	}
 
+	.field-label {
+		@apply text-[12px] font-bold uppercase tracking-wider;
+	}
+
+	.error-text {
+		@apply text-[14px] font-bold text-red-600;
+	}
+
 	.title {
 		@apply text-[32px] leading-tight tracking-tight md:text-[40px];
 	}
@@ -78,10 +86,6 @@
 
 	.btn-secondary {
 		@apply btn bg-panel text-ink hover:bg-panel-strong;
-	}
-
-	.btn-dark {
-		@apply btn bg-ink text-page hover:opacity-90;
 	}
 
 	.input {

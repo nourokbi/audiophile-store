@@ -27,12 +27,13 @@ A finished, deployed project beats a bigger unfinished one on a CV.
 
 ---
 
-## Where we are now (2026-10-18)
+## Where we are now (2026-10-25)
 
-**Phase 1 is done** (`v0.2.0`). A customer can sign up, fill a cart from the home page, check out, pay by card on
-Fawaterak (staging), watch the order turn *Confirmed* when the webhook arrives, and cancel an unpaid order.
-Two checkouts for the last unit give one order and one 409. 37 tests pass on PostgreSQL, in GitHub Actions on
-every push and pull request.
+**Phase 1 is done** (`v0.2.0`) and the **shop is redesigned** from the Stitch project (PR #6): light and dark theme,
+22 products in five categories, filters and pagination, a cart page, checkout with saved addresses, order tracking
+and cancel. **Phase 5 is half done**: the dashboard has its own layout with a side menu and four pages, the products
+page is finished end to end, and the orders pages run on the admin orders API.
+62 tests pass on PostgreSQL, in GitHub Actions on every push and pull request.
 
 | Phase | Status |
 |---|---|
@@ -40,19 +41,42 @@ every push and pull request.
 | 1 Checkout + concurrency | ✅ done: checkout from the cart, `xmin` + one retry, cancel, order tests, CI |
 | 2 Pluggable payments | 🟡 Fawaterak is on (card only) and tested for real; **the pluggable design and fake-gateway tests left** |
 | 3 Login, roles, addresses | ✅ done |
-| 4 React client | 🟡 redesigned from Stitch (light theme, Lucide icons) with every customer page; **guest cart, httpOnly cookie left** |
-| 5 Admin dashboard | ⬜ not started |
+| 4 React client | ✅ every customer page, redesigned from Stitch with a dark theme; **guest cart and httpOnly cookie left** |
+| 5 Admin dashboard | 🟡 every page done end to end; **the check by hand and `v0.3.0` are next** (branch `phase-5/admin-api`) |
 | 6 Caching + messaging | ⬜ not started |
 | 7 Docker, CI, deploy | ⬜ not started (AWS was considered; the VPS + Neon plan still stands) |
 
 ### Next up, in this order
 
-One branch and one PR each.
+Phase 5 is worked on the branch `phase-5/admin-api`, one commit per endpoint that works end to end (API, test and
+the dashboard connected). How to build each step, with hints and code sketches, is in Phase 5 below.
 
-1. **Phase 2**: `IPaymentGateway` + keyed services + resolver, one webhook route `POST /payments/{provider}/webhook`,
-   `Payments:Enabled`, `FakePaymentGateway` tests. Optionally bring wallet or Fawry back as a second strategy.
-2. **Phase 4 leftovers**: guest cart (merged on login), refresh token in an httpOnly cookie.
-3. Then Phases 5 → 6 → 7.
+**Done**
+
+- ✅ Step 0, the shared stock retry
+- ✅ Step 1, admin products: list with filters (search, category, availability, low stock, sort), add, **edit**,
+  restock, price, show and hide, every action from the dashboard, and the shop updates without a refresh
+- ✅ Client cleanup, the account dropdown, and the dashboard frame (sticky side menu that folds into icons)
+- ✅ Step 2, admin orders: the list with status, date and search filters and a count per status, one order, and the
+  status controls, connected to the orders pages and the recent orders on the overview (2026-10-27)
+- ✅ The payment panel on the order page: messages from Fawaterak, *Sync with gateway*, *Refund needed* (2026-10-27)
+- ✅ Step 3, the overview numbers: revenue against the period before, active orders, customers, orders per day,
+  and a delivered cash order now counts as paid (2026-10-27)
+- ✅ Part F, the income page: Chart.js charts for revenue and orders per day, revenue by category, top products,
+  payment method and status, for 7, 30, 90 days or a year, all on Cairo days (2026-10-27)
+
+**You build next** (the client is ready and waits for these)
+
+1. **The check by hand** of every admin page, then tag `v0.3.0` and merge `phase-5/admin-api`.
+2. **React Query** across the client, now that every list has an API.
+3. Then Phase 4 leftovers (guest cart, httpOnly cookie), Phase 2 (pluggable payments, kept as a later refactor),
+   and Phases 6 → 7.
+
+**Still missing in Phase 5** (each one is a box further down)
+
+- The check by hand in the browser: orders, the overview and the income page
+- Income: the API and the charts
+- Products, optional: uploading a photo instead of typing a URL
 
 Dropped: `POST /orders/preview`. `GET /cart` already returns the totals the order will use.
 
@@ -226,42 +250,351 @@ chain, not every session) are a possible refinement; revoking everything is the 
 
 Same React app, under `/admin`, behind a route guard that checks the `Admin` role.
 
-- [x] The page itself (2026-10-19): stat cards, orders chart, low stock, recent orders with *Export CSV*, and the
-      product table with *Restock*, *Price* and an *Available* switch on every row. Products are live; revenue, the
-      chart and recent orders are sample data in `client/src/data/adminSample.js`, and the product actions only
-      change the page, until the endpoints below exist
+- [x] The page itself (2026-10-19), since split into `/admin` (overview), `/admin/products`, `/admin/orders`,
+      `/admin/orders/:id` and `/admin/income` inside `AdminLayout` (2026-10-25)
 
-### The admin API the dashboard is waiting for (next step)
+### How to work through this phase
 
-Every call the dashboard makes is in `client/src/lib/adminApi.js`. Build these, then replace each function body
-there with its `api(...)` call and set `ADMIN_API_CONNECTED = true`:
+1. Stay on the branch `phase-5/admin-api`. Commit after every endpoint that works, open the pull request at the end.
+2. Inside each step, build **one endpoint end to end** before starting the next, always in this order:
+   **entity → contracts → service → controller → test → client**. Start with the hardest one of the step.
+3. Try every endpoint by hand in `src/Audiophile.API/Audiophile.API.http` (log in as `admin@admin.com`, copy the
+   token), then write its test.
+4. After each step: `dotnet test` is green, then ask for a review (*"review my changes"*), then tick the boxes here.
 
-| Endpoint | Used by | Notes |
+### Rules for every admin endpoint
+
+- **Logic lives in the entity's own service, not in an `AdminService`**: product actions go in `ProductService`,
+  order actions in `OrderService`. Who calls a method (shop or admin) does not decide where it lives; only a job
+  with no home of its own, like the dashboard stats, gets a new service.
+- **One controller per area** in `src/Audiophile.API/Controllers/`: `AdminProductsController` (`[Route("admin/products")]`),
+  `AdminOrdersController`, `AdminStatsController`, each with `[Authorize(Roles = Roles.Admin)]` on the class. Keep
+  the `_productsService` naming. Each action is one line that calls one service method.
+- **Rules stay in the entities** (`Product.Restock`, `Order.ChangeStatus`); the services only load, call and save.
+- **Errors are already mapped** in `GlobalExceptionHandler`, so just throw:
+  `NotFoundException` → 404, `ArgumentException` (what `Guard` throws) → 400,
+  `ConflictException` and `InvalidOperationException` (what `ChangeStatus` throws) → 409.
+- **Reads** are `AsNoTracking` projections straight into DTOs (`.Select(p => new ProductDto(...))`), and every
+  list is paged with the `PagedResult<T>` from `Products/ProductContracts.cs`.
+- **Stock changes** (restock, admin cancel) go through the `xmin` retry, because a restock and a checkout can touch
+  the same product at once.
+- **Tests**: every endpoint gets an HTTP test as the admin and one that a customer gets **403**.
+- **Client**: every dashboard call lives in `client/src/lib/api/admin.js`, built on `api(path, { method, body })`
+  from `lib/api/client.js`. Shop calls live next to it in `lib/api/` (`auth`, `cart`, `products`, `orders`, `addresses`).
+- **Order rules on the client** live in `client/src/lib/orders.js` (`canCancel`, `isActiveOrder`, `PAYMENT_LABELS`), so the
+  shop and the dashboard never write the same status list twice.
+
+### Step 0 — Move the stock retry where both services can use it
+
+`RetryOnStockConflictAsync` is private inside `OrderService` (`Orders/OrderService.cs`), and restock needs it too.
+
+- [x] Move it to `src/Audiophile.Application/Common/StockConflictRetry.cs` as an extension on `IAppDbContext`
+- [x] `OrderService` calls the shared one, and its tests still pass
+
+```csharp
+// Runs the work once more on fresh data when another request changed the same stock, a second conflict becomes a 409
+public static class StockConflictRetry
+{
+  public static async Task<T> RetryOnStockConflictAsync<T>(this IAppDbContext db, Func<Task<T>> work)
+  {
+    try { return await work(); }
+    catch (DbUpdateConcurrencyException)
+    {
+      db.ChangeTracker.Clear();      // forget the stale product so the second try reads the new stock
+      return await work();
+    }
+  }
+}
+// Usage: return db.RetryOnStockConflictAsync(async () => { ...load, change, save... });
+```
+
+`IAppDbContext` already exposes `ChangeTracker`. The log line can move with it (pass an `ILogger`) or stay in the caller.
+
+### Step 1 — Admin products API (UC-11) · ✅ done 2026-10-25
+
+| Endpoint | Body | Answer | Used by |
+|---|---|---|---|
+| `GET /admin/products?page=&pageSize=` | | Page of products **including hidden ones** | Product table |
+| `GET /admin/products/search?q=&page=` | | Search, also with hidden ones | Table search box |
+| `POST /admin/products/{id}/restock` | `{ quantity }` | The product | *Restock* button |
+| `PUT /admin/products/{id}/price` | `{ price }` | The product | *Price* button |
+| `PUT /admin/products/{id}/availability` | `{ isActive }` | The product | *Available* switch |
+
+Moved to `AdminProductsController` (done 2026-10-25): `POST /admin/products` (create), `PUT /admin/products/{id}`
+(edit every field), `DELETE /admin/products/{id}` (hide), so every admin URL starts with `/admin` and
+`ProductsController` only browses. The dashboard's disabled *Add product* button uses `POST /admin/products` in this step.
+
+**Build it in this order**
+
+- [x] **Entity**: add `public void Activate() => IsActive = true;` to `Product.cs`, next to `Deactivate()`
+- [x] **List and search** (done 2026-10-22, moved 2026-10-25): search has its own `GET /products/search?q=`, the shop's
+      list and search show only products on sale, and `GET /admin/products` and `/admin/products/search` call the same
+      `ProductService` methods with hidden products included. `ProductDto` has `isActive` and `createdAt`, so every
+      admin answer uses the same `ProductDto`
+- [x] **Contracts** in `Products/ProductContracts.cs`, only the three request bodies:
+
+  ```csharp
+  public sealed record RestockRequest(int Quantity);
+  public sealed record ChangePriceRequest(decimal Price);
+  public sealed record SetAvailabilityRequest(bool IsActive);
+  ```
+
+- [x] **Service**: the three methods live in `ProductService` (no separate admin service)
+  - [x] `SetAvailabilityAsync` returns the product, and `DELETE /admin/products/{id}` calls it with `false`
+  - [x] `FindAnyAsync(id)` looks a product up **without** the `IsActive` check, so the admin reaches hidden ones
+  - [x] `RestockAsync` (needs the retry), then `ChangePriceAsync`
+
+  ```csharp
+  public Task<ProductDto> RestockAsync(Guid id, int quantity, CancellationToken ct) =>
+      db.RetryOnStockConflictAsync(logger, async () =>
+      {
+        var product = await FindAnyAsync(id, ct);
+        product.Restock(quantity);            // Guard throws for quantity below 1, which becomes a 400
+        await db.SaveChangesAsync(ct);
+        return ProductDto.From(product);
+      });
+  ```
+
+- [x] **Controller** `AdminProductsController.cs` holds every `/admin/products` route and calls `ProductService`:
+
+  ```csharp
+  [ApiController]
+  [Route("admin/products")]
+  [Authorize(Roles = Roles.Admin)]
+  public sealed class AdminProductsController(ProductService _productsService) : ControllerBase
+  {
+    [HttpPost("{id:guid}/restock")]
+    public async Task<IActionResult> Restock(Guid id, RestockRequest request, CancellationToken ct) =>
+        Ok(await _productsService.RestockAsync(id, request.Quantity, ct));
+  }
+  ```
+
+- [x] **Tests** in `tests/Audiophile.Tests/Api/AdminProductApiTests.cs` (copy the login and `CreateProductAsync`
+      helpers from `OrderApiTests`, the admin logs in with `ApiFactory.AdminEmail` / `AdminPassword`):
+  - restock 5 on a product with 3 gives 8
+  - a product hidden with `availability false` is gone from `GET /products`, still in
+    `GET /admin/products`, and comes back when set to `true`
+  - quantity 0 and price 0 give 400, an unknown id gives 404
+  - a customer gets 403 on all three endpoints
+- [x] **Client**, in this order, run the API and `npm run dev` and check the page after each box:
+  - [x] **1. Calls** `client/src/lib/adminApi.js`: give every function a real body with `api(path, { method, body })`
+        and add `listProducts(page)`, `searchProducts(q, page)` and `createProduct(body)`
+    `` restock: (id, quantity) => api(`/admin/products/${id}/restock`, { method: 'POST', body: { quantity } }) ``
+  - [x] **2. One product shape**: `export` `toProduct` from `CatalogContext.jsx`, add `isActive: p.isActive` to it, and use
+        `p.isActive` in `AdminProducts.jsx` where it says `p.available`
+  - [x] **3. The table loads its own data** `AdminDashboard.jsx`: a `products` state filled from
+        `adminApi.listProducts(page)` (`GET /admin/products`, already mapped with `toProduct`), so hidden products show up; `useCatalog`, the `changes`
+        state and the `catalog.map(...)` line go away
+  - [x] **4. Trust the server's answer** `AdminProducts.jsx`: `run(product, call)` keeps only `call`, and the product the API
+        sends back replaces that row, `onChange(toProduct(await call()))`; the `patch` arguments go away
+  - [x] **5. Paging and search**: *Previous* and *Next* under the table from `page` and `totalPages`, and a search box that
+        calls `searchProducts` about 300 ms after the last key
+  - [x] **6. Add product**: enable the button, a `Dialog` with the `ProductRequest` fields that calls `createProduct`, and the
+        400 message shown inside the dialog
+  - [x] **7. Switch off the placeholders**: delete `ADMIN_API_CONNECTED` and its sentence in the banner
+  - [x] **8. Check by hand** (passed 2026-10-25): restock, change a price, hide a product (gone from the shop, faded in the table), show it again,
+        add a product, and refresh the page to see every change was saved. After the client cleanup also click through
+        the shop once: home filters and pages, a product, the cart, checkout with a new address, my orders, settings
+  - [x] **9. Edit product**: an *Edit* button on every row opens the same dialog filled in, and saves with
+        `PUT /admin/products/{id}`
+
+- [x] **Decided** (2026-10-25): `PUT /admin/products/{id}` uses `FindAnyAsync`, so the admin can edit a hidden product
+      and show it when it is ready. Only `GET /products/{id}` keeps `FindActiveAsync`.
+- [x] **Fixed** (2026-10-25): the edit took the stock from the request, so a form opened before a checkout would put
+      the old number back. The edit now has its own `UpdateProductRequest` without stock (stock only moves through
+      restock and orders), and `inTheBox` left out keeps the box as it is. A test covers both
+- [x] *In the box* in the add and edit dialog (2026-10-25): one row per item with its quantity and name, *Add an item*
+      and a remove button per row, filled in on edit; empty rows are skipped, a missing name, a quantity under 1 or the
+      same item twice is refused before saving
+- [ ] Optional: a photo upload instead of the URL field
+
+### Client cleanup (done 2026-10-25)
+
+- [x] Folders: `components/layout`, `components/ui`, `components/shop`, `components/checkout`, `components/orders`,
+      `components/admin`; every API call in `lib/api/`; `toProduct`, `productPath` and `stockLabel` in `lib/products.js`
+- [x] Shared pieces: `PriceSummary`, `Switch`, `Select`, `TextArea`, `EmptyState`, `AddressLines`, and the
+      `.field-label` and `.error-text` classes in `index.css`
+- [x] Big pages split: `Home` into `Hero`, `ShopFilters`, `PromiseStrip` and the `useShopFilters` hook; `Checkout` into
+      `AddressPicker`, `AddressForm` and `PaymentPicker`; `useAddresses` for checkout and settings
+- [x] `useAuth()` returns `isAdmin`, and `<RequireAuth adminOnly />` guards `/admin`
+- [x] Fixes: the shop loads every page of products (it stopped at 50), a catalogue error clears after a load that
+      works, free shipping reads `SHIPPING.freeFrom`, pagination shows `1 ... 4 5 6 ... 20`, the dashboard code loads
+      only on `/admin`
+- [x] `client/.prettierrc` (tabs, single quotes, width 130, `endOfLine: auto` so each file keeps its line endings)
+
+### Dashboard redesign (planned 2026-10-25)
+
+What changes, in the order to build it. Each part says which API it needs.
+
+| # | Part | Backend | Client |
+|---|---|---|---|
+| A | Account dropdown | none | `AccountMenu` replaces `UserDrawer` in the navbar |
+| B | Dashboard frame | none | `AdminLayout` with a side menu, nested routes under `/admin` |
+| C | Products page | filters on `GET /admin/products` | `/admin/products` with filters and paging |
+| D | Orders page | Step 2 below, plus counts per status | `/admin/orders`, `/admin/orders/:id`, status controls |
+| E | Overview | Step 3 below, whole business numbers | `/admin` cards and previews |
+| F | Income page | `GET /admin/orders/stats` | `/admin/income` with Chart.js |
+
+**A. Account dropdown** (done 2026-10-25)
+- [x] `components/layout/AccountMenu.jsx`: a small menu under the user icon (My orders, Settings, Admin dashboard for
+      admins, the theme switch, Log out; Log in and Create account for visitors). It closes on a click outside or on Escape
+- [x] Delete `UserDrawer.jsx` once nothing imports it
+
+**B. Dashboard frame** (done 2026-10-25)
+- [x] `components/admin/AdminLayout.jsx`: the side menu that used to be the drawer (Overview, Products, Orders, Income),
+      sticky on the left under the header, the page on the right with `<Outlet />`. *Collapse* folds it into a bar of
+      icons and the choice is remembered in the browser; on a phone it always stays folded
+- [x] Routes in `App.jsx` under `<RequireAuth adminOnly />`: `/admin` (overview), `/admin/products`, `/admin/orders`,
+      `/admin/orders/:id`, `/admin/income`, each page loaded with `React.lazy`
+- [x] `pages/admin/` holds one page per route; `AdminDashboard.jsx` became `pages/admin/Products.jsx` and
+      `pages/admin/Overview.jsx` holds the cards and previews. Orders and Income show the sample data until their API exists
+- [x] The overview's *Products on sale* and *Low stock* cards and the low stock preview already count the whole
+      catalogue, from two small filtered pages of `GET /admin/products` (`useInventorySummary`), until Step 3
+
+**C. Products page** (done 2026-10-25)
+- [x] **Backend**: `GET /admin/products` takes `q`, `availability=All|OnSale|Hidden`, `lowStockOnly=true` and
+      `sort=Name|Newest|PriceLowToHigh|PriceHighToLow|StockLowToHigh`, all in `ProductQuery` (admin only, the shop
+      ignores them), `ProductQuery.LowStockLimit = 8` is the one low stock number, and two tests cover them
+- [x] **Client**: a filter bar above `ProductsTable` (category, availability, low stock only, sort, search), every filter
+      in the URL (`useSearchParams`) so a refresh keeps it, and the *Add product* button moves here
+
+**D. Orders page**: Step 2 below, plus
+- [x] **Backend**: the order list answer also carries `statusCounts` (`{ Pending: 3, Confirmed: 5, ... }`) for the
+      filtered dates, so the page shows the numbers without a second call
+- [x] **Order phases have their own logic**: the API decides the allowed moves (`Order.NextStatuses`) and every admin
+      order answer carries `nextStatuses`. The client never guesses: `lib/orderHelpers.js` only labels them, and
+      `components/admin/OrderStatusControl.jsx` draws one button per entry, with a confirm step for *Cancelled*
+- [x] **Client layout** (2026-10-25, on sample data): `useAdminOrders` and `useAdminProducts` share `useUrlFilters`;
+      `/admin/orders` has `OrderStatusTabs` with counts, `OrderFilters` (search, from and to dates), `OrdersTable` with a
+      quick *next step* button per row and *Export CSV*; `/admin/orders/:id` has the progress, items, customer, address,
+      `OrderStatusControl` and a `ConfirmDialog` before *Cancel*. The orders come from `data/adminOrdersSample.js`, a
+      pretend server with the planned answers (`statusCounts`, `nextStatuses`, a 409 for an illegal move)
+- [x] **Connect it** (2026-10-27): `listOrders`, `getOrder` and `changeOrderStatus` in `lib/api/admin.js`, the three
+      hooks read `adminApi`, and `data/adminOrdersSample.js` is deleted
+- [x] The payment panel on the order page (2026-10-27): `components/admin/PaymentPanel.jsx` with `usePaymentPanel`,
+      the messages from Fawaterak newest first with the raw message folded, *Sync with gateway* for card orders (then
+      the order is read again), and a *Refund needed* note on a cancelled order whose payment is still `Succeeded`
+
+**E. Overview**: Step 3 below, and
+- [ ] The four cards count the **whole business**, never the page in view: products on sale, active orders, low stock
+      products, revenue in the last 30 days. `AdminStatsDto` gets `ProductCount` and `LowStockCount`
+- [ ] Previews under the cards, each with a *See all* link to its page: the last 5 orders, the 5 lowest stock
+      products, orders this week
+- [x] `client/src/data/adminSample.js` is deleted
+
+**F. Income page** (last) · ✅ done 2026-10-27
+- [x] **Backend**: the same `GET /admin/orders/stats?days=` grew instead of a second endpoint: revenue and orders for
+      every day of the period, by payment method, by category, the top 5 products, and the statuses
+- [x] **Client**: Chart.js 4 with `react-chartjs-2` 5, only the pieces used registered in `lib/charts.js`.
+      `components/charts/` has `BarChart`, `LineChart` and `ChartCard` (title, summary, and *Show the numbers* as a
+      table). Every chart is one series in the brand orange (`#d87d4a`, `#c96f3e` on the dark card, both validated),
+      one axis, a tooltip on hover. The income page has a period switch (7, 30, 90 days, a year) kept in the URL
+
+### Step 2 — Admin orders API (UC-12, UC-13, UC-14) · ✅ done 2026-10-27, except the check by hand
+
+| Endpoint | Body | Answer | Used by |
+|---|---|---|---|
+| `GET /admin/orders?status=&from=&to=&q=&page=&pageSize=` | | Page of orders, newest first, with the customer's name and email, plus `statusCounts` | Orders page, recent orders on the overview, *Export CSV* |
+| `GET /admin/orders/{id}` | | The order with its customer, shipping address, items and payment | Order details page |
+| `PUT /admin/orders/{id}/status` | `{ status }` | The order | *Next status* buttons |
+
+Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{id}/payment/sync` for the payment panel.
+
+**The answers** the client reads:
+
+- **Summary** in the list: `id, createdAt, updatedAt, customerName, customerEmail, status, paymentMethod,
+  paymentStatus, subTotal, shippingFee, totalAmount, itemCount` (the sum of the quantities) and `nextStatuses`
+- **One order**: the summary plus `shipping { fullName, phone, street, city, country, postalCode }` and
+  `items [{ productId, productName, productImageUrl, unitPrice, quantity, lineTotal }]`
+- **The list page**: `{ items, page, pageSize, totalCount, totalPages, statusCounts }`. `statusCounts` counts every
+  status for the search and dates but **ignores the status filter**, so every tab keeps its number
+- `q` searches the customer's name and email, and an order number typed from its start (the first 8 characters shown)
+- `from` and `to` are days like `2026-10-25`, and `to` includes the whole day
+
+**Build it in this order**
+
+- [x] **Entity**: `Order.NextStatuses`, and `Order.NextStatusesFor(status)` that the list query calls with only the
+      status column
+- [x] **Contracts** in `Orders/OrderContracts.cs`: `AdminOrderQuery(Status, From, To, Search, Page, PageSize)`,
+      `AdminOrderSummaryDto` and `AdminOrderDto` with the fields above, `AdminOrderPage` (the paged list plus
+      `StatusCounts`), and `ChangeStatusRequest(OrderStatus Status)`
+- [x] **Service**: the admin order methods go in `OrderService`:
+  - `ListAllOrdersAsync`: `db.Orders.AsNoTracking()`, filter by status, `CreatedAt >= from` and `< to.AddDays(1)`, search on
+    `o.User.Name` / `o.User.Email`, `OrderByDescending(o => o.CreatedAt)`, page, then `Select` into the summary.
+    Sum the quantities with `o.OrderItems.Sum(i => i.Quantity)` inside the projection so it stays one SQL query.
+    `StatusCounts`: the same query without the status filter, `GroupBy(o => o.Status).Select(g => new { g.Key, Count = g.Count() })`
+  - `GetAnyOrderAsync`: include `User`, `Payment`, `OrderItems.Product`, 404 when missing
+  - `ChangeOrderStatusAsync` **first** in this step:
+
+    ```csharp
+    public Task<AdminOrderDto> ChangeOrderStatusAsync(Guid id, OrderStatus next, CancellationToken ct) =>
+        db.RetryOnStockConflictAsync(logger, async () =>
+        {
+          var order = await OrderWithDetailsAsync(id, ct);
+          if (next == OrderStatus.Cancelled)
+            order.Cancel();                  // puts the stock back and fails a pending payment
+          else
+            order.ChangeStatus(next);         // an illegal move throws InvalidOperationException, which becomes a 409
+          await db.SaveChangesAsync(ct);
+          return AdminOrderDto.From(order);
+        });
+    ```
+
+  - **Decided** (2026-10-27): a cash order is already Confirmed when it is placed, so only card orders are ever Pending.
+    `Order` itself keeps `Confirmed` out of a card order's `nextStatuses` until its payment succeeded, so the page shows
+    no *Confirm* button and the API answers 409; the webhook or *Sync with gateway* confirms it.
+    The admin **can** cancel a paid card order, the page warns first and the refund is made by hand on Fawaterak
+- [x] **Controller** `AdminOrdersController` with `[Route("admin/orders")]`
+- [x] **Tests** `AdminOrderApiTests.cs` (7): Confirmed → Processing → Shipped → Delivered works, a status that is not
+      next is 409, an unpaid card order cannot be confirmed but can be cancelled (with a fake gateway), admin cancel
+      puts the stock back, one order has its address and items, the list filters by status, search and dates and
+      counts every status, a customer gets 403
+- [x] **Client pages**: built on sample data, see part D of *Dashboard redesign* above
+- [x] **Client, connect it**: see part D
+- [x] The payment panel (part D)
+- [ ] The check by hand: filter, open an order, walk it to Delivered, cancel one, sync a card order
+
+### Step 3 — Admin stats API (UC-15) · ✅ done 2026-10-27, except the check by hand
+
+| Endpoint | Answer | Used by |
 |---|---|---|
-| `GET /admin/products` | Product table | All products **including hidden ones** (`GET /products` only lists active ones), paged |
-| `POST /admin/products/{id}/restock` `{ quantity }` | *Restock* button | `Product.Restock`, answer with the product |
-| `PUT /admin/products/{id}/price` `{ price }` | *Price* button | `Product.ChangePrice` |
-| `PUT /admin/products/{id}/availability` `{ isActive }` | *Available* switch | `Product.Activate` (add it back to the entity) / `Deactivate` |
-| `GET /admin/stats` | Stat cards and the orders chart | Revenue for 30 days, active orders, orders per day for the last 7 days |
-| `GET /admin/orders?status=&from=&to=&page=` | Recent orders and *Export CSV* | Paged, newest first, with the customer's name |
-| `PUT /admin/orders/{id}/status` `{ status }` | Order details (next) | `Order.ChangeStatus`, the state machine refuses illegal moves |
+| `GET /admin/orders/stats?days=30` | Revenue for the period and the one before, orders placed and paid, active orders, customers, every day of the period, payment method, category, top products, statuses | Stat cards, the orders chart, customer count, the income page |
 
-All under `[Authorize(Roles = Roles.Admin)]`, with HTTP tests that a customer gets 403.
+**Decided** (2026-10-27): the stats are order numbers, so they live in `OrderService` and `AdminOrdersController`, not
+in a separate stats service. The product cards and the low stock list keep reading the products API through
+`useInventorySummary`. A cash order's payment becomes `Succeeded` when it is delivered (`Payment.MarkCashCollected`,
+called by `Order.ChangeStatus`), so revenue has one rule: **paid and not cancelled**.
+
+- [x] **Domain**: `Payment.MarkCashCollected()`, a delivered cash order is paid, and a test
+- [x] **Contracts**: `OrderStatsDto` with `DailySales`, `PaymentMethodSales`, `CategorySales` and `ProductSales`
+- [x] **Service** `OrderService.GetOrderStatsAsync(days)`: `days` 1–365, the revenue rule written once in the domain
+      (`Order.CountsAsRevenue`), one light query for the period's orders grouped by Cairo day in C#, one for what the
+      paid orders sold, and the empty days filled with 0
+- [x] **Controller**: `GET /admin/orders/stats` on `AdminOrdersController`
+- [x] **Tests**: a delivered cash order is the only revenue next to a confirmed cash order, a cancelled one and an
+      unpaid card order, and every breakdown; 30 days with today last; `days=0` is 400; a customer gets 403
+- [x] **Client**: `useOrderStats` feeds `StatCards`, the orders per day chart and the customer count on the overview,
+      and the income page (part F); `client/src/data/adminSample.js` is deleted
+- [x] **Cairo days** (2026-10-27): `Application/Common/ShopTime` turns a UTC moment into its Cairo day and a Cairo day
+      into the UTC moment it starts, summer time included (the day it starts begins at 1 a.m.). The stats and the
+      orders page date filter both use it, with three tests. A constant for now; a `Shop:TimeZone` setting if the shop
+      ever sells in another country
+- [ ] The check by hand: the cards and the charts match the orders page
+
+### Optional — Users
+
+`GET /admin/users` and `PUT /admin/users/{id}/role` for the Stitch *Users & Roles* screen, if there is time.
+Use `UserManager` (`AddToRoleAsync` / `RemoveFromRoleAsync`), and refuse to remove the Admin role from yourself.
 
 ### Do not forget, after the admin API exists
 
 - [ ] **TanStack Query (React Query)** for every server call: products, cart, orders and the admin lists. It brings
       caching, loading and error state, refetch after a change (restock, cancel) and polling (it replaces the
-      3 second timer in `OrderDetail.jsx`). Keep `lib/api.js` as the function each query calls; no need for axios.
-- [ ] **Chart.js** (with `react-chartjs-2`) for the dashboard: replace the `div` bars of *Orders this week* in
-      `AdminDashboard.jsx` with a bar chart fed by `GET /admin/stats`, then add revenue over time and sales by category.
+      3 second timer in `OrderDetail.jsx`). Keep `lib/api/client.js` as the function each query calls; no need for axios.
+- [x] **Chart.js** (with `react-chartjs-2`) for the dashboard, see part F (2026-10-27)
 
-- [ ] Products: table, create / edit / deactivate, set stock and price (UC-11)
-- [ ] Orders: table with filter by status and date, paged (UC-12)
-- [ ] Order details: items, customer, payment, the *next status* buttons the state machine allows (UC-13)
-- [ ] Payment panel: the event log and a *Sync with gateway* button (UC-14)
-- [ ] Overview cards: today's sales, orders by status, low-stock products (UC-15)
-- [ ] API side: `/admin/products`, `/admin/orders`, `/admin/stats`, all paged, all `AsNoTracking` projections
+**Done when** every number and button on the dashboard comes from the API (no file left in `client/src/data/admin*`),
+a customer gets 403 on every `/admin` endpoint, and a check by hand of every admin page passes. Tag `v0.3.0`.
 
 ## Phase 6 — Caching + messaging · 1 week
 
@@ -289,6 +622,50 @@ All under `[Authorize(Roles = Roles.Admin)]`, with HTTP tests that a customer ge
 - [ ] Health checks (`/health` checks the DB, Redis and RabbitMQ); structured logs (Serilog)
 - [ ] README: live link, screenshots, architecture diagram, *"hard problems and how I solved them"*, how to run
 - [ ] Make the repo public, pin it on your GitHub profile, add it to your CV
+
+**Load and security testing (before going public)**
+
+Run these against the deployed server, or one like it, never the dev laptop, so the numbers mean something.
+
+- [ ] **k6** scripts in `tests/load/`: `products.js` (browse the shop) and `checkout.js` (many users buy the same
+      product at once, so the `xmin` retry and the database connections are under pressure)
+- [ ] Find the capacity: raise the virtual users step by step (100, 200, 500) until p95 goes over 500 ms or errors
+      go over 1%; the last step that passed is how many users the site handles. Put the numbers in the README
+- [ ] Rate limiting with ASP.NET Core's `AddRateLimiter` on `/auth/login`, `/auth/register` and checkout, answering
+      429 when one IP sends too many requests
+- [ ] Lock an account for a few minutes after repeated failed logins (Identity `LockoutOptions`)
+- [ ] **OWASP ZAP** baseline scan against the running API and client; fix what it reports (security headers, CORS,
+      cookies)
+- [ ] Dependency checks: `dotnet list package --vulnerable` and `npm audit` in CI; turn on **Dependabot** and
+      **CodeQL** in the GitHub repo settings
+
+---
+
+## Future improvements (after Phase 7)
+
+Ideas kept out of scope on purpose, each one is worth doing only once the store is live.
+
+### Refunds through the Fawaterak API
+
+Today a cancel never moves money. A paid card order cancelled by the admin keeps its payment `Succeeded`, and the refund
+is made by hand in the Fawaterak dashboard. The API this project uses (API key, `FawaterakGateway`) has no refund call.
+
+Found on 2026-10-27, **not confirmed yet**: Fawaterak's official documentation lists a *Refund APIs* section, and an
+unofficial SDK for **API v3** (OAuth2 client credentials) creates, lists and cancels refund requests for an invoice or a
+transaction; only a pending request can be cancelled, an approved refund is final, and Fawaterak calls a refund webhook
+once it is approved.
+
+- [ ] **Confirm first**: read the *Refund APIs* page logged in, and ask Fawaterak support whether this account can use
+      API v3 and its refunds
+- [ ] **Gateway**: `RefundAsync(payment, amount, reason)` on the payment gateway (it fits the `IPaymentGateway` of
+      Phase 2), plus the v3 OAuth2 token
+- [ ] **Domain**: `Refunded` payment status and `Payment.MarkRefunded()`; a refund request that is still pending shows
+      as *Refund requested*
+- [ ] **Flow**: the admin cancel of a paid card order asks for the refund, the signed refund webhook (or a lookup, like
+      *Sync with gateway*) marks it `Refunded`, every step recorded as a `PaymentEvent`
+- [ ] **Tests** with the fake gateway: refund asked once, webhook twice, refund refused
+- [x] **Until then**: a *Refund needed* badge on cancelled orders whose payment is still `Succeeded` (part of the
+      payment panel in Phase 5)
 
 ---
 

@@ -100,7 +100,7 @@ public sealed class OrderApiTests
         var login = await admin.PostAsJsonAsync("/auth/login", new { email = ApiFactory.AdminEmail, password = ApiFactory.AdminPassword });
         Authorize(admin, (await ReadAsync(login)).GetProperty("accessToken").GetString()!);
 
-        var response = await admin.PostAsJsonAsync("/products", new
+        var response = await admin.PostAsJsonAsync("/admin/products", new
         {
             name = "Test Speaker", description = "A speaker made for the tests.", features = (string?)null,
             price = 1000m, stock, category = "Speakers", imageUrl = (string?)null, inTheBox = (object?)null,

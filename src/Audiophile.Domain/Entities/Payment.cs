@@ -59,6 +59,14 @@ public sealed class Payment
         UpdatedAt = DateTime.UtcNow;
     }
 
+    // The courier collected the cash at the door, only the order calls it when a cash order is delivered
+    internal void MarkCashCollected()
+    {
+        EnsurePending();
+        Status = PaymentStatus.Succeeded;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void MarkFailed()
     {
         EnsurePending();

@@ -6,3 +6,7 @@ export function formatPrice(amount) {
 export function shortId(id) {
 	return id.slice(0, 8).toUpperCase();
 }
+
+export function formatDate(value) {
+	return new Date(value).toLocaleString();
+}

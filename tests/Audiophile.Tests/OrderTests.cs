@@ -54,6 +54,38 @@ public class OrderTests
     }
 
     [Fact]
+    public void A_card_order_is_only_confirmed_once_its_payment_succeeded()
+    {
+        var order = PlaceOrder(Guid.NewGuid(), (Headphones(price: 1000m, stock: 5), 1));
+
+        Assert.Equal([OrderStatus.Cancelled], order.NextStatuses);
+        Assert.Throws<InvalidOperationException>(order.Confirm);
+
+        order.Payment!.MarkSucceeded("tx-1");
+        order.Confirm();
+
+        Assert.Equal(OrderStatus.Confirmed, order.Status);
+    }
+
+    [Fact]
+    public void A_cash_order_is_paid_when_it_is_delivered()
+    {
+        var userId = Guid.NewGuid();
+        var address = new Address(userId, "Mona Hassan", "12 Tahrir Street", "Cairo", "Egypt", "+201000000000");
+        var order = Order.Place(userId, PaymentMethod.CashOnDelivery, address,
+            [(Headphones(price: 1000m, stock: 5), 1)], idempotencyKey: Guid.NewGuid().ToString());
+
+        order.Confirm();
+        order.ChangeStatus(OrderStatus.Processing);
+        order.ChangeStatus(OrderStatus.Shipped);
+        Assert.Equal(PaymentStatus.Pending, order.Payment!.Status);
+
+        order.ChangeStatus(OrderStatus.Delivered);
+
+        Assert.Equal(PaymentStatus.Succeeded, order.Payment.Status);
+    }
+
+    [Fact]
     public void A_payment_can_only_succeed_once()
     {
         var payment = PlaceOrder(Guid.NewGuid(), (Headphones(price: 1000m, stock: 5), 1)).Payment!;

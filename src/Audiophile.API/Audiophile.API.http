@@ -47,8 +47,12 @@ GET {{base}}/products?category=Headphones&minPrice=1000&page=1&pageSize=12
 ### One product
 GET {{base}}/products/{{productId}}
 
+### The admin products page, hidden ones included, every filter is optional
+GET {{base}}/admin/products?availability=Hidden&lowStockOnly=true&sort=StockLowToHigh&q=speaker
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
 ### Add a product, admin only so log in as the admin first or get 403
-POST {{base}}/products
+POST {{base}}/admin/products
 Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 
@@ -116,6 +120,25 @@ Idempotency-Key: {{codOrder.request.headers.Idempotency-Key}}
 ### My orders
 GET {{base}}/orders
 Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Every customer's orders, admin only, every filter is optional and statusCounts ignores the status filter
+GET {{base}}/admin/orders?status=Confirmed&from=2026-10-01&to=2026-10-31&q=mona&page=1&pageSize=10
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### The overview numbers, admin only, days is 1 to 365
+GET {{base}}/admin/orders/stats?days=30
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### One order with its customer, address and items, admin only
+GET {{base}}/admin/orders/{{codOrder.response.body.$.id}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Move an order one step, only a status in its nextStatuses is accepted, Cancelled returns the stock
+PUT {{base}}/admin/orders/{{codOrder.response.body.$.id}}/status
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "status": "Processing" }
 
 ### Health
 GET {{base}}/health
