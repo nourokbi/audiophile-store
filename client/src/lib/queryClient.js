@@ -1,15 +1,13 @@
 import { QueryClient } from '@tanstack/react-query';
 
-import { ApiError } from './api/client';
-
 // One cache for every API answer, a page that asks for data already in it shows it at once
 // An answer counts as fresh for 30 seconds, after that a page showing it fetches again in the background
-// A failed request is tried once more, but never a 4xx, since asking again gives the same answer
+// A failed request is tried once more before the page shows the error
 export const queryClient = new QueryClient({
 	defaultOptions: {
 		queries: {
 			staleTime: 30 * 1000,
-			retry: (failureCount, error) => failureCount < 1 && !(error instanceof ApiError && error.status < 500),
+			retry: 1,
 		},
 	},
 });

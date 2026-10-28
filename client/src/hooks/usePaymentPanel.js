@@ -9,9 +9,8 @@ export function usePaymentPanel(orderId, isCardOrder) {
 
 	const { data: events = [], error } = useQuery({
 		queryKey: queryKeys.paymentEvents(orderId),
-		queryFn: () => adminApi.listPaymentEvents(orderId),
+		queryFn: async () => (await adminApi.listPaymentEvents(orderId)).reverse(),
 		enabled: isCardOrder, // a cash order never talks to Fawaterak
-		select: (loadedEvents) => [...loadedEvents].reverse(),
 	});
 
 	// A sync stores a new event and can move the order, so the whole admin orders group loads again, these events included

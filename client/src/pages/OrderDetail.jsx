@@ -39,14 +39,14 @@ const OrderDetail = () => {
 		return () => clearTimeout(stopTimer);
 	}, [isWaiting]);
 
-	// The cancelled order goes straight into the cache, my orders and the shop's stock load again
+	// After a cancel, my orders (this one included) and the shop's stock load again
 	const cancel = useMutation({
 		mutationFn: () => ordersApi.cancel(id),
-		onSuccess: (cancelledOrder) => {
-			queryClient.setQueryData(queryKeys.myOrder(id), cancelledOrder);
-			queryClient.invalidateQueries({ queryKey: queryKeys.myOrders });
-			queryClient.invalidateQueries({ queryKey: queryKeys.catalog });
-		},
+		onSuccess: () =>
+			Promise.all([
+				queryClient.invalidateQueries({ queryKey: queryKeys.myOrders }),
+				queryClient.invalidateQueries({ queryKey: queryKeys.catalog }),
+			]),
 	});
 
 	if (loadError || !order) {
