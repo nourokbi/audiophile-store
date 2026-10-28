@@ -8,6 +8,8 @@ namespace Audiophile.Application.Carts;
 // The customer's cart, the rules about its items live in the Cart entity
 public sealed class CartService(IAppDbContext db)
 {
+    private const int MaxGuestCartLines = 100;
+
     public async Task<CartDto> GetAsync(Guid userId, CancellationToken ct)
     {
         var cart = await FindCartAsync(userId, ct);
@@ -70,9 +72,63 @@ public sealed class CartService(IAppDbContext db)
         return CartDto.Empty;
     }
 
+    // Prices the cart a visitor keeps in the browser, hidden products drop out and each line is capped at the stock
+    public async Task<CartDto> QuoteAsync(IReadOnlyList<GuestCartItem> items, CancellationToken ct)
+    {
+        var wanted = WantedQuantities(items);
+        var products = await ActiveProductsAsync(wanted.Keys, ct);
+
+        return CartDto.From(products
+            .Select(p => (Product: p, Quantity: CappedQuantity(p, wanted[p.Id])))
+            .Where(l => l.Quantity > 0));
+    }
+
+    // Moves the visitor's cart into the account after login, a line that would pass the stock is capped so the login never fails
+    public async Task<CartDto> MergeAsync(Guid userId, IReadOnlyList<GuestCartItem> items, CancellationToken ct)
+    {
+        var wanted = WantedQuantities(items);
+        var products = await ActiveProductsAsync(wanted.Keys, ct);
+
+        var cart = await FindCartAsync(userId, ct);
+        if (cart is null)
+        {
+            cart = new Cart(userId);
+            db.Carts.Add(cart);
+        }
+
+        foreach (var product in products)
+        {
+            var alreadyInCart = cart.FindItem(product.Id)?.Quantity ?? 0;
+            var toAdd = CappedQuantity(product, alreadyInCart + wanted[product.Id]) - alreadyInCart;
+            if (toAdd > 0)
+                cart.AddItem(product.Id, toAdd);
+        }
+
+        await db.SaveChangesAsync(ct);
+        return await GetAsync(userId, ct);
+    }
+
     private Task<Cart?> FindCartAsync(Guid userId, CancellationToken ct) => db.Carts
         .Include(c => c.CartItems).ThenInclude(i => i.Product)
         .FirstOrDefaultAsync(c => c.UserId == userId, ct);
+
+    private Task<List<Product>> ActiveProductsAsync(IEnumerable<Guid> ids, CancellationToken ct) =>
+        db.Products.Where(p => ids.Contains(p.Id) && p.IsActive).ToListAsync(ct);
+
+    // One quantity per product, a product listed twice is added up
+    private static Dictionary<Guid, int> WantedQuantities(IReadOnlyList<GuestCartItem> items)
+    {
+        if (items.Count > MaxGuestCartLines)
+            throw new ArgumentException($"A cart cannot have more than {MaxGuestCartLines} lines.", nameof(items));
+
+        return items
+            .Where(i => i.Quantity > 0)
+            .GroupBy(i => i.ProductId)
+            .ToDictionary(g => g.Key, g => g.Sum(i => Math.Min(i.Quantity, CartItem.MaxQuantity)));
+    }
+
+    private static int CappedQuantity(Product product, int quantity) =>
+        Math.Min(quantity, Math.Min(product.Stock, CartItem.MaxQuantity));
 
     // Tells the customer early that stock is short, checkout checks again when it decreases the stock
     private static void EnsureInStock(Product product, int quantity)
