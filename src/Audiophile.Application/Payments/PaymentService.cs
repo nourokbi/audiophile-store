@@ -27,6 +27,33 @@ public sealed class PaymentService(
         order.Payment!.LinkToProvider(IFawaterakGateway.Provider, checkout.InvoiceKey, checkout.InvoiceId, checkout.PaymentUrl);
     }
 
+    // A failed attempt closes the Fawaterak invoice, so paying again opens a new one for the same order
+    public async Task<OrderDto> RetryPaymentAsync(Guid userId, Guid orderId, CancellationToken ct)
+    {
+        var order = await db.Orders
+            .Include(o => o.Payment)
+            .Include(o => o.OrderItems)
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId, ct)
+            ?? throw new NotFoundException($"Order {orderId} was not found.");
+
+        if (order.Status != OrderStatus.Pending || order.Payment is not { UsesGateway: true, Status: PaymentStatus.Pending })
+            throw new ConflictException("This order is not waiting for a payment.");
+        if (order.Payment.CreatedAt < DateTime.UtcNow - PaymentWindow)
+            throw new ConflictException("The time to pay this order has run out, its items go back into stock.");
+
+        // The last attempt may have gone through after all, then the order is confirmed instead of charged twice
+        if (order.Payment.ProviderOrderId is not null)
+        {
+            var synced = await SyncWithGatewayAsync(orderId, ct);
+            if (synced.Payment?.Status != PaymentStatus.Pending)
+                return synced;
+        }
+
+        await OpenCheckoutAsync(order, ct);
+        await db.SaveChangesAsync(ct);
+        return OrderDto.From(order);
+    }
+
     // Asks Fawaterak for the real invoice status, for when a webhook never arrived
     public async Task<OrderDto> SyncWithGatewayAsync(Guid orderId, CancellationToken ct)
     {

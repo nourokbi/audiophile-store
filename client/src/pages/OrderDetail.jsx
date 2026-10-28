@@ -49,6 +49,15 @@ const OrderDetail = () => {
 			]),
 	});
 
+	// Asks the API for a new payment page and goes there, or shows the order paid if the last attempt went through after all
+	const payAgain = useMutation({
+		mutationFn: () => ordersApi.retryPayment(id),
+		onSuccess: (updatedOrder) => {
+			if (updatedOrder.payment?.checkoutUrl) window.location.assign(updatedOrder.payment.checkoutUrl);
+			else return queryClient.invalidateQueries({ queryKey: queryKeys.myOrders });
+		},
+	});
+
 	if (loadError || !order) {
 		return (
 			<div className='page py-16'>
@@ -82,7 +91,10 @@ const OrderDetail = () => {
 							paymentResult={paymentResult}
 							isWaitingForPayment={isWaiting}
 							hasStoppedWaiting={hasStoppedWaiting}
+							onPayAgain={() => payAgain.mutate()}
+							isOpeningPaymentPage={payAgain.isPending}
 						/>
+						{payAgain.error && <p className='error-text'>{payAgain.error.message}</p>}
 						{order.status !== 'Cancelled' && <OrderProgress status={order.status} />}
 					</section>
 

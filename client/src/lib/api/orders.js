@@ -14,4 +14,7 @@ export const ordersApi = {
 		}),
 
 	cancel: (id) => api(`/orders/${id}/cancel`, { method: 'POST' }),
+
+	// A new Fawaterak payment page for an unpaid card order, the old one closes after a failed attempt
+	retryPayment: (id) => api(`/orders/${id}/payment/retry`, { method: 'POST' }),
 };

@@ -43,6 +43,11 @@ public sealed class OrdersController(OrderService _ordersService, PaymentService
   public async Task<IActionResult> Cancel(Guid id, CancellationToken ct) =>
       Ok(await _ordersService.CancelOrderAsync(currentUser.Id, id, ct));
 
+  // Opens a new Fawaterak payment page for the customer's unpaid card order, since a failed attempt closes the old one
+  [HttpPost("{id:guid}/payment/retry")]
+  public async Task<IActionResult> RetryPayment(Guid id, CancellationToken ct) =>
+      Ok(await _paymentsService.RetryPaymentAsync(currentUser.Id, id, ct));
+
   // The Fawaterak notifications stored for any order, a support tool for admins
   [HttpGet("{id:guid}/payment/events")]
   [Authorize(Roles = Roles.Admin)]

@@ -1,7 +1,7 @@
 import { CircleCheck, CircleX, Loader } from 'lucide-react';
 
 // The big message on top of an order: cancelled, waiting for the card payment, or thank you
-const OrderHeadline = ({ order, paymentResult, isWaitingForPayment, hasStoppedWaiting }) => {
+const OrderHeadline = ({ order, paymentResult, isWaitingForPayment, hasStoppedWaiting, onPayAgain, isOpeningPaymentPage }) => {
 	if (order.status === 'Cancelled') {
 		return (
 			<Message icon={CircleX} tone='text-red-600' title='Order cancelled'>
@@ -27,10 +27,20 @@ const OrderHeadline = ({ order, paymentResult, isWaitingForPayment, hasStoppedWa
 					: hasStoppedWaiting
 					? 'Fawaterak has not confirmed this payment yet. If you paid, refresh this page in a minute.'
 					: 'We are waiting for Fawaterak to confirm the payment. This page updates by itself.'}
-				{paymentPageUrl && paymentResult !== 'success' && (
+				{/* A pending result keeps its page, it may hold a code to pay at a kiosk, anything else gets a new page */}
+				{paymentResult === 'pending' && paymentPageUrl && (
 					<a href={paymentPageUrl} className='btn-primary mt-4'>
-						{hasPaymentFailed ? 'Try paying again' : 'Go to the payment page'}
+						Go to the payment page
 					</a>
+				)}
+				{paymentResult !== 'pending' && paymentResult !== 'success' && (
+					<button onClick={onPayAgain} disabled={isOpeningPaymentPage} className='btn-primary mt-4'>
+						{isOpeningPaymentPage
+							? 'Opening the payment page...'
+							: hasPaymentFailed
+							? 'Try paying again'
+							: 'Go to the payment page'}
+					</button>
 				)}
 			</Message>
 		);

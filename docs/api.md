@@ -114,6 +114,7 @@ shop saves back what `quote` returns and a login never fails because of the cart
 | GET | `/orders` | 200 my orders, newest first | 401 |
 | GET | `/orders/{id}` | 200 | 404 |
 | POST | `/orders/{id}/cancel` | 200 the cancelled order, stock returned | 404 · 409 already cancelled, shipped, or a paid card order (contact support) |
+| POST | `/orders/{id}/payment/retry` | 200 the order with a new `payment.checkoutUrl`, or confirmed if the last attempt was paid after all | 404 · 409 not an unpaid card order, or its 30 minutes ran out |
 | GET | `/orders/{id}/payment/events` | 200 what Fawaterak sent about this order | 🛡 admin · 404 |
 | POST | `/orders/{id}/payment/sync` | 200 the order after asking Fawaterak | 🛡 admin · 404 · 409 not a gateway order |
 
