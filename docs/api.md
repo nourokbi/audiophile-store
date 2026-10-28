@@ -87,7 +87,7 @@ Rules:
 Body: `{ fullAddressName, street, city, country, phone, postalCode? }`. Each customer only ever sees their own addresses:
 someone else's address is a **404**, not a 403, so ids can't be probed. DELETE is a soft delete.
 
-## Cart — `CartController` (all 🔑)
+## Cart — `CartController` (all 🔑 except the quote)
 
 | Method | Path | Body | Success | Errors |
 |---|---|---|---|---|
@@ -96,9 +96,15 @@ someone else's address is a **404**, not a 403, so ids can't be probed. DELETE i
 | PUT | `/cart/items/{productId}` | `{ quantity }` | 200 cart | 400 · 404 · 409 |
 | DELETE | `/cart/items/{productId}` | — | 200 cart | 404 |
 | DELETE | `/cart` | — | 200 empty cart | — |
+| POST | `/cart/quote` (anonymous) | `[{ productId, quantity }]` | 200 cart | 400 more than 100 lines |
+| POST | `/cart/merge` | `[{ productId, quantity }]` | 200 cart | 400 more than 100 lines · 401 |
 
 Every call returns the whole cart: `{ items, totalQuantity, subTotal, shippingFee, total }`. Adding a product already in
 the cart increases that line. Quantity per line is 1–100. Shipping is 50 EGP, free from 5,000 EGP.
+
+A visitor keeps the cart in the browser. `quote` prices it without an account and `merge` moves it into the account
+after login. Both leave out hidden or unknown products and cap each line at the stock instead of failing, so the
+shop saves back what `quote` returns and a login never fails because of the cart.
 
 ## Orders — `OrdersController` (all 🔑)
 
