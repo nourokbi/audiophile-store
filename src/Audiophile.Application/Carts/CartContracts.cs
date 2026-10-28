@@ -10,6 +10,9 @@ public sealed record SetCartItemQuantityRequest(int Quantity);
 public sealed record CartItemDto(
     Guid ProductId, string ProductName, string? ImageUrl, decimal UnitPrice, int Quantity, decimal LineTotal);
 
+// One line of the cart a visitor keeps in the browser, sent to be priced or moved into the account after login
+public sealed record GuestCartItem(Guid ProductId, int Quantity);
+
 // Every cart endpoint returns the whole cart with today's catalogue prices, so the shop just replaces what it shows
 public sealed record CartDto(
     IReadOnlyList<CartItemDto> Items, int TotalQuantity, decimal SubTotal, decimal ShippingFee, decimal Total)
@@ -17,19 +20,20 @@ public sealed record CartDto(
     public static readonly CartDto Empty = new([], 0, 0m, 0m, 0m);
 
     // Needs the products of the items loaded
-    public static CartDto From(Cart cart)
-    {
-        if (cart.IsEmpty)
-            return Empty;
+    public static CartDto From(Cart cart) => From(cart.CartItems.Select(i => (i.Product, i.Quantity)));
 
-        var items = cart.CartItems
-            .Select(i => new CartItemDto(
-                i.ProductId, i.Product.Name, i.Product.ImageUrl, i.Product.Price, i.Quantity, i.Product.Price * i.Quantity))
+    public static CartDto From(IEnumerable<(Product Product, int Quantity)> lines)
+    {
+        var items = lines
+            .Select(l => new CartItemDto(
+                l.Product.Id, l.Product.Name, l.Product.ImageUrl, l.Product.Price, l.Quantity, l.Product.Price * l.Quantity))
             .OrderBy(i => i.ProductName)
             .ToList();
+        if (items.Count == 0)
+            return Empty;
 
         var subTotal = items.Sum(i => i.LineTotal);
         var shippingFee = ShippingPolicy.FeeFor(subTotal);
-        return new CartDto(items, cart.TotalQuantity, subTotal, shippingFee, subTotal + shippingFee);
+        return new CartDto(items, items.Sum(i => i.Quantity), subTotal, shippingFee, subTotal + shippingFee);
     }
 }

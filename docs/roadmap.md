@@ -238,7 +238,8 @@ chain, not every session) are a possible refinement; revoking everything is the 
       redirect to `checkoutUrl` (or straight to the order page for COD) (2026-10-18)
 - [x] My orders page and an order progress page that polls until the webhook confirms (2026-10-18)
 - [x] Home page lists every product as a card with quantity + *Add to cart*, filtered by category (2026-10-18)
-- [ ] **Guest cart**: today you must log in before adding; keep a local cart and merge it into the server cart on login
+- [x] **Guest cart**: a visitor's cart lives in `localStorage`, `POST /cart/quote` prices it and `POST /cart/merge`
+      moves it into the account on login, capped at the stock (2026-10-28)
 - [x] *Cancel order* button on the order page (2026-10-18)
 - [x] Fix the old lint errors (gone with the redesign; `npm run lint` passes with zero warnings)
 - [x] **Redesign from the Stitch project** (2026-10-19): light theme, Lucide icons, one product list in `CatalogContext`,

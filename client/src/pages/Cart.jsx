@@ -13,7 +13,7 @@ import { findCategory } from '../lib/navigation';
 import { isFewLeft, productPath, stockLabel } from '../lib/productHelpers';
 import { SHIPPING } from '../lib/shipping';
 
-// The cart page, every change goes to the API and the page shows the cart it sends back
+// The cart page for customers and visitors alike, every change goes through the cart context and the page shows the cart it gets back
 const Cart = () => {
 	const { user } = useAuth();
 	const { cart, setQuantity, remove, clear } = useCart();
@@ -29,27 +29,17 @@ const Cart = () => {
 		}
 	};
 
-	if (!user || cart.items.length === 0) {
+	if (cart.items.length === 0) {
 		return (
 			<div className='page py-16'>
 				<EmptyState
 					icon={ShoppingBag}
-					title={user ? 'Your cart is empty' : 'Log in to see your cart'}
-					text={
-						user
-							? 'Add something you like and it will wait here until you check out.'
-							: 'Your cart is saved on your account, so it is the same on every device.'
-					}
+					title='Your cart is empty'
+					text='Add something you like and it will wait here until you check out.'
 				>
-					{user ? (
-						<Link to='/' className='btn-primary'>
-							Continue shopping
-						</Link>
-					) : (
-						<Link to='/login?redirect=%2Fcart' className='btn-primary'>
-							<LogIn size={16} /> Log in
-						</Link>
-					)}
+					<Link to='/' className='btn-primary'>
+						Continue shopping
+					</Link>
 				</EmptyState>
 			</div>
 		);
@@ -95,8 +85,17 @@ const Cart = () => {
 						<p className='text-[13px] text-muted'>Add {formatPrice(leftForFreeShipping)} more for free shipping.</p>
 					)}
 					{changeError && <p className='error-text'>{changeError}</p>}
+					{/* A visitor logs in on the way, the cart moves into the account and checkout opens */}
 					<Link to='/checkout' className='btn-primary w-full'>
-						Checkout <ArrowRight size={16} />
+						{user ? (
+							<>
+								Checkout <ArrowRight size={16} />
+							</>
+						) : (
+							<>
+								<LogIn size={16} /> Log in to check out
+							</>
+						)}
 					</Link>
 					<Link to='/' className='btn-secondary w-full'>
 						Continue shopping

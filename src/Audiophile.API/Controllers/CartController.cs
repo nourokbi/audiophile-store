@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Audiophile.API.Controllers;
 
-// The signed in customer's cart, each endpoint answers with the whole updated cart
+// The signed in customer's cart, plus pricing a visitor's browser cart, each endpoint answers with the whole cart
 [ApiController]
 [Authorize]
 [Route("cart")]
@@ -30,4 +30,13 @@ public sealed class CartController(CartService carts, ICurrentUser currentUser) 
     [HttpDelete]
     public async Task<IActionResult> Clear(CancellationToken ct) =>
         Ok(await carts.ClearAsync(currentUser.Id, ct));
+
+    [AllowAnonymous]
+    [HttpPost("quote")]
+    public async Task<IActionResult> Quote(IReadOnlyList<GuestCartItem> items, CancellationToken ct) =>
+        Ok(await carts.QuoteAsync(items, ct));
+
+    [HttpPost("merge")]
+    public async Task<IActionResult> Merge(IReadOnlyList<GuestCartItem> items, CancellationToken ct) =>
+        Ok(await carts.MergeAsync(currentUser.Id, items, ct));
 }

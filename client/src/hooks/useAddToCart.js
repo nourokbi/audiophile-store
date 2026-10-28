@@ -1,15 +1,10 @@
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 
-import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
-// Add to cart for the product page and the cards, visitors go to login first and customers get a short notice back
+// Add to cart for the product page and the cards, visitors and customers alike get a short notice back
 export function useAddToCart() {
-	const { user } = useAuth();
 	const { add } = useCart();
-	const navigate = useNavigate();
-	const location = useLocation();
 	const [busy, setBusy] = React.useState(false);
 	const [notice, setNotice] = React.useState(null); // { ok: boolean, text: string }
 
@@ -21,10 +16,6 @@ export function useAddToCart() {
 	}, [notice]);
 
 	const addToCart = async (productId, quantity) => {
-		if (!user) {
-			navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`);
-			return false;
-		}
 		setBusy(true);
 		try {
 			await add(productId, quantity);
