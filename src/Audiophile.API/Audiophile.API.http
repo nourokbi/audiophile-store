@@ -25,18 +25,11 @@ Content-Type: application/json
 GET {{base}}/auth/me
 Authorization: Bearer {{login.response.body.$.accessToken}}
 
-### New token pair, sending it twice is treated as theft and ends every session
+### New token pair from the audiophile_refresh cookie that login set, an old cookie sent again ends every session
 POST {{base}}/auth/refresh
-Content-Type: application/json
 
-{ "refreshToken": "{{login.response.body.$.refreshToken}}" }
-
-### Log out this session
+### Log out the session in the cookie and delete it
 POST {{base}}/auth/logout
-Authorization: Bearer {{login.response.body.$.accessToken}}
-Content-Type: application/json
-
-{ "refreshToken": "{{login.response.body.$.refreshToken}}" }
 
 
 ############################## Catalogue

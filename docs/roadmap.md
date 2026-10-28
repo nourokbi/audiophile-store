@@ -232,7 +232,8 @@ chain, not every session) are a possible refinement; revoking everything is the 
 - [ ] **TanStack Query** for server data (products, cart, orders); today it's React context + `fetch`. Moved to Phase 5, after the admin API
       `data.json` still supplies images and copy; prices, stock and ids come from the API (matched on slug)
 - [x] Login / register pages (2026-10-18)
-- [ ] Move the refresh token to an httpOnly cookie; today both tokens are in `localStorage`
+- [x] Move the refresh token to an httpOnly cookie, the access token lives in memory and a page load restores the
+      session from the cookie (2026-10-28)
 - [x] Cart drawer uses the cart API (2026-10-18)
 - [x] Checkout page: address → payment method → `POST /orders` with an `Idempotency-Key` →
       redirect to `checkoutUrl` (or straight to the order page for COD) (2026-10-18)
