@@ -75,7 +75,7 @@ public sealed class ProductApiTests
         var response = await admin.PostAsJsonAsync("/admin/products", new
         {
             name, description = "A speaker made for the tests.", features = (string?)null,
-            price = 1000m, stock = 5, category = "Speakers", imageUrl = (string?)null, inTheBox = (object?)null,
+            price = 1000m, stock = 5, category = "Speakers", images = (string[]?)null, inTheBox = (object?)null,
         });
         response.EnsureSuccessStatusCode();
         return (await ReadAsync(response)).GetProperty("id").GetString()!;

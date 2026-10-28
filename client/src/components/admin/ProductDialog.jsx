@@ -1,18 +1,33 @@
 import React from 'react';
 
 import BoxContentsEditor from './BoxContentsEditor';
+import ImageListEditor from './ImageListEditor';
 import Dialog from '../ui/Dialog';
 import Select from '../ui/Select';
 import TextArea from '../ui/TextArea';
 import TextField from '../ui/TextField';
 import { CATEGORIES } from '../../lib/navigation';
 
-const EMPTY_FORM = { name: '', description: '', features: '', price: '', stock: '0', category: 'headphones', imageUrl: '' };
+const EMPTY_FORM = { name: '', description: '', features: '', price: '', stock: '0', category: 'headphones' };
 
 const MAX_ITEM_LENGTH = 100; // the API's limit for an item name
+const MAX_IMAGES = 8; // the API's limit, Product.MaxImages
 
 // A picture from the shop's own files like /assets/products/name.jpg, or a full link to another site
-const isImageAddress = (text) => text === '' || text.startsWith('/') || /^https?:\/\/\S+$/i.test(text);
+const isImageAddress = (text) => text.startsWith('/') || /^https?:\/\/\S+$/i.test(text);
+
+// One photo row, rowId keeps React's key steady while the address is typed
+const newImageRow = (url = '') => ({ rowId: crypto.randomUUID(), url });
+
+// The addresses to save in order, an empty row is ignored
+const filledImages = (rows) => rows.map((row) => row.url.trim()).filter((url) => url !== '');
+
+function findImagesError(rows) {
+	const images = filledImages(rows);
+	if (images.some((url) => !isImageAddress(url))) return 'Paths like /assets/... or links with https://';
+	if (images.length > MAX_IMAGES) return `Up to ${MAX_IMAGES} photos`;
+	return false;
+}
 
 // One editable row of the box, rowId keeps React's key steady while the name is typed
 const newBoxRow = (item = '', quantity = '1') => ({ rowId: crypto.randomUUID(), item, quantity });
@@ -45,7 +60,6 @@ const toForm = (product) => ({
 	price: String(product.price),
 	stock: String(product.stock),
 	category: product.category,
-	imageUrl: product.imageUrl ?? '',
 });
 
 // The add and edit product form, the checks mirror the API's rules and onSave gets the body the API expects
@@ -56,6 +70,7 @@ const ProductDialog = ({ product = null, isSaving, errorMessage, onClose, onSave
 	const [boxRows, setBoxRows] = React.useState(() =>
 		isEditing ? product.includes.map((entry) => newBoxRow(entry.item, String(entry.quantity))) : [],
 	);
+	const [imageRows, setImageRows] = React.useState(() => (isEditing ? product.imageUrls.map((url) => newImageRow(url)) : []));
 	const [hasTriedToSave, setHasTriedToSave] = React.useState(false); // errors show after the first save so an empty form is not all red
 	const updateField = (fieldName) => (event) => setForm((currentForm) => ({ ...currentForm, [fieldName]: event.target.value }));
 
@@ -63,6 +78,17 @@ const ProductDialog = ({ product = null, isSaving, errorMessage, onClose, onSave
 		setBoxRows((currentRows) => currentRows.map((row) => (row.rowId === rowId ? { ...row, [fieldName]: value } : row)));
 	const addBoxRow = () => setBoxRows((currentRows) => [...currentRows, newBoxRow()]);
 	const removeBoxRow = (rowId) => setBoxRows((currentRows) => currentRows.filter((row) => row.rowId !== rowId));
+
+	const updateImageRow = (rowId, url) =>
+		setImageRows((currentRows) => currentRows.map((row) => (row.rowId === rowId ? { ...row, url } : row)));
+	const addImageRow = () => setImageRows((currentRows) => [...currentRows, newImageRow()]);
+	const removeImageRow = (rowId) => setImageRows((currentRows) => currentRows.filter((row) => row.rowId !== rowId));
+	// Moves the photo to the top, the rest keep their order
+	const makeCover = (rowId) =>
+		setImageRows((currentRows) => [
+			...currentRows.filter((row) => row.rowId === rowId),
+			...currentRows.filter((row) => row.rowId !== rowId),
+		]);
 
 	const price = Number(form.price);
 	const stock = Number(form.stock);
@@ -72,7 +98,7 @@ const ProductDialog = ({ product = null, isSaving, errorMessage, onClose, onSave
 		price: !(price > 0) && 'Above 0',
 		stock: !(Number.isInteger(stock) && stock >= 0) && 'A whole number, 0 or more',
 		box: findBoxError(boxRows),
-		imageUrl: !isImageAddress(form.imageUrl.trim()) && 'A path like /assets/... or a link with https://',
+		images: findImagesError(imageRows),
 	};
 	const isFormValid = !Object.values(fieldErrors).some(Boolean);
 	const errorToShow = (fieldName) => (hasTriedToSave ? fieldErrors[fieldName] || undefined : undefined);
@@ -87,7 +113,7 @@ const ProductDialog = ({ product = null, isSaving, errorMessage, onClose, onSave
 			features: form.features.trim() || null,
 			price,
 			category: toApiCategory(form.category),
-			imageUrl: form.imageUrl.trim() || null,
+			images: filledImages(imageRows), // always sent, the first is the cover
 			inTheBox: toInTheBox(boxRows), // always sent, so removing every row on an edit empties the box
 		};
 		onSave(isEditing ? details : { ...details, stock });
@@ -160,24 +186,16 @@ const ProductDialog = ({ product = null, isSaving, errorMessage, onClose, onSave
 						onRemoveRow={removeBoxRow}
 					/>
 
-					<TextField
-						label='Image (optional)'
-						name='imageUrl'
-						inputMode='url'
-						placeholder='/assets/products/name.jpg or https://...'
-						value={form.imageUrl}
-						onChange={updateField('imageUrl')}
-						error={errorToShow('imageUrl')}
+					<ImageListEditor
+						rows={imageRows}
+						maxRows={MAX_IMAGES}
+						error={errorToShow('images')}
+						isValidAddress={isImageAddress}
+						onRowChange={updateImageRow}
+						onAddRow={addImageRow}
+						onRemoveRow={removeImageRow}
+						onMakeCover={makeCover}
 					/>
-					{form.imageUrl.trim() !== '' && isImageAddress(form.imageUrl.trim()) && (
-						<img
-							src={form.imageUrl.trim()}
-							alt='Preview of the product picture'
-							className='h-24 w-24 rounded bg-panel object-cover'
-							onError={(event) => (event.currentTarget.style.visibility = 'hidden')}
-							onLoad={(event) => (event.currentTarget.style.visibility = 'visible')}
-						/>
-					)}
 				</div>
 
 				{errorMessage && <p className='error-text'>{errorMessage}</p>}

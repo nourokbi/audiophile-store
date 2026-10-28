@@ -42,7 +42,7 @@ public sealed record ProductRequest(
     decimal Price,
     int Stock,
     ProductCategory Category,
-    string? ImageUrl,
+    List<string>? Images,       // the first is the cover
     Dictionary<string, int>? InTheBox,
     string? Slug = null);       // made from the name when left out, and never changed afterwards
 
@@ -54,7 +54,7 @@ public sealed record UpdateProductRequest(
     string? Features,
     decimal Price,
     ProductCategory Category,
-    string? ImageUrl,
+    List<string>? Images,
     Dictionary<string, int>? InTheBox);
 
 public sealed record ProductDto(
@@ -68,13 +68,14 @@ public sealed record ProductDto(
     bool InStock,
     ProductCategory Category,
     string? ImageUrl,
+    IReadOnlyList<string> Images,
     IReadOnlyDictionary<string, int> InTheBox,
     bool IsActive,
     DateTime CreatedAt)
 {
   public static ProductDto From(Product p) => new(
       p.Id, p.Name, p.Slug, p.Description, p.Features, p.Price, p.Stock, p.Stock > 0, p.Category, p.ImageUrl,
-      new Dictionary<string, int>(p.InTheBox), p.IsActive, p.CreatedAt);
+      p.Images.ToList(), new Dictionary<string, int>(p.InTheBox), p.IsActive, p.CreatedAt);
 }
 
 // The bodies of the admin restock, price and availability actions

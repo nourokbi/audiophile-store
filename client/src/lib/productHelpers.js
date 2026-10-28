@@ -15,12 +15,13 @@ const NO_IMAGE =
 		"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'><rect width='1' height='1' fill='#d4d4d4'/></svg>",
 	);
 
-// The API's product in the shape every page uses, with the photos and gallery from pictures.json added by slug
+// The API's product in the shape every page uses, with the sized cover photos from pictures.json added by slug
 export function toProduct(apiProduct) {
 	const look = pictures[apiProduct.slug] ?? {};
 	// The pictures.json photos stay while the API still has the image it was seeded with, a new image saved in the dashboard wins
 	const hasNewImage = apiProduct.imageUrl && apiProduct.imageUrl !== look.image && apiProduct.imageUrl !== look.seededImageUrl;
 	const image = (hasNewImage ? apiProduct.imageUrl : look.image) ?? apiProduct.imageUrl ?? NO_IMAGE;
+	const cover = typeof image === 'string' ? sameImageEverywhere(image) : image;
 	return {
 		id: apiProduct.id,
 		slug: apiProduct.slug,
@@ -33,9 +34,9 @@ export function toProduct(apiProduct) {
 		isActive: apiProduct.isActive,
 		category: apiProduct.category.toLowerCase(),
 		includes: Object.entries(apiProduct.inTheBox).map(([item, quantity]) => ({ item, quantity })),
-		image: typeof image === 'string' ? sameImageEverywhere(image) : image,
-		imageUrl: apiProduct.imageUrl, // the address saved in the API, the admin edit form shows it
-		gallery: look.gallery ?? null,
+		image: cover,
+		images: [cover, ...apiProduct.images.slice(1).map(sameImageEverywhere)], // every photo for the product page, cover first
+		imageUrls: apiProduct.images, // the addresses saved in the API, the admin edit form shows them
 		isNew: Boolean(look.new),
 	};
 }

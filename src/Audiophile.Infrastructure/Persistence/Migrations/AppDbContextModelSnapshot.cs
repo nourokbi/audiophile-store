@@ -373,10 +373,6 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
-                    b.Property<string>("ImageUrl")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -403,6 +399,11 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<string>("_images")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("Images");
+
                     b.Property<string>("_inTheBox")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -428,12 +429,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "The new XX99 Mark II headphones is the pinnacle of pristine audio. It redefines your premium headphone experience by reproducing the balanced depth and precision of studio-quality sound.",
                             Features = "Featuring a genuine leather head strap and premium earcups, these headphones deliver superior comfort for those who like to enjoy endless listening. It includes intuitive controls designed for any situation. Whether you’re taking a business call or just in your own personal space, the auto on/off and pause features ensure that you’ll never miss a beat.\n\nThe advanced Active Noise Cancellation with built-in equalizer allow you to experience your audio world on your terms. It lets you enjoy your audio in peace, but quickly interact with your surroundings when you need to. Combined with Bluetooth 5. 0 compliant connectivity and 17 hour battery life, the XX99 Mark II headphones gives you superior sound, cutting-edge technology, and a modern design aesthetic.",
-                            ImageUrl = "/assets/cart/image-xx99-mark-two-headphones.jpg",
                             IsActive = true,
                             Name = "XX99 Mark II Headphones",
                             Price = 2999m,
                             Slug = "xx99-mark-two-headphones",
                             Stock = 25,
+                            _images = "[\"/assets/cart/image-xx99-mark-two-headphones.jpg\",\"/assets/product-xx99-mark-two-headphones/desktop/image-gallery-1.jpg\",\"/assets/product-xx99-mark-two-headphones/desktop/image-gallery-2.jpg\",\"/assets/product-xx99-mark-two-headphones/desktop/image-gallery-3.jpg\"]",
                             _inTheBox = "{\"Headphone unit\":1,\"Replacement earcups\":2,\"User manual\":1,\"3.5mm 5m audio cable\":1,\"Travel bag\":1}"
                         },
                         new
@@ -443,12 +444,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "As the gold standard for headphones, the classic XX99 Mark I offers detailed and accurate audio reproduction for audiophiles, mixing engineers, and music aficionados alike in studios and on the go.",
                             Features = "As the headphones all others are measured against, the XX99 Mark I demonstrates over five decades of audio expertise, redefining the critical listening experience. This pair of closed-back headphones are made of industrial, aerospace-grade materials to emphasize durability at a relatively light weight of 11 oz.\n\nFrom the handcrafted microfiber ear cushions to the robust metal headband with inner damping element, the components work together to deliver comfort and uncompromising sound. Its closed-back design delivers up to 27 dB of passive noise cancellation, reducing resonance by reflecting sound to a dedicated absorber. For connectivity, a specially tuned cable is includes with a balanced gold connector.",
-                            ImageUrl = "/assets/cart/image-xx99-mark-one-headphones.jpg",
                             IsActive = true,
                             Name = "XX99 Mark I Headphones",
                             Price = 1750m,
                             Slug = "xx99-mark-one-headphones",
                             Stock = 20,
+                            _images = "[\"/assets/cart/image-xx99-mark-one-headphones.jpg\",\"/assets/product-xx99-mark-one-headphones/desktop/image-gallery-1.jpg\",\"/assets/product-xx99-mark-one-headphones/desktop/image-gallery-2.jpg\",\"/assets/product-xx99-mark-one-headphones/desktop/image-gallery-3.jpg\"]",
                             _inTheBox = "{\"Headphone unit\":1,\"Replacement earcups\":2,\"User manual\":1,\"3.5mm 5m audio cable\":1}"
                         },
                         new
@@ -458,12 +459,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Enjoy your audio almost anywhere and customize it to your specific tastes with the XX59 headphones. The stylish yet durable versatile wireless headset is a brilliant companion at home or on the move.",
                             Features = "These headphones have been created from durable, high-quality materials tough enough to take anywhere. Its compact folding design fuses comfort and minimalist style making it perfect for travel. Flawless transmission is assured by the latest wireless technology engineered for audio synchronization with videos.\n\nMore than a simple pair of headphones, this headset features a pair of built-in microphones for clear, hands-free calling when paired with a compatible smartphone. Controlling music and calls is also intuitive thanks to easy-access touch buttons on the earcups. Regardless of how you use the XX59 headphones, you can do so all day thanks to an impressive 30-hour battery life that can be rapidly recharged via USB-C.",
-                            ImageUrl = "/assets/cart/image-xx59-headphones.jpg",
                             IsActive = true,
                             Name = "XX59 Headphones",
                             Price = 899m,
                             Slug = "xx59-headphones",
                             Stock = 40,
+                            _images = "[\"/assets/cart/image-xx59-headphones.jpg\",\"/assets/product-xx59-headphones/desktop/image-gallery-1.jpg\",\"/assets/product-xx59-headphones/desktop/image-gallery-2.jpg\",\"/assets/product-xx59-headphones/desktop/image-gallery-3.jpg\"]",
                             _inTheBox = "{\"Headphone unit\":1,\"Replacement earcups\":2,\"User manual\":1,\"3.5mm 5m audio cable\":1}"
                         },
                         new
@@ -473,12 +474,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Upgrade your sound system with the all new ZX9 active speaker. It’s a bookshelf speaker system that offers truly wireless connectivity -- creating new possibilities for more pleasing and practical audio setups.",
                             Features = "Connect via Bluetooth or nearly any wired source. This speaker features optical, digital coaxial, USB Type-B, stereo RCA, and stereo XLR inputs, allowing you to have up to five wired source devices connected for easy switching. Improved bluetooth technology offers near lossless audio quality at up to 328ft (100m).\n\nDiscover clear, more natural sounding highs than the competition with ZX9’s signature planar diaphragm tweeter. Equally important is its powerful room-shaking bass courtesy of a 6.5” aluminum alloy bass unit. You’ll be able to enjoy equal sound quality whether in a large room or small den. Furthermore, you will experience new sensations from old songs since it can respond to even the subtle waveforms.",
-                            ImageUrl = "/assets/cart/image-zx9-speaker.jpg",
                             IsActive = true,
                             Name = "ZX9 Speaker",
                             Price = 4500m,
                             Slug = "zx9-speaker",
                             Stock = 10,
+                            _images = "[\"/assets/cart/image-zx9-speaker.jpg\",\"/assets/product-zx9-speaker/desktop/image-gallery-1.jpg\",\"/assets/product-zx9-speaker/desktop/image-gallery-2.jpg\",\"/assets/product-zx9-speaker/desktop/image-gallery-3.jpg\"]",
                             _inTheBox = "{\"Speaker unit\":2,\"Speaker cloth panel\":2,\"User manual\":1,\"3.5mm 10m audio cable\":1,\"10m optical cable\":1}"
                         },
                         new
@@ -488,12 +489,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Stream high quality sound wirelessly with minimal to no loss. The ZX7 speaker uses high-end audiophile components that represents the top of the line powered speakers for home or studio use.",
                             Features = "Reap the advantages of a flat diaphragm tweeter cone. This provides a fast response rate and excellent high frequencies that lower tiered bookshelf speakers cannot provide. The woofers are made from aluminum that produces a unique and clear sound. XLR inputs allow you to connect to a mixer for more advanced usage.\n\nThe ZX7 speaker is the perfect blend of stylish design and high performance. It houses an encased MDF wooden enclosure which minimises acoustic resonance. Dual connectivity allows pairing through bluetooth or traditional optical and RCA input. Switch input sources and control volume at your finger tips with the included wireless remote. This versatile speaker is equipped to deliver an authentic listening experience.",
-                            ImageUrl = "/assets/cart/image-zx7-speaker.jpg",
                             IsActive = true,
                             Name = "ZX7 Speaker",
                             Price = 3500m,
                             Slug = "zx7-speaker",
                             Stock = 15,
+                            _images = "[\"/assets/cart/image-zx7-speaker.jpg\",\"/assets/product-zx7-speaker/desktop/image-gallery-1.jpg\",\"/assets/product-zx7-speaker/desktop/image-gallery-2.jpg\",\"/assets/product-zx7-speaker/desktop/image-gallery-3.jpg\"]",
                             _inTheBox = "{\"Speaker unit\":2,\"Speaker cloth panel\":2,\"User manual\":1,\"3.5mm 7.5m audio cable\":1,\"7.5m optical cable\":1}"
                         },
                         new
@@ -503,12 +504,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Tailor your listening experience with bespoke dynamic drivers from the new YX1 Wireless Earphones. Enjoy incredible high-fidelity sound even in noisy environments with its active noise cancellation feature.",
                             Features = "Experience unrivalled stereo sound thanks to innovative acoustic technology. With improved ergonomics designed for full day wearing, these revolutionary earphones have been finely crafted to provide you with the perfect fit, delivering complete comfort all day long while enjoying exceptional noise isolation and truly immersive sound.\n\nThe YX1 Wireless Earphones features customizable controls for volume, music, calls, and voice assistants built into both earbuds. The new 7-hour battery life can be extended up to 28 hours with the charging case, giving you uninterrupted play time. Exquisite craftsmanship with a splash resistant design now available in an all new white and grey color scheme as well as the popular classic black.",
-                            ImageUrl = "/assets/cart/image-yx1-earphones.jpg",
                             IsActive = true,
                             Name = "YX1 Wireless Earphones",
                             Price = 599m,
                             Slug = "yx1-earphones",
                             Stock = 30,
+                            _images = "[\"/assets/cart/image-yx1-earphones.jpg\",\"/assets/product-yx1-earphones/desktop/image-gallery-1.jpg\",\"/assets/product-yx1-earphones/desktop/image-gallery-2.jpg\",\"/assets/product-yx1-earphones/desktop/image-gallery-3.jpg\"]",
                             _inTheBox = "{\"Earphone unit\":2,\"Multi-size earplugs\":6,\"User manual\":1,\"USB-C charging cable\":1,\"Travel pouch\":1}"
                         },
                         new
@@ -518,12 +519,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Closed-back studio headphones with a lambskin leather headband and machined brass hinges, tuned flat for mixing and long listening sessions.",
                             Features = "50mm dynamic drivers with a neutral tuning that tells you what is really in the recording. Memory foam earcups seal out the room without pressing on your ears.\n\nThe brass hinges fold flat for travel, and the detachable cable locks into place so it never slips out mid session.",
-                            ImageUrl = "/assets/products/studio-reference-headphones.jpg",
                             IsActive = true,
                             Name = "Studio Reference Headphones",
                             Price = 3299m,
                             Slug = "studio-reference-headphones",
                             Stock = 18,
+                            _images = "[\"/assets/products/studio-reference-headphones.jpg\"]",
                             _inTheBox = "{\"Headphone unit\":1,\"Detachable 3m cable\":1,\"6.35mm adapter\":1,\"Carry case\":1}"
                         },
                         new
@@ -533,12 +534,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Open-back planar magnetic headphones with brushed copper details, made for listeners who want every texture of the music.",
                             Features = "Planar magnetic drivers move the whole diaphragm at once, giving fast and clean detail with very low distortion. The open back creates a wide and natural soundstage.\n\nA light aluminum frame and suspended headband spread the weight, so they stay comfortable for hours.",
-                            ImageUrl = "/assets/products/planar-pro-headphones.jpg",
                             IsActive = true,
                             Name = "Planar Pro Headphones",
                             Price = 5299m,
                             Slug = "planar-pro-headphones",
                             Stock = 8,
+                            _images = "[\"/assets/products/planar-pro-headphones.jpg\"]",
                             _inTheBox = "{\"Headphone unit\":1,\"Balanced 4.4mm cable\":1,\"3.5mm cable\":1,\"Hard case\":1}"
                         },
                         new
@@ -548,12 +549,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Matte black over-ear headphones with polished bronze arms and plush leather earcups, a limited edition of our classic sound.",
                             Features = "Warm and full bodied tuning with a deep, controlled bass. The bronze arms are machined from solid metal and finished by hand.\n\nWireless with 30 hours of battery, or wired when you want the purest signal.",
-                            ImageUrl = "/assets/products/bronze-edition-headphones.jpg",
                             IsActive = true,
                             Name = "Bronze Edition Headphones",
                             Price = 2799m,
                             Slug = "bronze-edition-headphones",
                             Stock = 14,
+                            _images = "[\"/assets/products/bronze-edition-headphones.jpg\"]",
                             _inTheBox = "{\"Headphone unit\":1,\"USB-C charging cable\":1,\"3.5mm cable\":1,\"Travel pouch\":1}"
                         },
                         new
@@ -563,12 +564,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Everyday monitor headphones with lambskin earcups and a braided copper cable, ready for the studio desk or the commute.",
                             Features = "Closed-back design keeps your music in and the noise out. A balanced tuning works for recording, editing and simply enjoying music.\n\nThe braided cable resists tangles and the earcups can be replaced when they wear.",
-                            ImageUrl = "/assets/products/closed-back-monitor-headphones.jpg",
                             IsActive = true,
                             Name = "Closed-Back Monitor Headphones",
                             Price = 2199m,
                             Slug = "closed-back-monitor-headphones",
                             Stock = 25,
+                            _images = "[\"/assets/products/closed-back-monitor-headphones.jpg\"]",
                             _inTheBox = "{\"Headphone unit\":1,\"Braided cable\":1,\"User manual\":1}"
                         },
                         new
@@ -578,12 +579,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "A tall floorstanding speaker with a beryllium dome tweeter and carbon weave woofers, built to fill a large room.",
                             Features = "The beryllium tweeter gives clear and airy highs, while twin carbon woofers deliver deep bass without boom. The cabinet is braced inside to stay silent at any volume.\n\nDecoupling feet keep the floor from colouring the sound.",
-                            ImageUrl = "/assets/products/zx12-tower-speaker.jpg",
                             IsActive = true,
                             Name = "ZX12 Tower Speaker",
                             Price = 8499m,
                             Slug = "zx12-tower-speaker",
                             Stock = 4,
+                            _images = "[\"/assets/products/zx12-tower-speaker.jpg\"]",
                             _inTheBox = "{\"Speaker unit\":2,\"Decoupling feet\":8,\"Speaker cable\":2,\"User manual\":1}"
                         },
                         new
@@ -593,12 +594,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "A pair of bookshelf speakers in real walnut veneer with copper woofers and titanium tweeters, for a warm and detailed sound at home.",
                             Features = "Compact enough for a shelf or desk, with bass that sounds like a bigger speaker thanks to the rear port. The titanium tweeters keep vocals clear and natural.\n\nBuilt in amplifier with Bluetooth, optical and RCA inputs.",
-                            ImageUrl = "/assets/products/walnut-bookshelf-speakers.jpg",
                             IsActive = true,
                             Name = "Walnut Bookshelf Speakers",
                             Price = 3999m,
                             Slug = "walnut-bookshelf-speakers",
                             Stock = 12,
+                            _images = "[\"/assets/products/walnut-bookshelf-speakers.jpg\"]",
                             _inTheBox = "{\"Speaker unit\":2,\"Remote control\":1,\"Optical cable\":1,\"User manual\":1}"
                         },
                         new
@@ -608,12 +609,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Compact desktop monitors in a matte carbon finish with exposed copper drivers, made for creators who work close to their speakers.",
                             Features = "Near field tuning sounds right from a short distance, so your mixes travel well to other systems. Front controls let you adjust volume and tone without reaching behind.\n\nUSB-C audio input connects straight to a laptop.",
-                            ImageUrl = "/assets/products/carbon-desk-monitors.jpg",
                             IsActive = true,
                             Name = "Carbon Desk Monitors",
                             Price = 2899m,
                             Slug = "carbon-desk-monitors",
                             Stock = 16,
+                            _images = "[\"/assets/products/carbon-desk-monitors.jpg\"]",
                             _inTheBox = "{\"Speaker unit\":2,\"USB-C cable\":1,\"Isolation pads\":2,\"User manual\":1}"
                         },
                         new
@@ -623,12 +624,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "A wireless speaker in woven slate fabric with a copper dial on top, filling any room with even, room wide sound.",
                             Features = "Drivers face all directions, so the sound is the same wherever you sit. Turn the copper dial to change the volume and tap it to pause.\n\nPair two for stereo, or stream from any phone over Bluetooth or Wi-Fi.",
-                            ImageUrl = "/assets/products/cylinder-home-speaker.jpg",
                             IsActive = true,
                             Name = "Cylinder Home Speaker",
                             Price = 1899m,
                             Slug = "cylinder-home-speaker",
                             Stock = 22,
+                            _images = "[\"/assets/products/cylinder-home-speaker.jpg\"]",
                             _inTheBox = "{\"Speaker unit\":1,\"Power cable\":1,\"User manual\":1}"
                         },
                         new
@@ -638,12 +639,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "True wireless earphones with brass acoustic chambers and active noise cancellation, our best sound in the smallest size.",
                             Features = "Brass chambers tame resonance for a cleaner, richer sound than plastic shells. Active noise cancellation adapts to where you are.\n\nEight hours of play, plus three more charges in the aluminum case.",
-                            ImageUrl = "/assets/products/yx2-pro-earphones.jpg",
                             IsActive = true,
                             Name = "YX2 Pro Earphones",
                             Price = 1299m,
                             Slug = "yx2-pro-earphones",
                             Stock = 30,
+                            _images = "[\"/assets/products/yx2-pro-earphones.jpg\"]",
                             _inTheBox = "{\"Earphone unit\":2,\"Charging case\":1,\"Ear tips\":6,\"USB-C cable\":1}"
                         },
                         new
@@ -653,12 +654,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Light, sweat resistant wireless earphones with a secure fit, made for running, training and long days on the move.",
                             Features = "Wing tips hold the earphones in place through any workout, and the IPX5 rating keeps out sweat and rain. Transparency mode lets you hear traffic when you need to.\n\nQuick charge gives an hour of music from ten minutes in the case.",
-                            ImageUrl = "/assets/products/yx-sport-earphones.jpg",
                             IsActive = true,
                             Name = "YX Sport Earphones",
                             Price = 799m,
                             Slug = "yx-sport-earphones",
                             Stock = 40,
+                            _images = "[\"/assets/products/yx-sport-earphones.jpg\"]",
                             _inTheBox = "{\"Earphone unit\":2,\"Charging case\":1,\"Wing tips\":3,\"USB-C cable\":1}"
                         },
                         new
@@ -668,12 +669,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "A reference digital to analog converter and balanced headphone amplifier, machined from a solid block of aluminum.",
                             Features = "Dual converter chips run in mono mode, one per channel, for a black background and precise stereo image. The balanced output drives even the hardest headphones with ease.\n\nUSB, optical and coaxial inputs, with a clear display for the volume and sample rate.",
-                            ImageUrl = "/assets/products/aurum-reference-dac.jpg",
                             IsActive = true,
                             Name = "Aurum Reference DAC",
                             Price = 6499m,
                             Slug = "aurum-reference-dac",
                             Stock = 6,
+                            _images = "[\"/assets/products/aurum-reference-dac.jpg\"]",
                             _inTheBox = "{\"DAC unit\":1,\"Power supply\":1,\"USB cable\":1,\"Remote control\":1}"
                         },
                         new
@@ -683,12 +684,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "A vacuum tube headphone amplifier with a warm amber glow, adding body and depth to every recording.",
                             Features = "Hand selected tubes give the smooth, rich sound tube lovers know. A stepped volume control keeps both channels perfectly matched.\n\nTwo headphone outputs and a preamp output for powered speakers.",
-                            ImageUrl = "/assets/products/tube-headphone-amplifier.jpg",
                             IsActive = true,
                             Name = "Tube Headphone Amplifier",
                             Price = 4899m,
                             Slug = "tube-headphone-amplifier",
                             Stock = 7,
+                            _images = "[\"/assets/products/tube-headphone-amplifier.jpg\"]",
                             _inTheBox = "{\"Amplifier unit\":1,\"Vacuum tubes\":4,\"Power cable\":1,\"User manual\":1}"
                         },
                         new
@@ -698,12 +699,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "A compact DAC and headphone amplifier for your desk, the easiest way to hear more from your computer.",
                             Features = "Plug in over USB and it works with no drivers. The amplifier has enough power for studio headphones and a low noise floor for sensitive earphones.\n\nAn amber display shows the volume and the format you are playing.",
-                            ImageUrl = "/assets/products/desktop-dac-one.jpg",
                             IsActive = true,
                             Name = "Desktop DAC One",
                             Price = 2499m,
                             Slug = "desktop-dac-one",
                             Stock = 15,
+                            _images = "[\"/assets/products/desktop-dac-one.jpg\"]",
                             _inTheBox = "{\"DAC unit\":1,\"USB-C cable\":1,\"User manual\":1}"
                         },
                         new
@@ -713,12 +714,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "A curved stand in solid American walnut on a heavy aluminum base, keeping your headphones in shape and on display.",
                             Features = "The wide curve matches the shape of a headband so the padding never flattens. The weighted base stays steady on any desk.\n\nEach stand is shaped and oiled by hand, so the grain is unique.",
-                            ImageUrl = "/assets/products/walnut-headphone-stand.jpg",
                             IsActive = true,
                             Name = "Walnut Headphone Stand",
                             Price = 899m,
                             Slug = "walnut-headphone-stand",
                             Stock = 20,
+                            _images = "[\"/assets/products/walnut-headphone-stand.jpg\"]",
                             _inTheBox = "{\"Headphone stand\":1}"
                         },
                         new
@@ -728,12 +729,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "A braided silver plated headphone cable with a 4.4mm balanced plug, an easy upgrade for detachable headphones.",
                             Features = "Eight braided cores lower resistance and keep the cable soft and tangle free. The balanced plug works with modern players and amplifiers.\n\nAvailable for the XX99 and Planar Pro connectors.",
-                            ImageUrl = "/assets/products/silver-balanced-cable.jpg",
                             IsActive = true,
                             Name = "Silver Balanced Cable",
                             Price = 1199m,
                             Slug = "silver-balanced-cable",
                             Stock = 25,
+                            _images = "[\"/assets/products/silver-balanced-cable.jpg\"]",
                             _inTheBox = "{\"Cable\":1,\"Storage pouch\":1}"
                         },
                         new
@@ -743,12 +744,12 @@ namespace Audiophile.Infrastructure.Persistence.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Soft velvet memory foam earpads with cooling gel, bringing old headphones back to their first day comfort.",
                             Features = "Cooling gel keeps your ears fresh in long sessions and the velvet cover is gentle on skin. They clip onto the XX99 and Bronze Edition headphones in seconds.",
-                            ImageUrl = "/assets/products/velvet-replacement-earpads.jpg",
                             IsActive = true,
                             Name = "Velvet Replacement Earpads",
                             Price = 349m,
                             Slug = "velvet-replacement-earpads",
                             Stock = 50,
+                            _images = "[\"/assets/products/velvet-replacement-earpads.jpg\"]",
                             _inTheBox = "{\"Earpads\":2}"
                         });
                 });

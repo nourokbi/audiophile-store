@@ -48,7 +48,7 @@ public sealed class ProductService(IAppDbContext db, ILogger<ProductService> log
 
   public async Task<ProductDto> CreateAsync(ProductRequest r, CancellationToken ct)
   {
-    var product = new Product(r.Name, r.Description, r.Price, r.Stock, r.Category, r.Features, r.ImageUrl, r.Slug);
+    var product = new Product(r.Name, r.Description, r.Price, r.Stock, r.Category, r.Features, r.Images, r.Slug);
 
     // The slug is the product's address in the shop, so two products cannot share one
     if (await db.Products.AnyAsync(p => p.Slug == product.Slug, ct))
@@ -69,7 +69,7 @@ public sealed class ProductService(IAppDbContext db, ILogger<ProductService> log
 
     product.UpdateDetails(r.Name, r.Description, r.Category, r.Features);
     product.ChangePrice(r.Price);
-    product.SetImage(r.ImageUrl);
+    product.SetImages(r.Images);
     if (r.InTheBox is not null)
       product.ReplaceBoxContents(r.InTheBox);
 

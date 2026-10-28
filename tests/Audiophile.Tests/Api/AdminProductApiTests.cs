@@ -24,6 +24,44 @@ public sealed class AdminProductApiTests
     }
 
     [Fact]
+    public async Task A_product_keeps_its_images_in_order_and_the_first_is_the_cover()
+    {
+        using var factory = new ApiFactory();
+        var admin = await AdminClientAsync(factory);
+        string[] images = ["/assets/products/front.jpg", "https://images.example.com/side.jpg", " ", "/assets/products/front.jpg"];
+
+        var created = await admin.PostAsJsonAsync("/admin/products", new
+        {
+            name = "Test Speaker", description = "A speaker made for the tests.", features = (string?)null,
+            price = 1000m, stock = 3, category = "Speakers", images, inTheBox = (object?)null,
+        });
+        var product = await ReadAsync(created);
+        var id = product.GetProperty("id").GetString();
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal(["/assets/products/front.jpg", "https://images.example.com/side.jpg"], ImagesOf(product));
+        Assert.Equal("/assets/products/front.jpg", product.GetProperty("imageUrl").GetString());
+
+        var reordered = await admin.PutAsJsonAsync($"/admin/products/{id}", new
+        {
+            name = "Test Speaker", description = "A speaker made for the tests.", features = (string?)null,
+            price = 1000m, category = "Speakers", images = new[] { "https://images.example.com/side.jpg", "/assets/products/front.jpg" },
+            inTheBox = (object?)null,
+        });
+        var edited = await ReadAsync(reordered);
+        Assert.Equal("https://images.example.com/side.jpg", edited.GetProperty("imageUrl").GetString());
+        Assert.Equal(["https://images.example.com/side.jpg", "/assets/products/front.jpg"], ImagesOf(edited));
+
+        var tooMany = await admin.PostAsJsonAsync("/admin/products", new
+        {
+            name = "Another Speaker", description = "A speaker made for the tests.", features = (string?)null,
+            price = 1000m, stock = 3, category = "Speakers", images = Enumerable.Range(1, 9).Select(n => $"/assets/products/{n}.jpg"),
+            inTheBox = (object?)null,
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, tooMany.StatusCode);
+    }
+
+    [Fact]
     public async Task Change_price_sets_the_new_price()
     {
         using var factory = new ApiFactory();
@@ -86,7 +124,7 @@ public sealed class AdminProductApiTests
         var response = await admin.PutAsJsonAsync($"/admin/products/{id}", new
         {
             name = "Boxed Speaker", description = "A speaker made for the tests.", features = (string?)null,
-            price = 1200m, stock = 99, category = "Speakers", imageUrl = (string?)null,
+            price = 1200m, stock = 99, category = "Speakers", images = (string[]?)null,
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -169,6 +207,9 @@ public sealed class AdminProductApiTests
         Assert.Equal(HttpStatusCode.BadRequest, (await admin.GetAsync("/admin/products?sort=Banana")).StatusCode);
     }
 
+    private static List<string?> ImagesOf(JsonElement product) =>
+        product.GetProperty("images").EnumerateArray().Select(i => i.GetString()).ToList();
+
     private static IEnumerable<string> Ids(JsonElement page) =>
         page.GetProperty("items").EnumerateArray().Select(p => p.GetProperty("id").GetString()!).ToList();
 
@@ -183,13 +224,13 @@ public sealed class AdminProductApiTests
     private static object NewProduct(int stock, string name = "Test Speaker", decimal price = 1000m) => new
     {
         name, description = "A speaker made for the tests.", features = (string?)null,
-        price, stock, category = "Speakers", imageUrl = (string?)null, inTheBox = (object?)null,
+        price, stock, category = "Speakers", images = (string[]?)null, inTheBox = (object?)null,
     };
 
     private static object EditedProduct(string name, object? inTheBox = null) => new
     {
         name, description = "A speaker made for the tests.", features = (string?)null,
-        price = 1000m, category = "Speakers", imageUrl = (string?)null, inTheBox,
+        price = 1000m, category = "Speakers", images = (string[]?)null, inTheBox,
     };
 
     private static async Task<string> CreateProductAsync(HttpClient admin, int stock, string name = "Test Speaker", decimal price = 1000m)
