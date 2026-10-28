@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { authApi } from '../lib/api/auth';
-import { getSession, onSessionChange, setSession } from '../lib/api/client';
+import { onSessionChange, refreshSession, setSession } from '../lib/api/client';
 
 const ADMIN_ROLE = 'Admin';
 
@@ -9,15 +9,15 @@ const ADMIN_ROLE = 'Admin';
 const AuthContext = React.createContext(null);
 
 export function AuthProvider({ children }) {
-	const [user, setUser] = React.useState(() => getSession()?.user ?? null);
+	const [user, setUser] = React.useState(null);
+	const [isRestoring, setIsRestoring] = React.useState(true);
 
 	// Keeps React in step when the API client drops a refused session
 	React.useEffect(() => onSessionChange((session) => setUser(session?.user ?? null)), []);
 
-	// On first load checks that the saved session still works
+	// On page load the refresh cookie, if there is one, brings the session back
 	React.useEffect(() => {
-		if (!getSession()) return;
-		authApi.me().catch(() => setSession(null));
+		refreshSession().finally(() => setIsRestoring(false));
 	}, []);
 
 	const login = React.useCallback(async (email, password) => setSession(await authApi.login(email, password)), []);
@@ -28,16 +28,18 @@ export function AuthProvider({ children }) {
 	);
 
 	const logout = React.useCallback(async () => {
-		const refreshToken = getSession()?.refreshToken;
 		try {
-			if (refreshToken) await authApi.logout(refreshToken);
+			await authApi.logout();
 		} finally {
 			setSession(null);
 		}
 	}, []);
 
 	const isAdmin = Boolean(user?.roles?.includes(ADMIN_ROLE));
-	const value = React.useMemo(() => ({ user, isAdmin, login, register, logout }), [user, isAdmin, login, register, logout]);
+	const value = React.useMemo(
+		() => ({ user, isAdmin, isRestoring, login, register, logout }),
+		[user, isAdmin, isRestoring, login, register, logout],
+	);
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

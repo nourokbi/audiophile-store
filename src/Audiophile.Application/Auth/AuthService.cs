@@ -62,9 +62,12 @@ public sealed class AuthService(
     }
 
     // Every refresh token works once, trading it in revokes it and issues a new pair
-    public async Task<AuthResponse> RefreshAsync(RefreshRequest request, CancellationToken ct)
+    public async Task<AuthResponse> RefreshAsync(string? refreshToken, CancellationToken ct)
     {
-        var hash = tokens.HashRefreshToken(request.RefreshToken);
+        if (string.IsNullOrEmpty(refreshToken))
+            throw new UnauthorizedException(InvalidSession);
+
+        var hash = tokens.HashRefreshToken(refreshToken);
         var stored = await db.RefreshTokens.Include(t => t.User).FirstOrDefaultAsync(t => t.Token == hash, ct)
             ?? throw new UnauthorizedException(InvalidSession);
 
@@ -90,10 +93,14 @@ public sealed class AuthService(
     }
 
     // Deletes the token instead of revoking it, so a later reuse is not mistaken for theft
-    public async Task LogoutAsync(Guid userId, RefreshRequest request, CancellationToken ct)
+    // Holding the token is the proof of the session, so no access token is needed and an expired one still logs out
+    public async Task LogoutAsync(string? refreshToken, CancellationToken ct)
     {
-        var hash = tokens.HashRefreshToken(request.RefreshToken);
-        var stored = await db.RefreshTokens.FirstOrDefaultAsync(t => t.Token == hash && t.UserId == userId, ct);
+        if (string.IsNullOrEmpty(refreshToken))
+            return;
+
+        var hash = tokens.HashRefreshToken(refreshToken);
+        var stored = await db.RefreshTokens.FirstOrDefaultAsync(t => t.Token == hash, ct);
         if (stored is null)
             return;
 

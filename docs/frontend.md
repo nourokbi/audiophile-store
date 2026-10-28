@@ -73,8 +73,9 @@ which is fine for a shop this size; with hundreds of products it moves to the AP
   the answer. Totals and the shipping fee come from the API.
 - **Orders:** the order pages call the API directly. The order page polls every 3 seconds while a card payment waits
   for Fawaterak's webhook.
-- **Session:** `lib/api.js` keeps the tokens in `localStorage`, adds the bearer token, and on a 401 trades the
-  refresh token once for a new pair.
+- **Session:** `lib/api/client.js` keeps the access token in memory only and adds it as the bearer token. The refresh
+  token is an httpOnly cookie, so on page load and once after a 401 the client calls `/auth/refresh` and the browser
+  sends the cookie. Protected pages wait for that first restore before deciding to send you to login.
 
 ## Design system
 

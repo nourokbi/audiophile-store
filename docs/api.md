@@ -12,11 +12,13 @@ In Development the OpenAPI document is at `/openapi/v1.json`.
 |---|---|---|---|---|---|
 | POST | `/auth/register` | 🔓 · 5/hour per IP | `{ name, email, password }` | **201** session | 400 bad name/email/password · 409 email taken · 429 |
 | POST | `/auth/login` | 🔓 · 10/min per IP | `{ email, password }` | 200 session | 401 · 429 |
-| POST | `/auth/refresh` | 🔓 · 10/min per IP | `{ refreshToken }` | 200 new session | 401 |
-| POST | `/auth/logout` | 🔑 | `{ refreshToken }` | 204 | 401 |
+| POST | `/auth/refresh` | 🍪 · 30/min per IP | — | 200 new session | 401 no cookie or a bad one |
+| POST | `/auth/logout` | 🍪 | — | 204, the cookie is deleted | — |
 | GET | `/auth/me` | 🔑 | — | 200 `{ id, name, email, roles }` | 401 |
 
-A **session** is `{ accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, user }`.
+A **session** body is `{ accessToken, accessTokenExpiresAt, user }`. The refresh token never appears in a body: register,
+login and refresh set it as the cookie `audiophile_refresh` (🍪), which is `HttpOnly`, `SameSite=Strict`, `Path=/auth`,
+and `Secure` when the request came over https. The browser sends it back by itself, page scripts cannot read it.
 
 Rules:
 - **Access token:** a JWT, valid **15 minutes**. Claims: `sub` (user id), `email`, `name`, `role`, `jti`.
@@ -24,7 +26,8 @@ Rules:
 - **Rotation:** each refresh token works once. `/auth/refresh` revokes it and returns a new pair.
 - **Reuse detection:** presenting an already-used refresh token returns 401 **and revokes every session of that user**,
   because two parties holding the same token means it was stolen.
-- **Logout** deletes that one refresh token (other devices stay signed in). It only ever touches the caller's own tokens.
+- **Logout** deletes the refresh token in the cookie (other devices stay signed in) and needs no access token, so an
+  expired one still logs out. Holding the cookie is the proof of the session, and `SameSite=Strict` stops other sites.
 - **Login errors don't say which part was wrong:** an unknown email and a wrong password get the same 401 message.
 - **Lockout:** 5 wrong passwords lock the account for 5 minutes.
 - **Passwords:** at least 8 characters, with a digit and a lowercase letter (ASP.NET Core Identity).

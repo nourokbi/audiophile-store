@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Audiophile.Tests.Api;
 
@@ -9,6 +10,7 @@ namespace Audiophile.Tests.Api;
 public sealed class AuthApiTests
 {
     private const string Password = "password-123";
+    private const string RefreshCookie = "audiophile_refresh";
 
     [Fact]
     public async Task Register_returns_201_with_a_session_that_works()
@@ -69,24 +71,54 @@ public sealed class AuthApiTests
     }
 
     [Fact]
+    public async Task The_refresh_token_comes_only_in_an_httponly_cookie_that_the_browser_sends_back()
+    {
+        using var factory = new ApiFactory();
+        var browser = factory.CreateClient();   // keeps cookies like a browser
+
+        var registered = await browser.PostAsJsonAsync("/auth/register",
+            new { name = "Mona Hassan", email = "mona@example.com", password = Password });
+        Assert.False((await ReadAsync(registered)).TryGetProperty("refreshToken", out _));
+
+        var cookie = registered.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith(RefreshCookie));
+        Assert.Contains("httponly", cookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("samesite=strict", cookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("path=/auth", cookie, StringComparison.OrdinalIgnoreCase);
+
+        var refreshed = await browser.PostAsync("/auth/refresh", null);
+        Assert.Equal(HttpStatusCode.OK, refreshed.StatusCode);
+        Assert.Equal("mona@example.com", (await ReadAsync(refreshed)).GetProperty("user").GetProperty("email").GetString());
+    }
+
+    [Fact]
+    public async Task Refresh_without_a_cookie_is_refused()
+    {
+        using var factory = new ApiFactory();
+
+        var response = await factory.CreateClient().PostAsync("/auth/refresh", null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Refresh_rotates_and_reusing_an_old_token_ends_every_session()
     {
         using var factory = new ApiFactory();
-        var client = factory.CreateClient();
+        var client = CookielessClient(factory);
         var first = (await RegisterAsync(client, "mona@example.com")).Refresh;
 
         // A normal refresh returns a new pair
-        var rotated = await client.PostAsJsonAsync("/auth/refresh", new { refreshToken = first });
+        var rotated = await PostWithCookieAsync(client, "/auth/refresh", first);
         Assert.Equal(HttpStatusCode.OK, rotated.StatusCode);
-        var second = (await ReadAsync(rotated)).GetProperty("refreshToken").GetString();
+        var second = RefreshCookieOf(rotated);
         Assert.NotEqual(first, second);
 
         // The first token again means someone kept a copy, so it is refused
-        var reused = await client.PostAsJsonAsync("/auth/refresh", new { refreshToken = first });
+        var reused = await PostWithCookieAsync(client, "/auth/refresh", first);
         Assert.Equal(HttpStatusCode.Unauthorized, reused.StatusCode);
 
         // and the newer token is revoked with it
-        var afterReuse = await client.PostAsJsonAsync("/auth/refresh", new { refreshToken = second });
+        var afterReuse = await PostWithCookieAsync(client, "/auth/refresh", second);
         Assert.Equal(HttpStatusCode.Unauthorized, afterReuse.StatusCode);
     }
 
@@ -94,18 +126,16 @@ public sealed class AuthApiTests
     public async Task Logout_ends_that_session_only()
     {
         using var factory = new ApiFactory();
-        var client = factory.CreateClient();
+        var client = CookielessClient(factory);
         var laptop = await RegisterAsync(client, "mona@example.com");
         var phone = await LoginAsync(client, "mona@example.com", Password);
 
-        Authorize(client, laptop.Access);
-        var logout = await client.PostAsJsonAsync("/auth/logout", new { refreshToken = laptop.Refresh });
+        var logout = await PostWithCookieAsync(client, "/auth/logout", laptop.Refresh);
         Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
+        Assert.Contains(logout.Headers.GetValues("Set-Cookie"), c => c.StartsWith($"{RefreshCookie}=;"));
 
-        Assert.Equal(HttpStatusCode.Unauthorized,
-            (await client.PostAsJsonAsync("/auth/refresh", new { refreshToken = laptop.Refresh })).StatusCode);
-        Assert.Equal(HttpStatusCode.OK,
-            (await client.PostAsJsonAsync("/auth/refresh", new { refreshToken = phone.Refresh })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await PostWithCookieAsync(client, "/auth/refresh", laptop.Refresh)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PostWithCookieAsync(client, "/auth/refresh", phone.Refresh)).StatusCode);
     }
 
     [Fact]
@@ -155,22 +185,34 @@ public sealed class AuthApiTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);   // not 403: it does not even exist for Omar
     }
 
+    // Refresh is the cookie as a browser would send it back, name=value
     private static async Task<(string Access, string Refresh)> RegisterAsync(HttpClient client, string email)
     {
         var response = await client.PostAsJsonAsync("/auth/register", new { name = "Test Customer", email, password = Password });
         response.EnsureSuccessStatusCode();
-        return Tokens(await ReadAsync(response));
+        return ((await ReadAsync(response)).GetProperty("accessToken").GetString()!, RefreshCookieOf(response));
     }
 
     private static async Task<(string Access, string Refresh)> LoginAsync(HttpClient client, string email, string password)
     {
         var response = await client.PostAsJsonAsync("/auth/login", new { email, password });
         response.EnsureSuccessStatusCode();
-        return Tokens(await ReadAsync(response));
+        return ((await ReadAsync(response)).GetProperty("accessToken").GetString()!, RefreshCookieOf(response));
     }
 
-    private static (string Access, string Refresh) Tokens(JsonElement session) =>
-        (session.GetProperty("accessToken").GetString()!, session.GetProperty("refreshToken").GetString()!);
+    // Does not keep cookies, so each test picks which refresh token goes with a request
+    private static HttpClient CookielessClient(ApiFactory factory) =>
+        factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+    private static string RefreshCookieOf(HttpResponseMessage response) =>
+        response.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith(RefreshCookie)).Split(';')[0];
+
+    private static Task<HttpResponseMessage> PostWithCookieAsync(HttpClient client, string path, string cookie)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, path);
+        request.Headers.Add("Cookie", cookie);
+        return client.SendAsync(request);
+    }
 
     private static void Authorize(HttpClient client, string accessToken) =>
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);

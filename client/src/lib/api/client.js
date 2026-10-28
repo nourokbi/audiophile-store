@@ -1,9 +1,6 @@
 // The one place the shop talks to the API, Vite forwards /api to localhost:5040 in development and VITE_API_URL sets it in production
 const BASE = import.meta.env.VITE_API_URL ?? '/api';
 
-// The session is kept in localStorage so a refresh keeps you logged in, an httpOnly cookie is the safer choice for later
-const SESSION_KEY = 'audiophile.session';
-
 export class ApiError extends Error {
 	constructor(status, message, problem) {
 		super(message);
@@ -12,29 +9,13 @@ export class ApiError extends Error {
 	}
 }
 
-let session = readSession();
+// The session is { accessToken, user } in memory only, so a script injected into the page finds no token in storage
+// The refresh token sits in an httpOnly cookie the browser sends to /auth by itself, and a page load restores the session from it
+let session = null;
 const listeners = new Set();
-
-function readSession() {
-	try {
-		return JSON.parse(localStorage.getItem(SESSION_KEY)) ?? null;
-	} catch {
-		return null;
-	}
-}
-
-export function getSession() {
-	return session;
-}
 
 export function setSession(next) {
 	session = next;
-	try {
-		if (next) localStorage.setItem(SESSION_KEY, JSON.stringify(next));
-		else localStorage.removeItem(SESSION_KEY);
-	} catch {
-		// With storage blocked the session still lives until the tab closes
-	}
 	listeners.forEach((fn) => fn(next));
 }
 
@@ -44,16 +25,11 @@ export function onSessionChange(fn) {
 	return () => listeners.delete(fn);
 }
 
-// On a 401 the refresh token is traded once for a new pair and the call repeated, parallel calls share that one refresh
+// Trades the cookie for a new session, used on page load and once after a 401, parallel calls share that one refresh
 let refreshing = null;
 
-async function refreshSession() {
-	if (!session?.refreshToken) return false;
-	refreshing ??= fetch(`${BASE}/auth/refresh`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ refreshToken: session.refreshToken }),
-	})
+export async function refreshSession() {
+	refreshing ??= fetch(`${BASE}/auth/refresh`, { method: 'POST' })
 		.then(async (res) => {
 			if (!res.ok) {
 				setSession(null);
@@ -89,7 +65,7 @@ export async function api(path, { method = 'GET', body, headers = {}, retry = tr
 		body: body === undefined ? undefined : JSON.stringify(body),
 	});
 
-	if (res.status === 401 && retry && session?.refreshToken && !path.startsWith('/auth/')) {
+	if (res.status === 401 && retry && session && !path.startsWith('/auth/')) {
 		if (await refreshSession()) return api(path, { method, body, headers, retry: false });
 	}
 
