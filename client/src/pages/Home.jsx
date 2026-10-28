@@ -5,7 +5,7 @@ import ProductCard from '../components/shop/ProductCard';
 import PromiseStrip from '../components/shop/PromiseStrip';
 import ShopFilters from '../components/shop/ShopFilters';
 import Pagination from '../components/ui/Pagination';
-import { useCatalog } from '../context/CatalogContext';
+import { useCatalog } from '../hooks/useCatalog';
 import { useShopFilters } from '../hooks/useShopFilters';
 import { findCategory } from '../lib/navigation';
 

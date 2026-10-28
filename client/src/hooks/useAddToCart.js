@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { useCart } from '../context/CartContext';
+import { useCart } from './useCart';
 
 // Add to cart for the product page and the cards, visitors and customers alike get a short notice back
 export function useAddToCart() {

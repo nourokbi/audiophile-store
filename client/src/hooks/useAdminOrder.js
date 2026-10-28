@@ -1,25 +1,12 @@
-import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { adminApi } from '../lib/api/admin';
+import { queryKeys } from '../lib/queryClient';
 
-// One order for the admin order page, with the status change that answers the updated order and a reload
+// One order for the admin order page, a status change or a payment sync refreshes it through the cache
 export function useAdminOrder(id) {
-	const [order, setOrder] = React.useState(null);
-	const [loadError, setLoadError] = React.useState('');
+	const { data: order = null, error } = useQuery({ queryKey: queryKeys.adminOrder(id), queryFn: () => adminApi.getOrder(id) });
 
-	React.useEffect(() => {
-		let isOutdated = false;
-		adminApi
-			.getOrder(id)
-			.then((loadedOrder) => !isOutdated && setOrder(loadedOrder))
-			.catch((error) => !isOutdated && setLoadError(error.status === 404 ? 'This order does not exist.' : error.message));
-		return () => {
-			isOutdated = true;
-		};
-	}, [id]);
-
-	const changeStatus = async (nextStatus) => setOrder(await adminApi.changeOrderStatus(id, nextStatus));
-	const reload = async () => setOrder(await adminApi.getOrder(id));
-
-	return { order, loadError, changeStatus, reload };
+	const loadError = !error ? '' : error.status === 404 ? 'This order does not exist.' : error.message;
+	return { order, loadError };
 }

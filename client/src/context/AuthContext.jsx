@@ -2,6 +2,7 @@ import React from 'react';
 
 import { authApi } from '../lib/api/auth';
 import { onSessionChange, refreshSession, setSession } from '../lib/api/client';
+import { queryClient } from '../lib/queryClient';
 
 const ADMIN_ROLE = 'Admin';
 
@@ -32,6 +33,8 @@ export function AuthProvider({ children }) {
 			await authApi.logout();
 		} finally {
 			setSession(null);
+			// The next person on this browser must not see this account's orders, addresses or admin data
+			queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'catalog' });
 		}
 	}, []);
 

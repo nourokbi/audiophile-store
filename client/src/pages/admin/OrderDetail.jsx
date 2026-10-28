@@ -10,33 +10,25 @@ import OrderProgress from '../../components/orders/OrderProgress';
 import StatusBadge from '../../components/orders/StatusBadge';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { useAdminOrder } from '../../hooks/useAdminOrder';
+import { useChangeOrderStatus } from '../../hooks/useChangeOrderStatus';
 import { usePaymentPanel } from '../../hooks/usePaymentPanel';
 import { formatDate, shortId } from '../../lib/format';
 
 // One order for the admin: where it is, who it goes to, what is in it, its payment, and the buttons that move it on
 const OrderDetail = () => {
 	const { id } = useParams();
-	const { order, loadError, changeStatus, reload } = useAdminOrder(id);
-	const payment = usePaymentPanel(id, order?.paymentMethod === 'Card', reload);
-	const [isSaving, setIsSaving] = React.useState(false);
-	const [saveError, setSaveError] = React.useState('');
+	const { order, loadError } = useAdminOrder(id);
+	const payment = usePaymentPanel(id, order?.paymentMethod === 'Card');
+	const statusChange = useChangeOrderStatus();
 	const [isCancelDialogOpen, setIsCancelDialogOpen] = React.useState(false);
+	const isSaving = statusChange.isPending;
+	const saveError = statusChange.error?.message ?? '';
 
-	const moveTo = async (nextStatus) => {
-		setIsSaving(true);
-		setSaveError('');
-		try {
-			await changeStatus(nextStatus);
-			setIsCancelDialogOpen(false);
-		} catch (error) {
-			setSaveError(error.message);
-		} finally {
-			setIsSaving(false);
-		}
-	};
+	const moveTo = (nextStatus) =>
+		statusChange.mutate({ orderId: id, status: nextStatus }, { onSuccess: () => setIsCancelDialogOpen(false) });
 
 	const openCancelDialog = () => {
-		setSaveError('');
+		statusChange.reset();
 		setIsCancelDialogOpen(true);
 	};
 

@@ -4,7 +4,7 @@ import { ChevronDown, Menu, ShoppingBag, X } from 'lucide-react';
 
 import AccountMenu from './AccountMenu';
 import Logo from './Logo';
-import { useCart } from '../../context/CartContext';
+import { useCart } from '../../hooks/useCart';
 import { CATEGORIES, navLinkClass } from '../../lib/navigation';
 
 // The fixed header, the links sit in the middle and the cart and account menu on the right

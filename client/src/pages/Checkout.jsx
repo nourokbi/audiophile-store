@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Lock, ShoppingBag } from 'lucide-react';
 
@@ -8,10 +9,11 @@ import PaymentPicker from '../components/checkout/PaymentPicker';
 import PriceSummary from '../components/shop/PriceSummary';
 import EmptyState from '../components/ui/EmptyState';
 import { useAuth } from '../context/AuthContext';
-import { useCart } from '../context/CartContext';
+import { useCart } from '../hooks/useCart';
 import { useAddresses } from '../hooks/useAddresses';
 import { ordersApi } from '../lib/api/orders';
 import { formatPrice } from '../lib/format';
+import { queryKeys } from '../lib/queryClient';
 
 const NEW_ADDRESS_ID = 'new';
 const EMPTY_ADDRESS_FORM = { name: '', phone: '', street: '', postalCode: '', city: '', country: 'Egypt' };
@@ -31,6 +33,7 @@ const Checkout = () => {
 	const { user } = useAuth();
 	const { cart, refresh: refreshCart } = useCart();
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 	const { addresses, addAddress } = useAddresses();
 
 	const [chosenAddressId, setChosenAddressId] = React.useState(null); // null until the customer picks one
@@ -82,7 +85,10 @@ const Checkout = () => {
 				return;
 			}
 
+			// The cart is now empty, the new order joins my orders and the stock went down
 			idempotencyKey.current = crypto.randomUUID();
+			queryClient.invalidateQueries({ queryKey: queryKeys.myOrders });
+			queryClient.invalidateQueries({ queryKey: queryKeys.catalog });
 			await refreshCart();
 			navigate(`/orders/${order.id}`);
 		} catch (error) {

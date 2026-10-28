@@ -1,44 +1,29 @@
-import React from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { adminApi } from '../lib/api/admin';
+import { queryKeys } from '../lib/queryClient';
 
 // What Fawaterak sent about a card order, newest first, and the sync that asks Fawaterak again when a webhook seems lost
-export function usePaymentPanel(orderId, isCardOrder, onSynced) {
-	const [events, setEvents] = React.useState([]);
-	const [loadError, setLoadError] = React.useState('');
-	const [reloadCount, setReloadCount] = React.useState(0); // raised after a sync, which stores a new event
-	const [isSyncing, setIsSyncing] = React.useState(false);
-	const [syncError, setSyncError] = React.useState('');
+export function usePaymentPanel(orderId, isCardOrder) {
+	const queryClient = useQueryClient();
 
-	React.useEffect(() => {
-		if (!isCardOrder) return; // a cash order never talks to Fawaterak
-		let isOutdated = false;
-		adminApi
-			.listPaymentEvents(orderId)
-			.then((loadedEvents) => {
-				if (isOutdated) return;
-				setEvents([...loadedEvents].reverse());
-				setLoadError('');
-			})
-			.catch((error) => !isOutdated && setLoadError(error.message));
-		return () => {
-			isOutdated = true;
-		};
-	}, [orderId, isCardOrder, reloadCount]);
+	const { data: events = [], error } = useQuery({
+		queryKey: queryKeys.paymentEvents(orderId),
+		queryFn: async () => (await adminApi.listPaymentEvents(orderId)).reverse(),
+		enabled: isCardOrder, // a cash order never talks to Fawaterak
+	});
 
-	const syncWithGateway = async () => {
-		setIsSyncing(true);
-		setSyncError('');
-		try {
-			await adminApi.syncPayment(orderId);
-			await onSynced();
-			setReloadCount((count) => count + 1);
-		} catch (error) {
-			setSyncError(error.message);
-		} finally {
-			setIsSyncing(false);
-		}
+	// A sync stores a new event and can move the order, so the whole admin orders group loads again, these events included
+	const sync = useMutation({
+		mutationFn: () => adminApi.syncPayment(orderId),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.adminOrders }),
+	});
+
+	return {
+		events,
+		loadError: error?.message ?? '',
+		isSyncing: sync.isPending,
+		syncError: sync.error?.message ?? '',
+		syncWithGateway: () => sync.mutate(),
 	};
-
-	return { events, loadError, isSyncing, syncError, syncWithGateway };
 }

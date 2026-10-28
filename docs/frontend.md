@@ -23,8 +23,8 @@ After a change to `tailwind.config.js`, restart `npm run dev`: the dev server do
 |---|---|
 | `src/pages` | One file per route: `Home`, `Product`, `Cart`, `AuthPage`, `Checkout`, `Orders`, `OrderDetail`, `Settings`, `AdminDashboard` |
 | `src/components` | Pieces used by several pages: `Navbar`, `UserDrawer`, `Footer`, `ProductCard`, `QuantityStepper`, `TextField`, `Picture`, `OrderParts`, `Logo`, `Layout`, `RequireAuth` |
-| `src/context` | Shared state: `ThemeContext` (light or dark), `AuthContext` (who is signed in), `CartContext` (the server cart), `CatalogContext` (the products) |
-| `src/hooks` | `useAddToCart`, used by the product cards and the product page |
+| `src/context` | Browser state only: `ThemeContext` (light or dark), `AuthContext` (who is signed in) |
+| `src/hooks` | Every piece of server data as a React Query hook (`useCatalog`, `useCart`, `useAddresses`, the admin hooks), plus `useAddToCart` and the URL filter hooks |
 | `src/lib` | `api.js` (every call to the API), `format.js` (prices), `navigation.js` (the categories with their icons), `shipping.js` (the free shipping threshold shown on the cart page), `csv.js` (downloads rows as a CSV file) |
 | `src/data/pictures.json` | Each product's photo, and for the six original products the responsive sizes and the gallery |
 | `src/data/adminSample.js` | Sample numbers for the admin dashboard until the admin API exists |
@@ -66,13 +66,17 @@ which is fine for a shop this size; with hundreds of products it moves to the AP
 ## Where the data comes from
 
 - **Products:** the API is the source of every product: name, text, price, stock, category and *in the box*.
-  `CatalogContext` loads `GET /products` once and adds the photo, the gallery and the *new* flag from
+  `useCatalog` loads `GET /products` once and adds the photo, the gallery and the *new* flag from
   `pictures.json` by slug. A product with no entry there uses the API's `imageUrl`. Adding a product therefore
   means a seed row (or the admin API later) and, for a nicer photo, one line in `pictures.json`.
-- **Cart:** `CartContext` keeps the server cart. Every cart call returns the whole cart, so the context just stores
-  the answer. Totals and the shipping fee come from the API.
-- **Orders:** the order pages call the API directly. The order page polls every 3 seconds while a card payment waits
-  for Fawaterak's webhook.
+- **Cart:** `useCart` keeps a customer's cart on the server and a visitor's in `localStorage`, priced by
+  `POST /cart/quote` and merged into the account at login. Every cart call returns the whole cart, so the hook just
+  puts the answer in the cache. Totals and the shipping fee come from the API.
+- **Orders:** the order page polls every 3 seconds (React Query's `refetchInterval`) while a card payment waits for
+  Fawaterak's webhook, for 3 minutes at most.
+- **Server data:** every API answer lives in one React Query cache (`lib/queryClient.js`). `queryKeys` there names
+  each entry from the broad group to the detail, so a change invalidates a whole group: an order status change
+  reloads the order list, the open order and the stats in one call. An answer is fresh for 30 seconds.
 - **Session:** `lib/api/client.js` keeps the access token in memory only and adds it as the bearer token. The refresh
   token is an httpOnly cookie, so on page load and once after a 401 the client calls `/auth/refresh` and the browser
   sends the cookie. Protected pages wait for that first restore before deciding to send you to login.

@@ -26,12 +26,13 @@ const Products = () => {
 	};
 	const closeDialog = () => setOpenDialog(null);
 
-	// Every change goes through here: send the request, then hand the product the server answered to applyResult
-	const saveChange = async (productId, sendRequest, applyResult) => {
+	// Every change goes through here: send the request, then load again what it touched before the dialog closes
+	const saveChange = async (productId, sendRequest, refreshAfterSave) => {
 		setSavingProductId(productId);
 		setSaveError('');
 		try {
-			applyResult(await sendRequest());
+			await sendRequest();
+			await refreshAfterSave();
 			setOpenDialog(null);
 		} catch (error) {
 			setSaveError(error.message);
@@ -41,13 +42,13 @@ const Products = () => {
 	};
 
 	const toggleProductAvailability = (product) =>
-		saveChange(product.id, () => adminApi.setAvailability(product.id, !product.isActive), productList.replaceProduct);
+		saveChange(product.id, () => adminApi.setAvailability(product.id, !product.isActive), productList.refreshProducts);
 	const restockProduct = (product, quantity) =>
-		saveChange(product.id, () => adminApi.restock(product.id, quantity), productList.replaceProduct);
+		saveChange(product.id, () => adminApi.restock(product.id, quantity), productList.refreshProducts);
 	const changeProductPrice = (product, price) =>
-		saveChange(product.id, () => adminApi.changePrice(product.id, price), productList.replaceProduct);
+		saveChange(product.id, () => adminApi.changePrice(product.id, price), productList.refreshProducts);
 	const editProduct = (product, productRequest) =>
-		saveChange(product.id, () => adminApi.updateProduct(product.id, productRequest), productList.replaceProduct);
+		saveChange(product.id, () => adminApi.updateProduct(product.id, productRequest), productList.refreshProducts);
 	const createProduct = (productRequest) =>
 		saveChange(NEW_PRODUCT_ID, () => adminApi.createProduct(productRequest), productList.reloadFromFirstPage);
 
