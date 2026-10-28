@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 import Layout from './components/layout/Layout';
 import RequireAuth from './components/layout/RequireAuth';
+import ScrollToTop from './components/layout/ScrollToTop';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { queryClient } from './lib/queryClient';
@@ -30,6 +31,7 @@ const App = () => (
 		<ThemeProvider>
 			<AuthProvider>
 				<BrowserRouter>
+					<ScrollToTop />
 					<Routes>
 						<Route element={<Layout />}>
 							<Route path='/' element={<Home />} />
