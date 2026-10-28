@@ -58,13 +58,15 @@ Rules:
   (ties sorted by name); `q` searches like `/search`. An unknown `availability` or `sort` is a 400.
 - **Search** matches name or description, case-insensitive. It is a contains search that works like
   `LIKE '%term%'` and reads every row; a `pg_trgm` or full text index can replace it when the catalogue grows.
-- A **product** is `{ id, name, description, features, price, stock, inStock, category, imageUrl, inTheBox, isActive, createdAt }`;
+- A **product** is `{ id, name, description, features, price, stock, inStock, category, imageUrl, images, inTheBox, isActive, createdAt }`;
+  `images` is the list of photo addresses in order, up to 8, and `imageUrl` is the first one, the cover;
   `category` is `Headphones`, `Speakers`, `Earphones`, `Amplifiers` or `Accessories`;
   `inTheBox` is an object like `{ "Headphone unit": 1, "User manual": 1 }`.
-- **Create body:** `{ name, description, features?, price, stock, category, imageUrl?, inTheBox?, slug? }`.
-- **Update body:** `{ name, description, features?, price, category, imageUrl?, inTheBox? }`. It never changes the
+- **Create body:** `{ name, description, features?, price, stock, category, images?, inTheBox?, slug? }`.
+- **Update body:** `{ name, description, features?, price, category, images?, inTheBox? }`. It never changes the
   stock, which only moves through restock and orders, so an edit made with an old number cannot undo a checkout.
-  `inTheBox` left out keeps the current contents, an empty object empties the box.
+  `inTheBox` left out keeps the current contents, an empty object empties the box. `images` replaces the whole list,
+  blank and repeated addresses are dropped.
 - Every product has a **`slug`**, its address in the shop (`/headphones/xx59-headphones`). It is unique, made
   from the name when `POST /admin/products` leaves it out, and never changed by an update. The client matches its
   pages to the API's products by slug.

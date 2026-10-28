@@ -24,6 +24,44 @@ public sealed class AdminProductApiTests
     }
 
     [Fact]
+    public async Task A_product_keeps_its_images_in_order_and_the_first_is_the_cover()
+    {
+        using var factory = new ApiFactory();
+        var admin = await AdminClientAsync(factory);
+        string[] images = ["/assets/products/front.jpg", "https://images.example.com/side.jpg", " ", "/assets/products/front.jpg"];
+
+        var created = await admin.PostAsJsonAsync("/admin/products", new
+        {
+            name = "Test Speaker", description = "A speaker made for the tests.", features = (string?)null,
+            price = 1000m, stock = 3, category = "Speakers", images, inTheBox = (object?)null,
+        });
+        var product = await ReadAsync(created);
+        var id = product.GetProperty("id").GetString();
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal(["/assets/products/front.jpg", "https://images.example.com/side.jpg"], ImagesOf(product));
+        Assert.Equal("/assets/products/front.jpg", product.GetProperty("imageUrl").GetString());
+
+        var reordered = await admin.PutAsJsonAsync($"/admin/products/{id}", new
+        {
+            name = "Test Speaker", description = "A speaker made for the tests.", features = (string?)null,
+            price = 1000m, category = "Speakers", images = new[] { "https://images.example.com/side.jpg", "/assets/products/front.jpg" },
+            inTheBox = (object?)null,
+        });
+        var edited = await ReadAsync(reordered);
+        Assert.Equal("https://images.example.com/side.jpg", edited.GetProperty("imageUrl").GetString());
+        Assert.Equal(["https://images.example.com/side.jpg", "/assets/products/front.jpg"], ImagesOf(edited));
+
+        var tooMany = await admin.PostAsJsonAsync("/admin/products", new
+        {
+            name = "Another Speaker", description = "A speaker made for the tests.", features = (string?)null,
+            price = 1000m, stock = 3, category = "Speakers", images = Enumerable.Range(1, 9).Select(n => $"/assets/products/{n}.jpg"),
+            inTheBox = (object?)null,
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, tooMany.StatusCode);
+    }
+
+    [Fact]
     public async Task Change_price_sets_the_new_price()
     {
         using var factory = new ApiFactory();
@@ -48,7 +86,7 @@ public sealed class AdminProductApiTests
         Assert.Equal(HttpStatusCode.OK, hidden.StatusCode);
         Assert.False((await ReadAsync(hidden)).GetProperty("isActive").GetBoolean());
         Assert.Equal(HttpStatusCode.NotFound, (await shopper.GetAsync($"/products/{id}")).StatusCode);
-        Assert.Contains(id, Ids(await ReadAsync(await admin.GetAsync("/admin/products?pageSize=50"))));
+        Assert.Contains(id, Ids(await ReadAsync(await admin.GetAsync("/admin/products?availability=Hidden"))));
 
         // A hidden product can still be restocked, so the admin can get it ready before showing it again
         (await admin.PostAsJsonAsync($"/admin/products/{id}/restock", new { quantity = 1 })).EnsureSuccessStatusCode();
@@ -86,7 +124,7 @@ public sealed class AdminProductApiTests
         var response = await admin.PutAsJsonAsync($"/admin/products/{id}", new
         {
             name = "Boxed Speaker", description = "A speaker made for the tests.", features = (string?)null,
-            price = 1200m, stock = 99, category = "Speakers", imageUrl = (string?)null,
+            price = 1200m, stock = 99, category = "Speakers", images = (string[]?)null,
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -141,9 +179,9 @@ public sealed class AdminProductApiTests
         var onSaleStocked = await CreateProductAsync(admin, stock: 20, name: "Filter Stocked Speaker");
         (await admin.DeleteAsync($"/admin/products/{hiddenLowStock}")).EnsureSuccessStatusCode();
 
-        var hidden = Ids(await ReadAsync(await admin.GetAsync("/admin/products?availability=Hidden&pageSize=50")));
-        var onSale = Ids(await ReadAsync(await admin.GetAsync("/admin/products?availability=OnSale&pageSize=50")));
-        var lowStock = Ids(await ReadAsync(await admin.GetAsync("/admin/products?lowStockOnly=true&pageSize=50")));
+        var hidden = Ids(await ReadAsync(await admin.GetAsync("/admin/products?availability=Hidden&q=Filter")));
+        var onSale = Ids(await ReadAsync(await admin.GetAsync("/admin/products?availability=OnSale&q=Filter")));
+        var lowStock = Ids(await ReadAsync(await admin.GetAsync("/admin/products?lowStockOnly=true&q=Filter")));
 
         Assert.Contains(hiddenLowStock, hidden);
         Assert.DoesNotContain(onSaleStocked, hidden);
@@ -169,6 +207,9 @@ public sealed class AdminProductApiTests
         Assert.Equal(HttpStatusCode.BadRequest, (await admin.GetAsync("/admin/products?sort=Banana")).StatusCode);
     }
 
+    private static List<string?> ImagesOf(JsonElement product) =>
+        product.GetProperty("images").EnumerateArray().Select(i => i.GetString()).ToList();
+
     private static IEnumerable<string> Ids(JsonElement page) =>
         page.GetProperty("items").EnumerateArray().Select(p => p.GetProperty("id").GetString()!).ToList();
 
@@ -183,13 +224,13 @@ public sealed class AdminProductApiTests
     private static object NewProduct(int stock, string name = "Test Speaker", decimal price = 1000m) => new
     {
         name, description = "A speaker made for the tests.", features = (string?)null,
-        price, stock, category = "Speakers", imageUrl = (string?)null, inTheBox = (object?)null,
+        price, stock, category = "Speakers", images = (string[]?)null, inTheBox = (object?)null,
     };
 
     private static object EditedProduct(string name, object? inTheBox = null) => new
     {
         name, description = "A speaker made for the tests.", features = (string?)null,
-        price = 1000m, category = "Speakers", imageUrl = (string?)null, inTheBox,
+        price = 1000m, category = "Speakers", images = (string[]?)null, inTheBox,
     };
 
     private static async Task<string> CreateProductAsync(HttpClient admin, int stock, string name = "Test Speaker", decimal price = 1000m)

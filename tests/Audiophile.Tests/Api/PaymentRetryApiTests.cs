@@ -126,7 +126,7 @@ public sealed class PaymentRetryApiTests
         var product = await admin.PostAsJsonAsync("/admin/products", new
         {
             name = $"Test Speaker {Guid.NewGuid():N}", description = "A speaker made for the tests.", features = (string?)null,
-            price = 1000m, stock = 5, category = "Speakers", imageUrl = (string?)null, inTheBox = (object?)null,
+            price = 1000m, stock = 5, category = "Speakers", images = (string[]?)null, inTheBox = (object?)null,
         });
         product.EnsureSuccessStatusCode();
         var productId = (await ReadAsync(product)).GetProperty("id").GetString();

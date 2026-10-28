@@ -3,7 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ShoppingBag } from 'lucide-react';
 
 import ProductCard from '../components/shop/ProductCard';
-import Picture from '../components/ui/Picture';
+import ProductGallery from '../components/shop/ProductGallery';
 import QuantityStepper from '../components/ui/QuantityStepper';
 import { useCatalog } from '../hooks/useCatalog';
 import { useAddToCart } from '../hooks/useAddToCart';
@@ -49,9 +49,8 @@ const Product = () => {
 				</Link>
 
 				<section className='grid grid-cols-1 items-center gap-10 md:grid-cols-2 lg:gap-24'>
-					<div className='overflow-hidden rounded bg-panel shadow-sm'>
-						<Picture image={product.image} alt={product.name} className='aspect-square w-full object-cover' />
-					</div>
+					{/* Keyed by product so moving to another product starts again at its cover */}
+					<ProductGallery key={product.slug} images={product.images} name={product.name} />
 					<div className='flex flex-col gap-5'>
 						{product.isNew && <p className='eyebrow'>New product</p>}
 						<h1 className='text-[32px] leading-tight tracking-tight lg:text-[40px]'>{product.name}</h1>
@@ -89,18 +88,6 @@ const Product = () => {
 					</ul>
 				</div>
 			</section>
-
-			{product.gallery && (
-				<section className='grid grid-cols-1 gap-5 md:grid-cols-5 lg:gap-8'>
-					<div className='flex flex-col gap-5 md:col-span-2 lg:gap-8'>
-						<Picture image={product.gallery.first} className='w-full rounded' />
-						<Picture image={product.gallery.second} className='w-full rounded' />
-					</div>
-					<div className='md:col-span-3'>
-						<Picture image={product.gallery.third} className='h-full w-full rounded object-cover' />
-					</div>
-				</section>
-			)}
 
 			<section className='flex flex-col gap-10'>
 				<h2 className='text-center text-[24px] md:text-[32px]'>You may also like</h2>

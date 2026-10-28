@@ -103,7 +103,7 @@ public sealed class OrderApiTests
         var response = await admin.PostAsJsonAsync("/admin/products", new
         {
             name = "Test Speaker", description = "A speaker made for the tests.", features = (string?)null,
-            price = 1000m, stock, category = "Speakers", imageUrl = (string?)null, inTheBox = (object?)null,
+            price = 1000m, stock, category = "Speakers", images = (string[]?)null, inTheBox = (object?)null,
         });
         response.EnsureSuccessStatusCode();
         return (await ReadAsync(response)).GetProperty("id").GetString()!;

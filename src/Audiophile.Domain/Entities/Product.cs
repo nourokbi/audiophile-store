@@ -10,9 +10,13 @@ public sealed class Product
     public const int DescriptionMaxLength = 2000;
     public const int FeaturesMaxLength = 4000;
     public const int SlugMaxLength = 100;
+    public const int MaxImages = 8;
 
     // Not readonly because EF Core fills it from the jsonb InTheBox column
     private Dictionary<string, int> _inTheBox = new(StringComparer.OrdinalIgnoreCase);
+
+    // Not readonly because EF Core fills it from the jsonb Images column
+    private List<string> _images = [];
 
     private Product() { } // EF Core
 
@@ -23,7 +27,7 @@ public sealed class Product
         int stock,
         ProductCategory category,
         string? features = null,
-        string? imageUrl = null,
+        IEnumerable<string>? images = null,
         string? slug = null)
     {
         Name = Guard.Text(name, 2, NameMaxLength, nameof(name));
@@ -33,7 +37,7 @@ public sealed class Product
         Stock = Guard.AtLeast(stock, 0, nameof(stock));
         Category = Guard.Defined(category, nameof(category));
         Features = Guard.OptionalText(features, FeaturesMaxLength, nameof(features)) ?? string.Empty;
-        ImageUrl = Guard.OptionalUrl(imageUrl, nameof(imageUrl));
+        SetImages(images);
     }
 
     public Guid Id { get; private set; } = Guid.NewGuid();
@@ -46,7 +50,11 @@ public sealed class Product
     public string Features { get; private set; } = string.Empty;
     public decimal Price { get; private set; }
     public int Stock { get; private set; }
-    public string? ImageUrl { get; private set; }
+
+    // The photos in the order the shop shows them, the first is the cover on the cards, the cart and the orders
+    public IReadOnlyList<string> Images => _images;
+    public string? ImageUrl => _images.FirstOrDefault();
+
     public bool IsActive { get; private set; } = true;
     public ProductCategory Category { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
@@ -87,7 +95,19 @@ public sealed class Product
 
     public void ChangePrice(decimal newPrice) => Price = Guard.PositiveMoney(newPrice, nameof(newPrice));
 
-    public void SetImage(string? imageUrl) => ImageUrl = Guard.OptionalUrl(imageUrl, nameof(imageUrl));
+    // Blank entries are dropped and a repeated address is kept once, so the list holds only real photos
+    public void SetImages(IEnumerable<string>? images)
+    {
+        var validImages = (images ?? [])
+            .Select(image => Guard.OptionalUrl(image, "images"))
+            .OfType<string>()
+            .Distinct()
+            .ToList();
+        if (validImages.Count > MaxImages)
+            throw new ArgumentException($"A product can have up to {MaxImages} images.", nameof(images));
+
+        _images = validImages;
+    }
 
     public void ReplaceBoxContents(IEnumerable<KeyValuePair<string, int>> contents)
     {

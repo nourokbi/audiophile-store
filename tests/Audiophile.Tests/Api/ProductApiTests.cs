@@ -53,7 +53,7 @@ public sealed class ProductApiTests
         Assert.DoesNotContain(id, Ids(await ReadAsync(await customer.GetAsync("/products?pageSize=50"))));
         Assert.DoesNotContain(id, Ids(await ReadAsync(await customer.GetAsync("/products/search?q=hidden"))));
 
-        var all = await ReadAsync(await admin.GetAsync("/admin/products?pageSize=50"));
+        var all = await ReadAsync(await admin.GetAsync("/admin/products?availability=Hidden"));
         var hidden = all.GetProperty("items").EnumerateArray().Single(p => p.GetProperty("id").GetString() == id);
         Assert.False(hidden.GetProperty("isActive").GetBoolean());
         Assert.Contains(id, Ids(await ReadAsync(await admin.GetAsync("/admin/products/search?q=hidden"))));
@@ -75,7 +75,7 @@ public sealed class ProductApiTests
         var response = await admin.PostAsJsonAsync("/admin/products", new
         {
             name, description = "A speaker made for the tests.", features = (string?)null,
-            price = 1000m, stock = 5, category = "Speakers", imageUrl = (string?)null, inTheBox = (object?)null,
+            price = 1000m, stock = 5, category = "Speakers", images = (string[]?)null, inTheBox = (object?)null,
         });
         response.EnsureSuccessStatusCode();
         return (await ReadAsync(response)).GetProperty("id").GetString()!;
