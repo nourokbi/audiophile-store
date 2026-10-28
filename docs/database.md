@@ -34,8 +34,11 @@ start without one, so a missing setting fails at deploy time, not on the first r
 
 - **Tables:** Identity (`AspNetUsers`, `AspNetRoles`, `AspNetUserRoles`, …), `Addresses`, `RefreshTokens`,
   `Products`, `Carts`, `CartItems`, `Orders`, `OrderItems`, `Payments`, `PaymentEvents`.
-- **Seed data (`HasData` in the entity configurations):** the `Admin` and `Customer` roles and 22 products: the
-  six original ones and the new collection of 16 (migration `SeedNewCollection`), with photos in `client/public/assets/products`.
+- **Seed data (`HasData` in the entity configurations):** the `Admin` and `Customer` roles and 72 products: the
+  six original ones and the new collection of 16 (migration `SeedNewCollection`), with photos in `client/public/assets/products`,
+  and 50 more in `ExpandedCatalogSeed.cs` (migration `ExpandedCatalog`). `Products.Images` is a jsonb list of photo
+  addresses, the first is the cover (migration `ProductImages`). The extra photos are free Unsplash photos linked by
+  address, so they need an internet connection to show.
 - **Not seeded:** the admin *account*. Its password is a secret, so it can't live in a migration. It's created at
   startup from `Admin:Email` / `Admin:Password` (`DatabaseInitializer`), only if it doesn't exist yet.
 

@@ -86,7 +86,7 @@ public sealed class AdminProductApiTests
         Assert.Equal(HttpStatusCode.OK, hidden.StatusCode);
         Assert.False((await ReadAsync(hidden)).GetProperty("isActive").GetBoolean());
         Assert.Equal(HttpStatusCode.NotFound, (await shopper.GetAsync($"/products/{id}")).StatusCode);
-        Assert.Contains(id, Ids(await ReadAsync(await admin.GetAsync("/admin/products?pageSize=50"))));
+        Assert.Contains(id, Ids(await ReadAsync(await admin.GetAsync("/admin/products?availability=Hidden"))));
 
         // A hidden product can still be restocked, so the admin can get it ready before showing it again
         (await admin.PostAsJsonAsync($"/admin/products/{id}/restock", new { quantity = 1 })).EnsureSuccessStatusCode();
@@ -179,9 +179,9 @@ public sealed class AdminProductApiTests
         var onSaleStocked = await CreateProductAsync(admin, stock: 20, name: "Filter Stocked Speaker");
         (await admin.DeleteAsync($"/admin/products/{hiddenLowStock}")).EnsureSuccessStatusCode();
 
-        var hidden = Ids(await ReadAsync(await admin.GetAsync("/admin/products?availability=Hidden&pageSize=50")));
-        var onSale = Ids(await ReadAsync(await admin.GetAsync("/admin/products?availability=OnSale&pageSize=50")));
-        var lowStock = Ids(await ReadAsync(await admin.GetAsync("/admin/products?lowStockOnly=true&pageSize=50")));
+        var hidden = Ids(await ReadAsync(await admin.GetAsync("/admin/products?availability=Hidden&q=Filter")));
+        var onSale = Ids(await ReadAsync(await admin.GetAsync("/admin/products?availability=OnSale&q=Filter")));
+        var lowStock = Ids(await ReadAsync(await admin.GetAsync("/admin/products?lowStockOnly=true&q=Filter")));
 
         Assert.Contains(hiddenLowStock, hidden);
         Assert.DoesNotContain(onSaleStocked, hidden);
