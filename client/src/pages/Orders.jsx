@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ShoppingBag, User } from 'lucide-react';
 
@@ -10,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { ordersApi } from '../lib/api/orders';
 import { formatDate, formatPrice, shortId } from '../lib/format';
 import { isActiveOrder, PAYMENT_LABELS } from '../lib/orderHelpers';
+import { queryKeys } from '../lib/queryClient';
 
 const TABS = [
 	{ key: 'all', label: 'All orders', matches: () => true },
@@ -23,17 +25,14 @@ const Orders = () => {
 	const { user } = useAuth();
 	const [searchParams] = useSearchParams();
 	const paidOrderId = searchParams.get('orderId');
-	const [orders, setOrders] = React.useState(null);
-	const [loadError, setLoadError] = React.useState('');
 	const [selectedTab, setSelectedTab] = React.useState('all');
 
-	React.useEffect(() => {
-		if (paidOrderId) return;
-		ordersApi
-			.list()
-			.then(setOrders)
-			.catch((error) => setLoadError(error.message));
-	}, [paidOrderId]);
+	const { data: orders = null, error } = useQuery({
+		queryKey: queryKeys.myOrders,
+		queryFn: ordersApi.list,
+		enabled: !paidOrderId,
+	});
+	const loadError = error?.message ?? '';
 
 	if (paidOrderId) {
 		const paymentResult = searchParams.get('result') ?? 'pending';

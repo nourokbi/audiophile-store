@@ -68,8 +68,8 @@ the dashboard connected). How to build each step, with hints and code sketches, 
 **You build next** (the client is ready and waits for these)
 
 1. **The check by hand** of every admin page, then tag `v0.3.0` and merge `phase-5/admin-api`.
-2. **React Query** across the client, now that every list has an API.
-3. Then Phase 4 leftovers (guest cart, httpOnly cookie), Phase 2 (pluggable payments, kept as a later refactor),
+2. ✅ **React Query** across the client, and the Phase 4 leftovers (guest cart, httpOnly cookie) (2026-10-28).
+3. Then Phase 2 (pluggable payments, kept as a later refactor),
    and Phases 6 → 7.
 
 **Still missing in Phase 5** (each one is a box further down)
@@ -229,7 +229,7 @@ chain, not every session) are a possible refinement; revoking everything is the 
 
 - [x] `client/src/lib/api.js`: one `fetch` wrapper that adds the JWT, refreshes it once on 401, and reads the
       base URL from `VITE_API_URL` (done 2026-10-18)
-- [ ] **TanStack Query** for server data (products, cart, orders); today it's React context + `fetch`. Moved to Phase 5, after the admin API
+- [x] **TanStack Query** for server data (products, cart, orders), done in Phase 5 (2026-10-28)
       `data.json` still supplies images and copy; prices, stock and ids come from the API (matched on slug)
 - [x] Login / register pages (2026-10-18)
 - [x] Move the refresh token to an httpOnly cookie, the access token lives in memory and a page load restores the
@@ -590,7 +590,7 @@ Use `UserManager` (`AddToRoleAsync` / `RemoveFromRoleAsync`), and refuse to remo
 
 ### Do not forget, after the admin API exists
 
-- [ ] **TanStack Query (React Query)** for every server call: products, cart, orders and the admin lists. It brings
+- [x] **TanStack Query (React Query)** for every server call: products, cart, orders and the admin lists (2026-10-28). It brings
       caching, loading and error state, refetch after a change (restock, cancel) and polling (it replaces the
       3 second timer in `OrderDetail.jsx`). Keep `lib/api/client.js` as the function each query calls; no need for axios.
 - [x] **Chart.js** (with `react-chartjs-2`) for the dashboard, see part F (2026-10-27)

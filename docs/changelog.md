@@ -2,6 +2,16 @@
 
 What changed and why, newest first. Git history has the line-by-line detail; this file is the readable version.
 
+## 2026-10-28 — Guest cart, httpOnly refresh cookie, React Query
+
+- **Guest cart:** visitors can add to the cart without an account. The cart lives in `localStorage`,
+  `POST /cart/quote` prices it and `POST /cart/merge` moves it into the account at login, capped at the stock.
+- **Refresh cookie:** the refresh token moved from `localStorage` to an httpOnly cookie, and the access token lives in
+  memory only. A page load restores the session from the cookie, and logout works even with an expired access token.
+- **React Query:** every server call goes through one cache. `CartContext` and `CatalogContext` became the hooks
+  `useCart` and `useCatalog`, and the hand-written race guards, reload counters and the polling timer are gone.
+  A change invalidates what it touched, so the lists, the open order, the stats and the shop stay in step by themselves.
+
 ## 2026-10-19 — Admin product actions
 
 - Every row of the admin product table has *Restock*, *Price* and an *Available* switch, in a small dialog with a

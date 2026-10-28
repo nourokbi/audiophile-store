@@ -1,4 +1,3 @@
-import React from 'react';
 import { Download } from 'lucide-react';
 
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
@@ -6,6 +5,7 @@ import OrderFilters from '../../components/admin/OrderFilters';
 import OrdersTable from '../../components/admin/OrdersTable';
 import OrderStatusTabs from '../../components/admin/OrderStatusTabs';
 import { useAdminOrders } from '../../hooks/useAdminOrders';
+import { useChangeOrderStatus } from '../../hooks/useChangeOrderStatus';
 import { downloadCsv } from '../../lib/csv';
 import { shortId } from '../../lib/format';
 import { PAYMENT_LABELS } from '../../lib/orderHelpers';
@@ -30,20 +30,10 @@ const exportOrders = (orders) =>
 // Every order with its status tabs, filters and the quick step forward, the order page holds the rest of the controls
 const Orders = () => {
 	const orderList = useAdminOrders();
-	const [savingOrderId, setSavingOrderId] = React.useState(null);
-	const [saveError, setSaveError] = React.useState('');
+	const statusChange = useChangeOrderStatus();
 
-	const moveOrderForward = async (order, nextStatus) => {
-		setSavingOrderId(order.id);
-		setSaveError('');
-		try {
-			orderList.replaceOrder(await orderList.changeOrderStatus(order.id, nextStatus));
-		} catch (error) {
-			setSaveError(error.message);
-		} finally {
-			setSavingOrderId(null);
-		}
-	};
+	// The table, the tab counts and the overview load again by themselves once the change is saved
+	const moveOrderForward = (order, nextStatus) => statusChange.mutate({ orderId: order.id, status: nextStatus });
 
 	return (
 		<div className='flex flex-col gap-6'>
@@ -73,8 +63,8 @@ const Orders = () => {
 				totalCount={orderList.totalCount}
 				isLoading={orderList.isLoading}
 				hasFilters={orderList.hasFilters}
-				savingOrderId={savingOrderId}
-				errorMessage={saveError || orderList.loadError}
+				savingOrderId={statusChange.isPending ? statusChange.variables.orderId : null}
+				errorMessage={statusChange.error?.message || orderList.loadError}
 				currentPage={orderList.filters.page}
 				totalPages={orderList.totalPages}
 				onPageChange={(pageNumber) => orderList.setFilter('page', pageNumber)}

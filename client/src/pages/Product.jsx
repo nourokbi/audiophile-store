@@ -5,7 +5,7 @@ import { ArrowLeft, ShoppingBag } from 'lucide-react';
 import ProductCard from '../components/shop/ProductCard';
 import Picture from '../components/ui/Picture';
 import QuantityStepper from '../components/ui/QuantityStepper';
-import { useCatalog } from '../context/CatalogContext';
+import { useCatalog } from '../hooks/useCatalog';
 import { useAddToCart } from '../hooks/useAddToCart';
 import { formatPrice } from '../lib/format';
 import { findCategory } from '../lib/navigation';

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CreditCard, XCircle } from 'lucide-react';
 
@@ -10,8 +11,9 @@ import PriceSummary from '../components/shop/PriceSummary';
 import { ordersApi } from '../lib/api/orders';
 import { formatDate, shortId } from '../lib/format';
 import { canCancel, isWaitingForPayment, PAYMENT_LABELS } from '../lib/orderHelpers';
+import { queryKeys } from '../lib/queryClient';
 
-// While a card order waits for Fawaterak's webhook this page asks the API every few seconds
+// While a card order waits for Fawaterak's webhook this page asks the API every few seconds, for a few minutes at most
 const CHECK_EVERY_MS = 3000;
 const STOP_CHECKING_AFTER_MS = 3 * 60 * 1000;
 
@@ -19,38 +21,33 @@ const OrderDetail = () => {
 	const { id } = useParams();
 	const [searchParams] = useSearchParams();
 	const paymentResult = searchParams.get('result'); // success, fail or pending from Fawaterak's redirect
-	const [order, setOrder] = React.useState(null);
-	const [loadError, setLoadError] = React.useState('');
+	const queryClient = useQueryClient();
 	const [hasStoppedWaiting, setHasStoppedWaiting] = React.useState(false);
-	const [isCancelling, setIsCancelling] = React.useState(false);
-	const [cancelError, setCancelError] = React.useState('');
 
+	const { data: order = null, error } = useQuery({
+		queryKey: queryKeys.myOrder(id),
+		queryFn: () => ordersApi.get(id),
+		refetchInterval: (query) =>
+			query.state.data && isWaitingForPayment(query.state.data) && !hasStoppedWaiting ? CHECK_EVERY_MS : false,
+	});
+	const loadError = !error ? '' : error.status === 404 ? 'We could not find this order.' : error.message;
 	const isWaiting = order !== null && isWaitingForPayment(order);
 
 	React.useEffect(() => {
-		ordersApi
-			.get(id)
-			.then(setOrder)
-			.catch((error) => setLoadError(error.status === 404 ? 'We could not find this order.' : error.message));
-	}, [id]);
-
-	React.useEffect(() => {
 		if (!isWaiting) return;
-		const startedAt = Date.now();
-		const checkTimer = setInterval(async () => {
-			if (Date.now() - startedAt > STOP_CHECKING_AFTER_MS) {
-				clearInterval(checkTimer);
-				setHasStoppedWaiting(true);
-				return;
-			}
-			try {
-				setOrder(await ordersApi.get(id));
-			} catch {
-				// A missed check is fine, the next one tries again
-			}
-		}, CHECK_EVERY_MS);
-		return () => clearInterval(checkTimer);
-	}, [id, isWaiting]);
+		const stopTimer = setTimeout(() => setHasStoppedWaiting(true), STOP_CHECKING_AFTER_MS);
+		return () => clearTimeout(stopTimer);
+	}, [isWaiting]);
+
+	// The cancelled order goes straight into the cache, my orders and the shop's stock load again
+	const cancel = useMutation({
+		mutationFn: () => ordersApi.cancel(id),
+		onSuccess: (cancelledOrder) => {
+			queryClient.setQueryData(queryKeys.myOrder(id), cancelledOrder);
+			queryClient.invalidateQueries({ queryKey: queryKeys.myOrders });
+			queryClient.invalidateQueries({ queryKey: queryKeys.catalog });
+		},
+	});
 
 	if (loadError || !order) {
 		return (
@@ -67,17 +64,8 @@ const OrderDetail = () => {
 		);
 	}
 
-	const cancelOrder = async () => {
-		if (!window.confirm('Cancel this order? Its items go back into stock.')) return;
-		setIsCancelling(true);
-		setCancelError('');
-		try {
-			setOrder(await ordersApi.cancel(id));
-		} catch (error) {
-			setCancelError(error.message);
-		} finally {
-			setIsCancelling(false);
-		}
+	const cancelOrder = () => {
+		if (window.confirm('Cancel this order? Its items go back into stock.')) cancel.mutate();
 	};
 
 	return (
@@ -119,12 +107,12 @@ const OrderDetail = () => {
 						{order.payment && ` - payment ${order.payment.status.toLowerCase()}`}
 					</p>
 					{canCancel(order) && (
-						<button onClick={cancelOrder} disabled={isCancelling} className='btn-secondary w-full'>
+						<button onClick={cancelOrder} disabled={cancel.isPending} className='btn-secondary w-full'>
 							<XCircle size={16} />
-							{isCancelling ? 'Cancelling...' : 'Cancel order'}
+							{cancel.isPending ? 'Cancelling...' : 'Cancel order'}
 						</button>
 					)}
-					{cancelError && <p className='error-text'>{cancelError}</p>}
+					{cancel.error && <p className='error-text'>{cancel.error.message}</p>}
 					<Link to='/' className='btn-primary w-full'>
 						Continue shopping
 					</Link>
