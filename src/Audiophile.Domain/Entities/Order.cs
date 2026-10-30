@@ -23,7 +23,7 @@ public sealed class Order
 
     private Order() { } // EF Core
 
-    public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid Id { get; private set; } = Guid.CreateVersion7();
     public Guid UserId { get; private set; }
     public OrderStatus Status { get; private set; } = OrderStatus.Pending;
     public PaymentMethod PaymentMethod { get; private set; }

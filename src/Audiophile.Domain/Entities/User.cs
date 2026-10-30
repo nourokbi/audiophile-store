@@ -17,7 +17,7 @@ public class User : IdentityUser<Guid>
 
     private User(string name, string email)
     {
-        Id = Guid.NewGuid();
+        Id = Guid.CreateVersion7();
         Name = Guard.Text(name, NameMinLength, NameMaxLength, nameof(name));
         Email = Guard.Email(email, nameof(email));
         UserName = Email;

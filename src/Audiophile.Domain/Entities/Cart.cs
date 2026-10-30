@@ -11,7 +11,7 @@ public sealed class Cart
 
     public Cart(Guid userId) => UserId = Guard.NotEmpty(userId, nameof(userId));
 
-    public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid Id { get; private set; } = Guid.CreateVersion7();
     public Guid UserId { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 

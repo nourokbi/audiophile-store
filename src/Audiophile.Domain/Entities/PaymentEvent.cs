@@ -16,7 +16,7 @@ public sealed class PaymentEvent
         RawPayload = rawPayload ?? string.Empty;
     }
 
-    public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid Id { get; private set; } = Guid.CreateVersion7();
     public string Provider { get; private set; } = null!;
 
     // The invoice id plus its paid state, like 3072989001:success
