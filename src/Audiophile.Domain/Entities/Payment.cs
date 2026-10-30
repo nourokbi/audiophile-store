@@ -14,7 +14,7 @@ public sealed class Payment
         Amount = amount;
     }
 
-    public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid Id { get; private set; } = Guid.CreateVersion7();
     public Guid OrderId { get; private set; }
     public PaymentMethod PaymentMethod { get; private set; }
     public PaymentStatus Status { get; private set; } = PaymentStatus.Pending;

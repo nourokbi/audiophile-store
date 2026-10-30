@@ -19,7 +19,7 @@ public sealed class RefreshToken
         ExpiresAt = expiry;
     }
 
-    public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid Id { get; private set; } = Guid.CreateVersion7();
     public string Token { get; private set; } = null!;
     public Guid UserId { get; private set; }
     public DateTime ExpiresAt { get; private set; }

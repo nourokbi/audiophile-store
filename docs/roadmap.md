@@ -510,7 +510,7 @@ Already there and reused: `GET /orders/{id}/payment/events` and `POST /orders/{i
   `items [{ productId, productName, productImageUrl, unitPrice, quantity, lineTotal }]`
 - **The list page**: `{ items, page, pageSize, totalCount, totalPages, statusCounts }`. `statusCounts` counts every
   status for the search and dates but **ignores the status filter**, so every tab keeps its number
-- `q` searches the customer's name and email, and an order number typed from its start (the first 8 characters shown)
+- `q` searches the customer's name and email, and any part of the order id, such as the short number shown (its last 8 characters)
 - `from` and `to` are days like `2026-10-25`, and `to` includes the whole day
 
 **Build it in this order**

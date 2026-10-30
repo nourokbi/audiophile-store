@@ -46,6 +46,8 @@ PostgreSQL-specific details worth knowing:
 - `Products.InTheBox` is a `jsonb` column.
 - Check constraints back up the domain rules (`Price > 0`, `Stock >= 0`, quantity 1–100, amounts ≥ 0).
 - Money is `numeric(18,2)`; dates are `timestamp with time zone`, always UTC.
+- Ids are UUIDv7, made in C# with `Guid.CreateVersion7()`: they start with the time, so new rows go at the end of
+  each primary key index instead of a random spot. Rows made before the switch keep their random ids.
 
 ## Local: a PostgreSQL install (what this machine uses)
 

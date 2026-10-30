@@ -125,7 +125,7 @@ public sealed class AdminOrderApiTests
         Assert.Equal(omarOrderId, Assert.Single(Ids(byEmail)));
         Assert.Equal(3, byEmail.GetProperty("items")[0].GetProperty("itemCount").GetInt32());
 
-        Assert.Equal(omarOrderId, Assert.Single(Ids(await ListAsync(admin, $"?q={omarOrderId[..8]}"))));
+        Assert.Equal(omarOrderId, Assert.Single(Ids(await ListAsync(admin, $"?q={omarOrderId[^8..]}"))));
 
         var cancelled = await ListAsync(admin, "?status=Cancelled");
         Assert.Equal(omarOrderId, Assert.Single(Ids(cancelled)));

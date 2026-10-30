@@ -25,7 +25,7 @@ public sealed class Address
         PostalCode = Guard.OptionalText(postalCode, 20, nameof(postalCode));
     }
 
-    public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid Id { get; private set; } = Guid.CreateVersion7();
     public Guid UserId { get; private set; }
     public string FullAddressName { get; private set; } = null!;
     public string Street { get; private set; } = null!;

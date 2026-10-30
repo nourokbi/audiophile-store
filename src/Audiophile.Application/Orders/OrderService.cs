@@ -119,7 +119,7 @@ public sealed class OrderService(IAppDbContext db, PaymentService payments, ILog
       query = query.Where(o => o.CreatedAt < end);
     }
 
-    // The customer's name or email anywhere, or the order number typed from its start
+    // The customer's name or email anywhere, or any part of the order id such as its short number
     if (!string.IsNullOrWhiteSpace(q.Search))
     {
       if (q.Search.Length > AdminOrderQuery.MaxSearchLength)
@@ -128,7 +128,7 @@ public sealed class OrderService(IAppDbContext db, PaymentService payments, ILog
       var term = q.Search.Trim().ToLower();
       query = query.Where(o => o.User.Name.ToLower().Contains(term)
                                || o.User.Email!.ToLower().Contains(term)
-                               || o.Id.ToString().StartsWith(term));
+                               || o.Id.ToString().Contains(term));
     }
 
     // Counted before the status filter, and a status with no orders still gets its 0

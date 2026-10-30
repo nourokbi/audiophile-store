@@ -40,7 +40,7 @@ public sealed class Product
         SetImages(images);
     }
 
-    public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid Id { get; private set; } = Guid.CreateVersion7();
     public string Name { get; private set; } = null!;
 
     // The product's address in the shop, set once so saved links keep working after a rename

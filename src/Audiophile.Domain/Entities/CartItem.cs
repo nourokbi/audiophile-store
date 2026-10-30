@@ -17,7 +17,7 @@ public sealed class CartItem
         Quantity = Guard.Between(quantity, 1, MaxQuantity, nameof(quantity));
     }
 
-    public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid Id { get; private set; } = Guid.CreateVersion7();
     public Guid CartId { get; private set; }
     public Guid ProductId { get; private set; }
     public int Quantity { get; private set; }

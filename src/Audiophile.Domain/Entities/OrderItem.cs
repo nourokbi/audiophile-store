@@ -18,7 +18,7 @@ public sealed class OrderItem
         ProductImageUrl = product.ImageUrl ?? string.Empty;
     }
 
-    public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid Id { get; private set; } = Guid.CreateVersion7();
     public Guid OrderId { get; private set; }
     public Guid ProductId { get; private set; }
     public int Quantity { get; private set; }
