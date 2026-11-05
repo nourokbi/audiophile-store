@@ -38,7 +38,7 @@ public sealed class ProductService(IAppDbContext db, ILogger<ProductService> log
     return PageAsync(Sorted(query, q.Sort), q.Page, q.PageSize, ct);
   }
 
-  // A case insensitive contains search that works like SQL LIKE '%term%', it reads every row so a pg_trgm or full text index should replace it when the catalogue grows
+  // A case insensitive contains search that works like SQL LIKE '%term%', trigram indexes on lower(Name) and lower(Description) keep it from reading every row
   public Task<PagedResult<ProductDto>> SearchAsync(ProductSearch s, CancellationToken ct)
   {
     if (string.IsNullOrWhiteSpace(s.Term))
