@@ -62,7 +62,7 @@ Rules:
   products; `newOnly=true` keeps the new collection; `sort` takes the same values plus `Featured` (the new collection first,
   then the highest price).
 - **Search** matches name or description, case-insensitive. It is a contains search that works like
-  `LIKE '%term%'` and reads every row; a `pg_trgm` or full text index can replace it when the catalogue grows.
+  `LIKE '%term%'`, helped by `pg_trgm` indexes on the lower-cased name and description. A term under three letters gets no help from them.
 - A **product** is `{ id, name, description, features, price, stock, inStock, category, imageUrl, images, inTheBox, isActive, createdAt }`;
   `images` is the list of photo addresses in order, up to 8, and `imageUrl` is the first one, the cover;
   `category` is `Headphones`, `Speakers`, `Earphones`, `Amplifiers` or `Accessories`;

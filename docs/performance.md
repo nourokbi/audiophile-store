@@ -64,8 +64,36 @@ No run had a failed request.
 | Shop | 72 ms | 1.1 s |
 | Search | 896 ms | 1.71 s |
 
-PostgreSQL uses about 7 cores here. Search reads the name and description of every row, and indexes on the sort orders can't
-help it. A trigram index is the fix to try next.
+PostgreSQL uses about 7 cores here. Search read the name and description of every row, and indexes on the sort orders can't
+help it.
+
+## Search index
+
+Measured 2026-11-05 with `pg_trgm` indexes on the lower-cased name and description, about 3 MB together.
+
+| One query, milliseconds | Before | After |
+|---|---|---|
+| Count for a rare word (102 matches) | 26 | 1 |
+| A word with no matches, page and count | 27 and 23 | 0.2 and 0.2 |
+| First page for a common word (1,993 matches) | 27 | 0.2 |
+| Count for a common word | 24 | 19 |
+| Count for two letters | 26 | 23 |
+
+| k6 | Before | After |
+|---|---|---|
+| 50 shoppers, search p95 | 97 ms | 52 ms |
+| 100 nonstop, search median | 896 ms | 310 ms |
+| 100 nonstop, search p95 | 1.71 s | 1.26 s |
+| 100 nonstop, requests per second | 245 | 287 |
+
+**What is still slow:**
+
+- A common word still counts by reading every row, because most rows match anyway.
+- At 100 nonstop shoppers the shop page got no faster: p95 went from 1.1 s to 1.52 s, one run each, as more requests got through.
+  Each shop request also counts the whole catalogue, and deep pages read every row they skip.
+- The API opens a database connection for each request running at once, up to 100, which is also PostgreSQL's limit. After the
+  100 shopper run `psql` was refused with `too many clients already`. No API request failed, but a smaller connection pool is
+  worth measuring before deploying, since free database plans allow far fewer connections.
 
 ## After caching
 

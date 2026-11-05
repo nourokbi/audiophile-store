@@ -121,6 +121,21 @@ public sealed class ProductApiTests
         Assert.Equal(expected, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("ZEPHYR")]
+    [InlineData("phyr spe")]
+    [InlineData("tested for")]
+    public async Task Search_finds_any_part_of_the_name_or_description_in_any_case(string term)
+    {
+        using var factory = new ApiFactory();
+        var admin = await AdminClientAsync(factory);
+        var id = await CreateProductAsync(admin, "Zephyr Speaker", description: "A speaker tested for long sessions.");
+
+        var page = await ReadAsync(await factory.CreateClient().GetAsync($"/products?q={Uri.EscapeDataString(term)}"));
+
+        Assert.Equal(id, Assert.Single(Ids(page)));
+    }
+
     [Fact]
     public async Task An_unknown_sort_is_400()
     {
@@ -181,11 +196,12 @@ public sealed class ProductApiTests
     }
 
     private static async Task<string> CreateProductAsync(
-        HttpClient admin, string name, decimal price = 1000m, int stock = 5, string category = "Speakers")
+        HttpClient admin, string name, decimal price = 1000m, int stock = 5, string category = "Speakers",
+        string description = "A speaker made for the tests.")
     {
         var response = await admin.PostAsJsonAsync("/admin/products", new
         {
-            name, description = "A speaker made for the tests.", features = (string?)null,
+            name, description, features = (string?)null,
             price, stock, category, images = (string[]?)null, inTheBox = (object?)null,
         });
         response.EnsureSuccessStatusCode();
