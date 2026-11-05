@@ -30,6 +30,10 @@ public sealed class ProductService(IAppDbContext db, ILogger<ProductService> log
       query = query.Where(p => !p.IsActive);
     if (q.LowStockOnly)
       query = query.Where(p => p.Stock <= ProductQuery.LowStockLimit);
+    if (q.InStockOnly)
+      query = query.Where(p => p.Stock > 0);
+    if (q.NewOnly)
+      query = query.Where(p => p.IsNew);
 
     return PageAsync(Sorted(query, q.Sort), q.Page, q.PageSize, ct);
   }
@@ -45,6 +49,27 @@ public sealed class ProductService(IAppDbContext db, ILogger<ProductService> log
 
   public async Task<ProductDto> GetAsync(Guid id, CancellationToken ct) =>
       ProductDto.From(await FindActiveAsync(id, ct));
+
+  // The product page's address uses the slug, so the page can load one product without the catalogue
+  public async Task<ProductDto> GetBySlugAsync(string slug, CancellationToken ct) =>
+      ProductDto.From(await Catalogue(includeHidden: false).FirstOrDefaultAsync(p => p.Slug == slug, ct)
+          ?? throw new NotFoundException($"Product {slug} was not found."));
+
+  // More products for the product page, the same category first
+  public async Task<IReadOnlyList<ProductDto>> GetRelatedAsync(Guid id, int count, CancellationToken ct)
+  {
+    if (count is < 1 or > ProductQuery.MaxRelatedCount)
+      throw new ArgumentException($"count must be between 1 and {ProductQuery.MaxRelatedCount}.");
+
+    var product = await FindActiveAsync(id, ct);
+    var related = await Catalogue(includeHidden: false)
+        .Where(p => p.Id != id)
+        .OrderByDescending(p => p.Category == product.Category)
+        .ThenBy(p => p.Name)
+        .Take(count)
+        .ToListAsync(ct);
+    return related.Select(ProductDto.From).ToList();
+  }
 
   public async Task<ProductDto> CreateAsync(ProductRequest r, CancellationToken ct)
   {
@@ -130,6 +155,7 @@ public sealed class ProductService(IAppDbContext db, ILogger<ProductService> log
     ProductSort.PriceLowToHigh => query.OrderBy(p => p.Price).ThenBy(p => p.Name),
     ProductSort.PriceHighToLow => query.OrderByDescending(p => p.Price).ThenBy(p => p.Name),
     ProductSort.StockLowToHigh => query.OrderBy(p => p.Stock).ThenBy(p => p.Name),
+    ProductSort.Featured => query.OrderByDescending(p => p.IsNew).ThenByDescending(p => p.Price).ThenBy(p => p.Name),
     _ => query.OrderBy(p => p.Name),
   };
 

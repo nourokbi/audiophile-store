@@ -1,5 +1,6 @@
 using Audiophile.Domain.Common;
 using Audiophile.Domain.Entities;
+using Audiophile.Domain.Enums;
 
 namespace Audiophile.Application.Carts;
 
@@ -8,7 +9,8 @@ public sealed record AddCartItemRequest(Guid ProductId, int Quantity);
 public sealed record SetCartItemQuantityRequest(int Quantity);
 
 public sealed record CartItemDto(
-    Guid ProductId, string ProductName, string? ImageUrl, decimal UnitPrice, int Quantity, decimal LineTotal);
+    Guid ProductId, string ProductName, string? ImageUrl, decimal UnitPrice, int Quantity, decimal LineTotal,
+    string Slug, ProductCategory Category, string Description, int Stock);
 
 // One line of the cart a visitor keeps in the browser, sent to be priced or moved into the account after login
 public sealed record GuestCartItem(Guid ProductId, int Quantity);
@@ -26,7 +28,8 @@ public sealed record CartDto(
     {
         var items = lines
             .Select(l => new CartItemDto(
-                l.Product.Id, l.Product.Name, l.Product.ImageUrl, l.Product.Price, l.Quantity, l.Product.Price * l.Quantity))
+                l.Product.Id, l.Product.Name, l.Product.ImageUrl, l.Product.Price, l.Quantity, l.Product.Price * l.Quantity,
+                l.Product.Slug, l.Product.Category, l.Product.Description, l.Product.Stock))
             .OrderBy(i => i.ProductName)
             .ToList();
         if (items.Count == 0)

@@ -38,9 +38,11 @@ Rules:
 
 | Method | Path | Access | Success | Errors |
 |---|---|---|---|---|
-| GET | `/products?category=&minPrice=&maxPrice=&page=1&pageSize=12` | 🔓 | 200 page | 400 bad filter |
+| GET | `/products?category=&minPrice=&maxPrice=&q=&inStockOnly=false&newOnly=false&sort=Name&page=1&pageSize=12` | 🔓 | 200 page | 400 bad filter |
 | GET | `/products/search?q=&page=1&pageSize=12` | 🔓 | 200 page | 400 empty or long `q` |
 | GET | `/products/{id}` | 🔓 | 200 product | 404 |
+| GET | `/products/by-slug/{slug}` | 🔓 | 200 product | 404 |
+| GET | `/products/{id}/related?count=3` | 🔓 | 200 list, the same category first | 400 `count` not 1–12 · 404 |
 | GET | `/admin/products?category=&minPrice=&maxPrice=&q=&availability=All&lowStockOnly=false&sort=Name&page=1&pageSize=12` | 👑 | 200 page, hidden products included | 400 · 401 · 403 |
 | GET | `/admin/products/search?q=&page=1&pageSize=12` | 👑 | 200 page, hidden products included | 400 · 401 · 403 |
 | POST | `/admin/products` | 👑 | 201 product | 400 · 401 · 403 |
@@ -50,12 +52,15 @@ Rules:
 | PUT | `/admin/products/{id}/price` | 👑 | 200 product | 400 price not positive · 401 · 403 · 404 |
 | PUT | `/admin/products/{id}/availability` | 👑 | 200 product | 401 · 403 · 404 |
 
-- A **page** is `{ items, page, pageSize, totalCount, totalPages }`. `pageSize` is 1–50, `q` ≤ 100 characters,
-  `minPrice` ≤ `maxPrice`. `/products` lists only active products, ordered by name; `/admin/products` lists hidden ones
+- A **page** is `{ items, page, pageSize, totalCount, totalPages }`. `pageSize` is 1–72 (1–50 for admin orders), `q` ≤ 100 characters,
+  `minPrice` ≤ `maxPrice`. `/products` lists only active products, ordered by name unless `sort` says otherwise; `/admin/products` lists hidden ones
   too, which is how the dashboard's product table reads the catalogue.
 - **Admin filters** on `GET /admin/products`: `availability` is `All`, `OnSale` or `Hidden`; `lowStockOnly=true` keeps
   products with 8 or fewer left; `sort` is `Name`, `Newest`, `PriceLowToHigh`, `PriceHighToLow` or `StockLowToHigh`
   (ties sorted by name); `q` searches like `/search`. An unknown `availability` or `sort` is a 400.
+- **Shop filters** on `GET /products`: `q`, `category` and the price range combine; `inStockOnly=true` leaves out sold out
+  products; `newOnly=true` keeps the new collection; `sort` takes the same values plus `Featured` (the new collection first,
+  then the highest price).
 - **Search** matches name or description, case-insensitive. It is a contains search that works like
   `LIKE '%term%'` and reads every row; a `pg_trgm` or full text index can replace it when the catalogue grows.
 - A **product** is `{ id, name, description, features, price, stock, inStock, category, imageUrl, images, inTheBox, isActive, createdAt }`;
