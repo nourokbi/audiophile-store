@@ -1,0 +1,12 @@
+# The API image only needs the source under src
+**/bin/
+**/obj/
+.git/
+.github/
+.vs/
+.claude/
+.env
+client/
+docs/
+perf/
+tests/

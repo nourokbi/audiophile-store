@@ -15,8 +15,10 @@ export const SORT_ORDERS = {
 	name: { label: 'Name, A to Z', compare: (a, b) => a.name.localeCompare(b.name) },
 };
 
-const EMPTY_FILTERS = { searchText: '', priceRange: 'all', sortOrder: 'featured', inStockOnly: false };
-const PAGE_SIZE = 9;
+// Multiples of three, so the last row of the grid is always full
+export const PAGE_SIZES = [9, 18, 36, 72];
+
+const EMPTY_FILTERS = { searchText: '', priceRange: 'all', sortOrder: 'featured', inStockOnly: false, pageSize: PAGE_SIZES[0] };
 
 // Filters, sorts and pages the catalogue in the browser for the storefront, a new category or collection starts on page 1
 export function useShopFilters(products, categoryKey, collection) {
@@ -50,9 +52,9 @@ export function useShopFilters(products, categoryKey, collection) {
 		)
 		.sort(SORT_ORDERS[filters.sortOrder].compare);
 
-	const totalPages = Math.max(1, Math.ceil(matchingProducts.length / PAGE_SIZE));
+	const totalPages = Math.max(1, Math.ceil(matchingProducts.length / filters.pageSize));
 	const currentPage = Math.min(requestedPage, totalPages);
-	const firstIndex = (currentPage - 1) * PAGE_SIZE;
+	const firstIndex = (currentPage - 1) * filters.pageSize;
 
 	return {
 		filters,
@@ -60,7 +62,7 @@ export function useShopFilters(products, categoryKey, collection) {
 		setFilter,
 		clearFilters,
 		matchingCount: matchingProducts.length,
-		pageProducts: matchingProducts.slice(firstIndex, firstIndex + PAGE_SIZE),
+		pageProducts: matchingProducts.slice(firstIndex, firstIndex + filters.pageSize),
 		firstIndex,
 		currentPage,
 		totalPages,

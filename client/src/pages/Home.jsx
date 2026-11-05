@@ -55,8 +55,7 @@ const Home = ({ collection }) => {
 						Showing{' '}
 						<strong className='text-ink'>
 							{shop.pageProducts.length === 0 ? 0 : `${shop.firstIndex + 1} to ${shop.firstIndex + shop.pageProducts.length}`}
-						</strong>{' '}
-						of {shop.matchingCount} products
+						</strong>
 					</span>
 					{error && <span className='text-red-600'>Products could not be loaded ({error})</span>}
 				</div>

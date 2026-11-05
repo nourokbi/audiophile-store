@@ -44,7 +44,7 @@ page is finished end to end, and the orders pages run on the admin orders API.
 | 4 React client | ✅ every customer page, redesigned from Stitch with a dark theme; **guest cart and httpOnly cookie left** |
 | 5 Admin dashboard | 🟡 every page done end to end; **the check by hand and `v0.3.0` are next** (branch `phase-5/admin-api`) |
 | 6 Caching + messaging | ⬜ not started |
-| 7 Docker, CI, deploy | ⬜ not started (AWS was considered; the VPS + Neon plan still stands) |
+| 7 Docker, CI, deploy | 🟡 Dockerfiles and compose for client, API and database done; **CI images and deploy left** |
 
 ### Next up, in this order
 
@@ -604,7 +604,7 @@ a customer gets 403 on every `/admin` endpoint, and a check by hand of every adm
 - [ ] Redis in `docker-compose.yml`
 - [ ] **HybridCache** (`Microsoft.Extensions.Caching.Hybrid`) with Redis as the shared layer, for product list and details: *cache-aside*
 - [ ] Remove cache entries when an admin edits a product (invalidate on write)
-- [ ] Measure before and after with a simple load test (`k6` or `bombardier`); put the numbers in the README
+- [ ] Measure before and after with a simple load test: k6 baseline done ([`performance.md`](performance.md)), the after run left
 
 **Messaging (3 days)**
 - [ ] RabbitMQ in compose; **MassTransit v8** (open source; v9 is commercial)
@@ -615,8 +615,8 @@ a customer gets 403 on every `/admin` endpoint, and a check by hand of every adm
 
 ## Phase 7 — Docker, CI, deploy, README · 1 week
 
-- [ ] Multi-stage `Dockerfile` for the API; `Dockerfile` for the client (build with Node, serve with nginx)
-- [ ] `docker compose up` runs the whole system: client, api, postgres (already there), redis, rabbitmq, mailpit
+- [x] Multi-stage `Dockerfile` for the API; `Dockerfile` for the client (build with Node, serve with nginx)
+- [ ] `docker compose up` runs the whole system: client, api and postgres done (`--profile app`); redis, rabbitmq, mailpit left
 - [ ] GitHub Actions: test → build images → push to GHCR on merge to `main`
 - [ ] Deploy: the simplest path is **one small VPS + docker compose + Caddy** (automatic HTTPS, which the Fawaterak webhook needs)
 - [ ] Database: **Neon** (free tier). CI runs the EF migration bundle against Neon's direct connection before

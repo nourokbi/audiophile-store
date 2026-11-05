@@ -2,12 +2,12 @@ import { RotateCcw, Search } from 'lucide-react';
 
 import Select from '../ui/Select';
 import Switch from '../ui/Switch';
-import { PRICE_RANGES, SORT_ORDERS } from '../../hooks/useShopFilters';
+import { PAGE_SIZES, PRICE_RANGES, SORT_ORDERS } from '../../hooks/useShopFilters';
 import { CATEGORIES } from '../../lib/navigation';
 
 const CATEGORY_CHIPS = [{ key: 'all', label: 'All items' }, ...CATEGORIES];
 
-// The category chips, the search box, the price and sort dropdowns and the stock switch above the product grid
+// The category chips, the search box, the price, sort and page size dropdowns and the stock switch above the product grid
 const ShopFilters = ({ categoryKey, onCategoryClick, filters, onFilterChange, hasFilters, onClearFilters }) => (
 	<div className='card flex flex-col gap-5 p-6'>
 		<div className='flex flex-wrap gap-2'>
@@ -23,7 +23,7 @@ const ShopFilters = ({ categoryKey, onCategoryClick, filters, onFilterChange, ha
 		</div>
 
 		<div className='grid grid-cols-1 gap-3 md:grid-cols-12'>
-			<div className='relative flex items-center md:col-span-6'>
+			<div className='relative flex items-center md:col-span-4'>
 				<Search size={18} className='pointer-events-none absolute left-4 text-muted' />
 				<input
 					type='search'
@@ -57,6 +57,19 @@ const ShopFilters = ({ categoryKey, onCategoryClick, filters, onFilterChange, ha
 				{Object.entries(SORT_ORDERS).map(([key, sortOrder]) => (
 					<option key={key} value={key}>
 						{sortOrder.label}
+					</option>
+				))}
+			</Select>
+			<Select
+				label='Products per page'
+				hideLabel
+				value={filters.pageSize}
+				onChange={(event) => onFilterChange('pageSize', Number(event.target.value))}
+				className='md:col-span-2'
+			>
+				{PAGE_SIZES.map((pageSize) => (
+					<option key={pageSize} value={pageSize}>
+						{pageSize} per page
 					</option>
 				))}
 			</Select>

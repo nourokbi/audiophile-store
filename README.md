@@ -64,6 +64,19 @@ dotnet run --launch-profile http          # http://localhost:5040
 
 No local PostgreSQL? Skip the connection-string secret and run `docker compose up -d` from the repo root instead.
 
+### The whole app in containers
+
+Needs only Docker. The API runs in Production mode and applies migrations itself.
+
+```bash
+cp .env.example .env     # then fill in Jwt__Key and Admin__Password, and set POSTGRES_PORT=5433 if a local PostgreSQL has 5432
+docker compose --profile app up -d --build     # the shop on http://localhost:8080
+docker compose --profile app down              # stop it, add -v to delete the data too
+```
+
+Cash on delivery works as is. Card payments also need the Fawaterak values in `.env`.
+Load test results and how to run them: [`docs/performance.md`](docs/performance.md).
+
 ### The shop (React client), with card payments
 
 ```bash

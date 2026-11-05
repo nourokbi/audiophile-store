@@ -67,8 +67,8 @@ To start again from empty: `dotnet ef database drop --startup-project src/Audiop
 ## Local: Docker (alternative)
 
 Use this instead of a local install (on a machine without PostgreSQL, or in CI). Stop the local service first,
-or change the port in `docker-compose.yml`, because both want 5432. Remove the user-secret too, so the Docker
-connection string from `appsettings.Development.json` is used.
+because both want 5432, or set `POSTGRES_PORT` in `.env` and use that port in your connection string. Remove the
+user-secret too, so the Docker connection string from `appsettings.Development.json` is used.
 
 ```bash
 docker compose up -d                 # starts PostgreSQL 17 on localhost:5432
