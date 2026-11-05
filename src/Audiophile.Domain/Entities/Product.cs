@@ -56,6 +56,10 @@ public sealed class Product
     public string? ImageUrl => _images.FirstOrDefault();
 
     public bool IsActive { get; private set; } = true;
+
+    // Part of the new collection, which comes first in the shop's Featured order
+    public bool IsNew { get; private set; }
+
     public ProductCategory Category { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
     public IReadOnlyDictionary<string, int> InTheBox => _inTheBox;

@@ -14,18 +14,22 @@ public sealed record ProductQuery(
     string? Search = null,
     ProductAvailability Availability = ProductAvailability.All,
     bool LowStockOnly = false,
-    ProductSort Sort = ProductSort.Name)
+    ProductSort Sort = ProductSort.Name,
+    bool InStockOnly = false,
+    bool NewOnly = false)
 {
   public const int DefaultPageSize = 12;
-  public const int MaxPageSize = 50;
+  public const int MaxPageSize = 72; // the largest page size the shop offers
   public const int MaxSearchLength = 100;
   public const int LowStockLimit = 8;
+  public const int DefaultRelatedCount = 3;
+  public const int MaxRelatedCount = 12;
 }
 
 // Which products the admin list shows, the shop always sees only the ones on sale
 public enum ProductAvailability { All, OnSale, Hidden }
 
-public enum ProductSort { Name, Newest, PriceLowToHigh, PriceHighToLow, StockLowToHigh }
+public enum ProductSort { Name, Newest, PriceLowToHigh, PriceHighToLow, StockLowToHigh, Featured }
 
 // A search on name and description, paged like the list
 public sealed record ProductSearch(
@@ -71,11 +75,12 @@ public sealed record ProductDto(
     IReadOnlyList<string> Images,
     IReadOnlyDictionary<string, int> InTheBox,
     bool IsActive,
+    bool IsNew,
     DateTime CreatedAt)
 {
   public static ProductDto From(Product p) => new(
       p.Id, p.Name, p.Slug, p.Description, p.Features, p.Price, p.Stock, p.Stock > 0, p.Category, p.ImageUrl,
-      p.Images.ToList(), new Dictionary<string, int>(p.InTheBox), p.IsActive, p.CreatedAt);
+      p.Images.ToList(), new Dictionary<string, int>(p.InTheBox), p.IsActive, p.IsNew, p.CreatedAt);
 }
 
 // The bodies of the admin restock, price and availability actions

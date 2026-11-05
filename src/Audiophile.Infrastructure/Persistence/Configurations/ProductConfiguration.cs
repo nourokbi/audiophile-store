@@ -14,11 +14,29 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
   // Seed rows need fixed values because EF compares them with the model on every migration
   private static readonly DateTime SeededAt = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
+  // The seeded products that make up the new collection
+  private static readonly HashSet<string> NewCollection =
+  [
+    "aurum-reference-dac", "bronze-edition-headphones", "carbon-desk-monitors", "closed-back-monitor-headphones",
+    "cylinder-home-speaker", "desktop-dac-one", "planar-pro-headphones", "silver-balanced-cable",
+    "studio-reference-headphones", "tube-headphone-amplifier", "velvet-replacement-earpads", "walnut-bookshelf-speakers",
+    "walnut-headphone-stand", "yx-sport-earphones", "yx2-pro-earphones", "zx12-tower-speaker",
+  ];
+
   public void Configure(EntityTypeBuilder<Product> b)
   {
     b.Property(p => p.Name).HasMaxLength(Product.NameMaxLength);
     b.Property(p => p.Slug).HasMaxLength(Product.SlugMaxLength);
     b.HasIndex(p => p.Slug).IsUnique();
+
+    // One for each order the shop sorts by, alone and within a category, so a page reads only its own rows
+    b.HasIndex(p => p.Name);
+    b.HasIndex(p => new { p.Price, p.Name });
+    b.HasIndex(p => new { p.IsNew, p.Price, p.Name }).IsDescending(true, true, false);
+    b.HasIndex(p => new { p.Category, p.Name });
+    b.HasIndex(p => new { p.Category, p.Price, p.Name });
+    b.HasIndex(p => new { p.Category, p.IsNew, p.Price, p.Name }).IsDescending(false, true, true, false);
+
     b.Property(p => p.Description).HasMaxLength(Product.DescriptionMaxLength);
     b.Property(p => p.Features).HasMaxLength(Product.FeaturesMaxLength);
     b.Ignore(p => p.ImageUrl);
@@ -223,6 +241,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         Stock = stock,
         _images = new List<string> { imageUrl }.Concat(gallery ?? []).ToList(),
         IsActive = true,
+        IsNew = NewCollection.Contains(slug),
         Category = category,
         CreatedAt = SeededAt,
         _inTheBox = inTheBox,
