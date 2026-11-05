@@ -1,5 +1,6 @@
-# Local development services. Start with:  docker compose up -d
-# The API itself still runs with `dotnet run` for now; it joins this file in roadmap Phase 7.
+# Only the database, for `dotnet run`:   docker compose up -d
+# The whole app in containers:           docker compose --profile app up -d --build   (copy .env.example to .env first)
+# The load test, with the app running:   docker compose run --rm k6
 services:
   postgres:
     image: postgres:17-alpine          # same major version as Neon's default
@@ -9,7 +10,7 @@ services:
       POSTGRES_USER: audiophile
       POSTGRES_PASSWORD: audiophile    # local only; production uses Neon
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"   # set POSTGRES_PORT in .env when a local PostgreSQL already has 5432
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -17,6 +18,50 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  api:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: src/Audiophile.API/Dockerfile
+    container_name: audiophile-api
+    env_file: .env                     # Jwt__Key and the admin login
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=audiophile;Username=audiophile;Password=audiophile;GSS Encryption Mode=Disable
+      Database__MigrateOnStartup: "true"
+      Fawaterak__ClientReturnUrl: http://localhost:8080/orders
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The image has no curl, so bash asks /health itself
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  client:
+    profiles: [app]
+    build: ./client
+    container_name: audiophile-client
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  k6:
+    profiles: [perf]
+    image: grafana/k6:2.3.0
+    environment:
+      BASE_URL: http://api:8080
+      VUS: ${VUS:-50}
+      THINK_SECONDS: ${THINK_SECONDS:-1}
+    volumes:
+      - ./perf:/scripts:ro
+    command: run /scripts/products.js
 
 volumes:
   postgres-data:
