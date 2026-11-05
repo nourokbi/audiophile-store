@@ -2,6 +2,14 @@
 
 What changed and why, newest first. Git history has the line-by-line detail; this file is the readable version.
 
+## 2026-11-05 — The API filters and pages the shop
+
+- **One page per visit:** the shop used to download the whole catalogue and filter it in the browser. It now asks
+  `GET /products` for the page on screen, so a catalogue of 5,000 products costs one request instead of 107.
+- **Product and cart pages:** the product page loads one product by slug plus its related ones, and each cart line
+  carries the details the cart shows.
+- **Database:** an `IsNew` column replaces the flag in `pictures.json`, with indexes for every order the shop sorts by.
+
 ## 2026-10-28 — Guest cart, httpOnly refresh cookie, React Query
 
 - **Guest cart:** visitors can add to the cart without an account. The cart lives in `localStorage`,

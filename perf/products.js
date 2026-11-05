@@ -6,6 +6,7 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080/api';
 const VUS = Number(__ENV.VUS || 50);
 const THINK_SECONDS = Number(__ENV.THINK_SECONDS ?? 1); // 0 makes every shopper click nonstop, to find the API's limit
 const SEARCH_TERMS = ['headphones', 'speaker', 'earphones', 'wireless', 'studio'];
+const PAGE_SIZE = 9; // what the shop asks for by default
 
 export const options = {
 	stages: [
@@ -30,23 +31,27 @@ function get(path, page) {
 	return response;
 }
 
-// Runs once before the shoppers start and reads real product ids from the API
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+
+// Runs once before the shoppers start and reads real products and the page count from the API
 export function setup() {
-	const ids = http.get(`${BASE_URL}/products?pageSize=50`).json('items').map((product) => product.id);
-	if (ids.length === 0) throw new Error('The API returned no products');
-	return { ids };
+	const firstPage = http.get(`${BASE_URL}/products?pageSize=${PAGE_SIZE}`).json();
+	if (firstPage.items.length === 0) throw new Error('The API returned no products');
+	return { products: firstPage.items.map(({ id, slug }) => ({ id, slug })), totalPages: firstPage.totalPages };
 }
 
 // One shopper's visit, the sleeps are the time a person spends reading the page
-export default function ({ ids }) {
-	// The shop page loads the whole catalogue 50 at a time, like client/src/lib/api/products.js
-	get('/products?pageSize=50&page=1', 'shop');
-	get('/products?pageSize=50&page=2', 'shop');
+export default function ({ products, totalPages }) {
+	// The first page half the time, like most visits, otherwise any page of the catalogue
+	const page = Math.random() < 0.5 ? 1 : Math.ceil(Math.random() * totalPages);
+	get(`/products?sort=Featured&pageSize=${PAGE_SIZE}&page=${page}`, 'shop');
 	sleep(THINK_SECONDS);
 
-	get(`/products/${ids[Math.floor(Math.random() * ids.length)]}`, 'product');
+	const product = pick(products);
+	get(`/products/by-slug/${product.slug}`, 'product');
+	get(`/products/${product.id}/related?count=3`, 'product');
 	sleep(THINK_SECONDS);
 
-	get(`/products/search?q=${SEARCH_TERMS[Math.floor(Math.random() * SEARCH_TERMS.length)]}`, 'search');
+	get(`/products?q=${pick(SEARCH_TERMS)}&sort=Featured&pageSize=${PAGE_SIZE}`, 'search');
 	sleep(THINK_SECONDS);
 }

@@ -1,7 +1,7 @@
 # Performance
 
 Load tests use [k6](https://k6.io) and the script in [`perf/products.js`](../perf/products.js). Each simulated shopper
-opens the shop (the two catalogue requests the React client makes), opens a random product, then searches.
+opens one page of the shop, opens a product with its related ones, then searches, like the React client.
 
 ## How to run it
 
@@ -39,6 +39,33 @@ At that point PostgreSQL uses about 270% CPU (nearly 3 cores) for data that rare
   the numbers change between machines. Compare runs made on the same machine, not absolute values.
 - The catalogue is small. The shop request gets slower as products are added, and a cached response wouldn't.
 - This covers reading products only. Logging in and placing orders are not measured.
+
+## Server paging, on a catalogue of 5,323 products
+
+Measured 2026-11-05 on real products from the Best Buy open data set, loaded only for testing. The shop used to download
+the whole catalogue on every visit, which at this size is 107 requests. It now asks for the one page on screen. The script
+above was rewritten to match, so the table at the top of this page describes the older behaviour on 72 products and can't be
+compared with these numbers.
+
+| 50 shoppers, same pauses | Before: whole catalogue | After: one page |
+|---|---|---|
+| Time to show the shop | median 21 s, p95 25 s | p95 48 ms |
+| Requests to show the shop | 107 | 1 |
+| Data received per second | 7.5 MB | 0.24 MB |
+| PostgreSQL CPU | about 6.8 cores | about 0.8 core |
+
+No run had a failed request.
+
+**The new limit is search.** With 100 shoppers clicking nonstop the API handles 245 requests per second, and p95 is 1.37 s:
+
+| Page, 100 shoppers nonstop | Median | p95 |
+|---|---|---|
+| Product | 52 ms | 301 ms |
+| Shop | 72 ms | 1.1 s |
+| Search | 896 ms | 1.71 s |
+
+PostgreSQL uses about 7 cores here. Search reads the name and description of every row, and indexes on the sort orders can't
+help it. A trigram index is the fix to try next.
 
 ## After caching
 

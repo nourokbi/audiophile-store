@@ -5,37 +5,28 @@ import { ArrowLeft, ShoppingBag } from 'lucide-react';
 import ProductCard from '../components/shop/ProductCard';
 import ProductGallery from '../components/shop/ProductGallery';
 import QuantityStepper from '../components/ui/QuantityStepper';
-import { useCatalog } from '../hooks/useCatalog';
+import { useCatalogProduct, useRelatedProducts } from '../hooks/useCatalog';
 import { useAddToCart } from '../hooks/useAddToCart';
 import { formatPrice } from '../lib/format';
 import { findCategory } from '../lib/navigation';
 import { isFewLeft, stockLabel } from '../lib/productHelpers';
 
-const RELATED_COUNT = 3;
-
 const Product = () => {
 	const { slug } = useParams();
-	const { products, findBySlug, loading } = useCatalog();
+	const { data: product, isPending, error } = useCatalogProduct(slug);
+	const relatedProducts = useRelatedProducts(product?.id);
 	const { addToCart, busy, notice } = useAddToCart();
 	const [quantity, setQuantity] = React.useState(1);
 
 	// A new product page starts again at one
 	React.useEffect(() => setQuantity(1), [slug]);
 
-	if (loading) return <p className='page py-16 text-muted'>Loading product...</p>;
-
-	const product = findBySlug(slug);
-	if (!product) return <Navigate to='/' replace />;
+	if (isPending) return <p className='page py-16 text-muted'>Loading product...</p>;
+	if (error?.status === 404) return <Navigate to='/' replace />;
+	if (error) return <p className='page py-16 text-red-600'>This product could not be loaded ({error.message})</p>;
 
 	const isSoldOut = !product.inStock;
 	const category = findCategory(product.category);
-
-	// More products, from the same category first
-	const isSameCategory = (otherProduct) => Number(otherProduct.category === product.category);
-	const relatedProducts = products
-		.filter((otherProduct) => otherProduct.slug !== product.slug)
-		.sort((a, b) => isSameCategory(b) - isSameCategory(a))
-		.slice(0, RELATED_COUNT);
 
 	const addAndResetQuantity = async () => {
 		if (await addToCart(product.id, quantity)) setQuantity(1);

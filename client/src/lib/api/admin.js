@@ -1,15 +1,10 @@
-import { api } from './client';
+import { api, toQueryString } from './client';
 import { toProduct } from '../productHelpers';
 
 // Every call the admin dashboard makes, each product answer is turned into the shop's product shape so a row can be swapped in
 const toPage = (page) => ({ ...page, items: page.items.map(toProduct) });
 
 // Leaves out the empty filters so the API uses its defaults for them
-const toQueryString = (filters) =>
-	new URLSearchParams(
-		Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== ''),
-	).toString();
-
 export const adminApi = {
 	// GET /admin/products with q, category, availability, lowStockOnly, sort, page and pageSize, hidden products included,
 	// answers { items, page, pageSize, totalCount, totalPages }

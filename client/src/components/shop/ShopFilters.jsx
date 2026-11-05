@@ -30,6 +30,7 @@ const ShopFilters = ({ categoryKey, onCategoryClick, filters, onFilterChange, ha
 					value={filters.searchText}
 					onChange={(event) => onFilterChange('searchText', event.target.value)}
 					placeholder='Search products'
+					maxLength={100}
 					aria-label='Search products'
 					className='input pl-11'
 				/>

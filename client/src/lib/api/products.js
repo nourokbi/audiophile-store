@@ -1,14 +1,15 @@
-import { api } from './client';
+import { api, toQueryString } from './client';
 import { toProduct } from '../productHelpers';
 
-const LARGEST_PAGE = 50; // ProductQuery.MaxPageSize in the API
-
 export const productsApi = {
-	// Every product on sale, the first page tells how many pages there are and the others load together
-	listAll: async () => {
-		const pageUrl = (page) => `/products?pageSize=${LARGEST_PAGE}&page=${page}`;
-		const firstPage = await api(pageUrl(1));
-		const otherPages = await Promise.all(Array.from({ length: firstPage.totalPages - 1 }, (_, index) => api(pageUrl(index + 2))));
-		return [firstPage, ...otherPages].flatMap((page) => page.items).map(toProduct);
+	// GET /products with category, q, minPrice, maxPrice, inStockOnly, newOnly, sort, page and pageSize
+	listPage: async (query) => {
+		const page = await api(`/products?${toQueryString(query)}`);
+		return { ...page, items: page.items.map(toProduct) };
 	},
+
+	getBySlug: async (slug) => toProduct(await api(`/products/by-slug/${encodeURIComponent(slug)}`)),
+
+	// A few more products for the product page, the same category first
+	listRelated: async (id, count) => (await api(`/products/${id}/related?count=${count}`)).map(toProduct),
 };

@@ -15,13 +15,17 @@ const NO_IMAGE =
 		"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'><rect width='1' height='1' fill='#d4d4d4'/></svg>",
 	);
 
+// The pictures.json photos stay while the API still has the image it was seeded with, a new image saved in the dashboard wins
+function coverPhoto(slug, imageUrl) {
+	const look = pictures[slug] ?? {};
+	const hasNewImage = imageUrl && imageUrl !== look.image && imageUrl !== look.seededImageUrl;
+	const image = (hasNewImage ? imageUrl : look.image) ?? imageUrl ?? NO_IMAGE;
+	return typeof image === 'string' ? sameImageEverywhere(image) : image;
+}
+
 // The API's product in the shape every page uses, with the sized cover photos from pictures.json added by slug
 export function toProduct(apiProduct) {
-	const look = pictures[apiProduct.slug] ?? {};
-	// The pictures.json photos stay while the API still has the image it was seeded with, a new image saved in the dashboard wins
-	const hasNewImage = apiProduct.imageUrl && apiProduct.imageUrl !== look.image && apiProduct.imageUrl !== look.seededImageUrl;
-	const image = (hasNewImage ? apiProduct.imageUrl : look.image) ?? apiProduct.imageUrl ?? NO_IMAGE;
-	const cover = typeof image === 'string' ? sameImageEverywhere(image) : image;
+	const cover = coverPhoto(apiProduct.slug, apiProduct.imageUrl);
 	return {
 		id: apiProduct.id,
 		slug: apiProduct.slug,
@@ -37,9 +41,19 @@ export function toProduct(apiProduct) {
 		image: cover,
 		images: [cover, ...apiProduct.images.slice(1).map(sameImageEverywhere)], // every photo for the product page, cover first
 		imageUrls: apiProduct.images, // the addresses saved in the API, the admin edit form shows them
-		isNew: Boolean(look.new),
+		isNew: apiProduct.isNew,
 	};
 }
+
+// The product details a cart line carries, in the shape the product helpers read
+export const cartLineProduct = (item) => ({
+	slug: item.slug,
+	category: item.category.toLowerCase(),
+	description: item.description,
+	stock: item.stock,
+	inStock: item.stock > 0,
+	image: coverPhoto(item.slug, item.imageUrl),
+});
 
 export const productPath = (product) => `/${product.category}/${product.slug}`;
 

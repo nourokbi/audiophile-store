@@ -1,6 +1,12 @@
 // The one place the shop talks to the API, Vite forwards /api to localhost:5040 in development and VITE_API_URL sets it in production
 const BASE = import.meta.env.VITE_API_URL ?? '/api';
 
+// Leaves out empty filters, so a filter that is not set never reaches the address
+export const toQueryString = (filters) =>
+	new URLSearchParams(
+		Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+	).toString();
+
 export class ApiError extends Error {
 	constructor(status, message, problem) {
 		super(message);

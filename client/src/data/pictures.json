@@ -48,67 +48,51 @@
 		}
 	},
 	"studio-reference-headphones": {
-		"image": "/assets/products/studio-reference-headphones.jpg",
-		"new": true
+		"image": "/assets/products/studio-reference-headphones.jpg"
 	},
 	"planar-pro-headphones": {
-		"image": "/assets/products/planar-pro-headphones.jpg",
-		"new": true
+		"image": "/assets/products/planar-pro-headphones.jpg"
 	},
 	"bronze-edition-headphones": {
-		"image": "/assets/products/bronze-edition-headphones.jpg",
-		"new": true
+		"image": "/assets/products/bronze-edition-headphones.jpg"
 	},
 	"closed-back-monitor-headphones": {
-		"image": "/assets/products/closed-back-monitor-headphones.jpg",
-		"new": true
+		"image": "/assets/products/closed-back-monitor-headphones.jpg"
 	},
 	"zx12-tower-speaker": {
-		"image": "/assets/products/zx12-tower-speaker.jpg",
-		"new": true
+		"image": "/assets/products/zx12-tower-speaker.jpg"
 	},
 	"walnut-bookshelf-speakers": {
-		"image": "/assets/products/walnut-bookshelf-speakers.jpg",
-		"new": true
+		"image": "/assets/products/walnut-bookshelf-speakers.jpg"
 	},
 	"carbon-desk-monitors": {
-		"image": "/assets/products/carbon-desk-monitors.jpg",
-		"new": true
+		"image": "/assets/products/carbon-desk-monitors.jpg"
 	},
 	"cylinder-home-speaker": {
-		"image": "/assets/products/cylinder-home-speaker.jpg",
-		"new": true
+		"image": "/assets/products/cylinder-home-speaker.jpg"
 	},
 	"yx2-pro-earphones": {
-		"image": "/assets/products/yx2-pro-earphones.jpg",
-		"new": true
+		"image": "/assets/products/yx2-pro-earphones.jpg"
 	},
 	"yx-sport-earphones": {
-		"image": "/assets/products/yx-sport-earphones.jpg",
-		"new": true
+		"image": "/assets/products/yx-sport-earphones.jpg"
 	},
 	"aurum-reference-dac": {
-		"image": "/assets/products/aurum-reference-dac.jpg",
-		"new": true
+		"image": "/assets/products/aurum-reference-dac.jpg"
 	},
 	"tube-headphone-amplifier": {
-		"image": "/assets/products/tube-headphone-amplifier.jpg",
-		"new": true
+		"image": "/assets/products/tube-headphone-amplifier.jpg"
 	},
 	"desktop-dac-one": {
-		"image": "/assets/products/desktop-dac-one.jpg",
-		"new": true
+		"image": "/assets/products/desktop-dac-one.jpg"
 	},
 	"walnut-headphone-stand": {
-		"image": "/assets/products/walnut-headphone-stand.jpg",
-		"new": true
+		"image": "/assets/products/walnut-headphone-stand.jpg"
 	},
 	"silver-balanced-cable": {
-		"image": "/assets/products/silver-balanced-cable.jpg",
-		"new": true
+		"image": "/assets/products/silver-balanced-cable.jpg"
 	},
 	"velvet-replacement-earpads": {
-		"image": "/assets/products/velvet-replacement-earpads.jpg",
-		"new": true
+		"image": "/assets/products/velvet-replacement-earpads.jpg"
 	}
 }
