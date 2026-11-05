@@ -7,17 +7,15 @@ import EmptyState from '../components/ui/EmptyState';
 import QuantityStepper from '../components/ui/QuantityStepper';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../hooks/useCart';
-import { useCatalog } from '../hooks/useCatalog';
 import { formatPrice } from '../lib/format';
 import { findCategory } from '../lib/navigation';
-import { isFewLeft, productPath, stockLabel } from '../lib/productHelpers';
+import { cartLineProduct, isFewLeft, productPath, stockLabel } from '../lib/productHelpers';
 import { SHIPPING } from '../lib/shipping';
 
 // The cart page for customers and visitors alike, every change goes through the cart context and the page shows the cart it gets back
 const Cart = () => {
 	const { user } = useAuth();
 	const { cart, setQuantity, remove, clear } = useCart();
-	const { products } = useCatalog();
 	const [changeError, setChangeError] = React.useState('');
 
 	const runCartChange = async (sendChange) => {
@@ -66,7 +64,6 @@ const Cart = () => {
 						<CartItem
 							key={item.productId}
 							item={item}
-							product={products.find((product) => product.id === item.productId)}
 							onQuantityChange={(quantity) => runCartChange(() => setQuantity(item.productId, quantity))}
 							onRemove={() => runCartChange(() => remove(item.productId))}
 						/>
@@ -106,10 +103,11 @@ const Cart = () => {
 	);
 };
 
-// One cart line as a card, the catalogue adds the category, description, stock and the link to the product
-const CartItem = ({ item, product, onQuantityChange, onRemove }) => {
-	const productLink = product ? productPath(product) : '#';
-	const imageUrl = product?.image.mobile ?? item.imageUrl;
+// One cart line as a card, with the category, description, stock and the link to the product
+const CartItem = ({ item, onQuantityChange, onRemove }) => {
+	const product = cartLineProduct(item);
+	const productLink = productPath(product);
+	const imageUrl = product.image.mobile;
 
 	return (
 		<article className='card flex flex-col gap-5 p-5 sm:flex-row'>
@@ -120,7 +118,7 @@ const CartItem = ({ item, product, onQuantityChange, onRemove }) => {
 			<div className='flex min-w-0 flex-1 flex-col gap-3'>
 				<div className='flex items-start justify-between gap-4'>
 					<div className='min-w-0'>
-						{product && <p className='eyebrow text-[11px]'>{findCategory(product.category)?.label}</p>}
+						<p className='eyebrow text-[11px]'>{findCategory(product.category)?.label}</p>
 						<Link to={productLink} className='mt-1 block text-[18px] font-bold uppercase hover:text-brand-dark'>
 							{item.productName}
 						</Link>
@@ -134,25 +132,23 @@ const CartItem = ({ item, product, onQuantityChange, onRemove }) => {
 					</button>
 				</div>
 
-				{product && <p className='line-clamp-2 text-[14px] text-muted'>{product.description}</p>}
+				<p className='line-clamp-2 text-[14px] text-muted'>{product.description}</p>
 
-				{product && (
-					<p className='flex items-center gap-2 text-[13px] font-bold'>
-						{product.inStock && !isFewLeft(product) ? (
-							<span className='flex items-center gap-1 text-emerald-600'>
-								<Check size={14} /> {stockLabel(product)}
-							</span>
-						) : (
-							<span className='text-brand-dark'>{stockLabel(product)}</span>
-						)}
-						<span className='text-muted'>- {formatPrice(item.unitPrice)} each</span>
-					</p>
-				)}
+				<p className='flex items-center gap-2 text-[13px] font-bold'>
+					{product.inStock && !isFewLeft(product) ? (
+						<span className='flex items-center gap-1 text-emerald-600'>
+							<Check size={14} /> {stockLabel(product)}
+						</span>
+					) : (
+						<span className='text-brand-dark'>{stockLabel(product)}</span>
+					)}
+					<span className='text-muted'>- {formatPrice(item.unitPrice)} each</span>
+				</p>
 
 				<div className='mt-auto flex items-center justify-between gap-4 pt-2'>
 					<QuantityStepper
 						value={item.quantity}
-						max={Math.max(item.quantity, product?.stock ?? 100)}
+						max={Math.max(item.quantity, product.stock)}
 						label={item.productName}
 						onChange={onQuantityChange}
 					/>

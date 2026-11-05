@@ -16,6 +16,9 @@ export const queryClient = new QueryClient({
 // Invalidating adminOrders, for example, refreshes the order list, each open order, the stats and the payment events
 export const queryKeys = {
 	catalog: ['catalog'],
+	catalogPage: (query) => ['catalog', 'page', query],
+	catalogProduct: (slug) => ['catalog', 'product', slug],
+	relatedProducts: (productId) => ['catalog', 'related', productId],
 	cart: (userId) => ['cart', userId ?? 'guest'],
 	addresses: ['addresses'],
 	myOrders: ['my-orders'],

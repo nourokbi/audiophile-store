@@ -58,16 +58,15 @@ out. Visitors who are not signed in get Log in, Create account and the theme swi
 ## Storefront filters
 
 Category chips, a search box, a price range (under 1,000, 1,000 to 3,000, 3,000 to 5,000, over 5,000 EGP), a sort
-(featured, price both ways, name) and *in stock only*, with nine products per page and previous, page number and
-next buttons under the grid. Changing a filter or a category goes back to page one. The filtering runs in the browser over the whole catalogue,
-which is fine for a shop this size; with hundreds of products it moves to the API's `search`, `minPrice` and
-`maxPrice` parameters.
+(featured, price both ways, name), *in stock only* and 9, 18, 36 or 72 products per page, with previous, page number and
+next buttons under the grid. Changing a filter or a category goes back to page one. The API filters, sorts and pages, so a
+visit loads one page however large the catalogue grows. The search box waits until typing stops.
 
 ## Where the data comes from
 
 - **Products:** the API is the source of every product: name, text, price, stock, category and *in the box*.
-  `useCatalog` loads `GET /products` once and adds the photo, the gallery and the *new* flag from
-  `pictures.json` by slug. A product with no entry there uses the API's `imageUrl`. Adding a product therefore
+  `useCatalog` loads one page from `GET /products`, or one product and its related ones for the product page, and adds
+  the sized photos from `pictures.json` by slug. A product with no entry there uses the API's `imageUrl`. Adding a product therefore
   means a seed row (or the admin API later) and, for a nicer photo, one line in `pictures.json`.
 - **Cart:** `useCart` keeps a customer's cart on the server and a visitor's in `localStorage`, priced by
   `POST /cart/quote` and merged into the account at login. Every cart call returns the whole cart, so the hook just

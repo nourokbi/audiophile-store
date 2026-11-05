@@ -5,7 +5,6 @@ import ProductCard from '../components/shop/ProductCard';
 import PromiseStrip from '../components/shop/PromiseStrip';
 import ShopFilters from '../components/shop/ShopFilters';
 import Pagination from '../components/ui/Pagination';
-import { useCatalog } from '../hooks/useCatalog';
 import { useShopFilters } from '../hooks/useShopFilters';
 import { findCategory } from '../lib/navigation';
 
@@ -13,8 +12,7 @@ import { findCategory } from '../lib/navigation';
 const Home = ({ collection }) => {
 	const { category: categoryKey = 'all' } = useParams();
 	const navigate = useNavigate();
-	const { products, loading, error } = useCatalog();
-	const shop = useShopFilters(products, categoryKey, collection);
+	const shop = useShopFilters(categoryKey, collection);
 
 	if (categoryKey !== 'all' && !findCategory(categoryKey)) return <Navigate to='/' replace />;
 
@@ -57,15 +55,18 @@ const Home = ({ collection }) => {
 							{shop.pageProducts.length === 0 ? 0 : `${shop.firstIndex + 1} to ${shop.firstIndex + shop.pageProducts.length}`}
 						</strong>
 					</span>
-					{error && <span className='text-red-600'>Products could not be loaded ({error})</span>}
+					{shop.error && <span className='text-red-600'>Products could not be loaded ({shop.error})</span>}
 				</div>
 
-				{loading ? (
+				{shop.loading ? (
 					<p className='card p-10 text-center text-muted'>Loading products...</p>
-				) : shop.matchingCount === 0 ? (
+				) : shop.pageProducts.length === 0 ? (
 					<p className='card p-10 text-center text-muted'>No product matches these filters.</p>
 				) : (
-					<div className='grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3'>
+					<div
+						aria-busy={shop.updating}
+						className={`grid grid-cols-1 gap-6 transition-opacity md:grid-cols-2 lg:grid-cols-3 ${shop.updating ? 'opacity-60' : ''}`}
+					>
 						{shop.pageProducts.map((product) => (
 							<ProductCard key={product.slug} product={product} />
 						))}
