@@ -91,10 +91,23 @@ Measured 2026-11-05 with `pg_trgm` indexes on the lower-cased name and descripti
 - A common word still counts by reading every row, because most rows match anyway.
 - At 100 nonstop shoppers the shop page got no faster: p95 went from 1.1 s to 1.52 s, one run each, as more requests got through.
   Each shop request also counts the whole catalogue, and deep pages read every row they skip.
-- The API opens a database connection for each request running at once, up to 100, which is also PostgreSQL's limit. After the
-  100 shopper run `psql` was refused with `too many clients already`. No API request failed, but a smaller connection pool is
-  worth measuring before deploying, since free database plans allow far fewer connections.
+## Connection pool
 
-## After caching
+Measured 2026-11-05. The API keeps open database connections in a pool, and Npgsql's default allows 100, which is also
+PostgreSQL's limit: after a 100 shopper run `psql` was refused with `too many clients already`. Compose now sets
+`Maximum Pool Size=${DB_POOL_SIZE:-20}`, so a run can try other sizes with `DB_POOL_SIZE=10 docker compose --profile app up -d`.
 
-To be measured with the same commands once Redis and HybridCache are in.
+| 100 shoppers nonstop | Pool of 100 | Pool of 20 |
+|---|---|---|
+| Requests per second | 259 | 270 |
+| All pages p95 | 1.11 s | 551 ms |
+| Slowest request | 3.71 s | 1.08 s |
+| PostgreSQL memory | 300 MB | 102 MB |
+| Connections open, most running at once | 64, 44 running | 20, 8 to 11 running |
+| Requests that waited too long for a connection | 0 | 0 |
+
+**What it shows:** fewer connections did more work. With 100, PostgreSQL runs 44 queries at once on 8 CPUs, so each one waits
+for CPU and for memory, and every query gets slower. With 20, the extra requests wait in the API's queue for a few
+milliseconds instead, and nothing was refused. A pool of 10 wasn't measured because the laptop ran out of memory.
+
+On a hosted database, keep the pool under the plan's connection limit, minus a few for migrations and `psql`.

@@ -28,7 +28,7 @@ services:
     env_file: .env                     # Jwt__Key and the admin login
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Default: Host=postgres;Port=5432;Database=audiophile;Username=audiophile;Password=audiophile;GSS Encryption Mode=Disable
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=audiophile;Username=audiophile;Password=audiophile;GSS Encryption Mode=Disable;Maximum Pool Size=${DB_POOL_SIZE:-20}
       Database__MigrateOnStartup: "true"
       Fawaterak__ClientReturnUrl: http://localhost:8080/orders
     depends_on:
