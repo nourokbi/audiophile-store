@@ -59,6 +59,9 @@ public sealed class Order : HasDomainEvents
             ? AllowedNextStatuses[status].Where(s => s != OrderStatus.Confirmed).ToList()
             : AllowedNextStatuses[status];
 
+    // A cancelled card order whose money is still with the shop
+    public bool NeedsRefund => Status == OrderStatus.Cancelled && Payment?.Status == PaymentStatus.Succeeded;
+
     // Income is a paid order that was not cancelled, a cancelled paid card order is waiting for its refund
     public static bool CountsAsRevenue(OrderStatus status, PaymentStatus? paymentStatus) =>
         status != OrderStatus.Cancelled && paymentStatus == PaymentStatus.Succeeded;
@@ -115,6 +118,19 @@ public sealed class Order : HasDomainEvents
 
         foreach (var item in _orderItems)
             item.Product.Restock(item.Quantity);
+    }
+
+    // Records that the admin sent the money back, Fawaterak has no refund call so the admin refunds in its dashboard first
+    public void MarkRefunded(string? reference)
+    {
+        if (!NeedsRefund)
+            throw new InvalidOperationException(Status == OrderStatus.Cancelled
+                ? "This order has no payment to refund."
+                : "Only a cancelled order can be refunded, cancel it first.");
+
+        Payment!.MarkRefunded(reference);
+        UpdatedAt = DateTime.UtcNow;
+        Raise(new OrderRefunded(Id, Payment.Amount, UpdatedAt));
     }
 
     public void ChangeStatus(OrderStatus next)

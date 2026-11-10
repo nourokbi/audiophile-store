@@ -63,7 +63,7 @@ public sealed class OrderEmails(IAppDbContext db, IEmailSender sender, IOptions<
             OrderStatus.Delivered => ($"Order {number} was delivered",
                 "Your order was delivered. Enjoy the sound."),
             OrderStatus.Cancelled when paidByCard && order.Payment?.CheckoutUrl is null => null,
-            OrderStatus.Cancelled when paidByCard && order.Payment?.Status == PaymentStatus.Succeeded =>
+            OrderStatus.Cancelled when paidByCard && order.Payment?.Status is PaymentStatus.Succeeded or PaymentStatus.Refunded =>
                 ($"Order {number} was cancelled",
                 $"Your order was cancelled. Your payment of {Money(order.TotalAmount)} will go back to your card, and we'll email you when it's sent."),
             OrderStatus.Cancelled when change.From == OrderStatus.Pending && paidByCard => ($"Order {number} was cancelled",

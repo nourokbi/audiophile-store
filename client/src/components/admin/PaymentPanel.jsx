@@ -1,4 +1,5 @@
-import { CreditCard, RefreshCw } from 'lucide-react';
+import React from 'react';
+import { CreditCard, RefreshCw, Undo2 } from 'lucide-react';
 
 import PriceSummary from '../shop/PriceSummary';
 import { formatDate } from '../../lib/format';
@@ -14,9 +15,10 @@ function readablePayload(rawPayload) {
 }
 
 // The order's payment and totals, and for a card order the messages from Fawaterak and a button to ask it again
-const PaymentPanel = ({ order, events, loadError, isSyncing, syncError, onSync }) => {
+const PaymentPanel = ({ order, events, loadError, isSyncing, syncError, onSync, isRefunding, refundError, onRefund }) => {
 	const isCardOrder = order.paymentMethod === 'Card';
 	const needsRefund = order.status === 'Cancelled' && order.paymentStatus === 'Succeeded';
+	const [refundReference, setRefundReference] = React.useState('');
 
 	return (
 		<section className='card flex flex-col gap-4 p-6'>
@@ -27,8 +29,36 @@ const PaymentPanel = ({ order, events, loadError, isSyncing, syncError, onSync }
 				{PAYMENT_LABELS[order.paymentMethod]}, <span className='font-bold'>{order.paymentStatus.toLowerCase()}</span>
 			</p>
 			{needsRefund && (
-				<p className='rounded bg-red-50 p-3 text-[13px] font-bold text-red-700 dark:bg-red-950 dark:text-red-300'>
-					Refund needed: this order was cancelled after it was paid, refund it in the Fawaterak dashboard.
+				<form
+					onSubmit={(event) => {
+						event.preventDefault();
+						onRefund(refundReference.trim());
+					}}
+					className='flex flex-col gap-3 rounded bg-red-50 p-3 text-[13px] text-red-700 dark:bg-red-950 dark:text-red-300'
+				>
+					<p className='font-bold'>
+						Refund needed: this order was cancelled after it was paid. Refund it in the Fawaterak dashboard, then mark it
+						refunded so the customer gets an email.
+					</p>
+					<label className='flex flex-col gap-1'>
+						Refund id from Fawaterak (optional)
+						<input
+							value={refundReference}
+							onChange={(event) => setRefundReference(event.target.value)}
+							maxLength={255}
+							className='rounded border border-line bg-surface px-3 py-2 text-ink'
+						/>
+					</label>
+					<button type='submit' disabled={isRefunding} className='btn-primary'>
+						<Undo2 size={16} /> {isRefunding ? 'Saving...' : 'Mark refunded'}
+					</button>
+					{refundError && <p className='error-text'>{refundError}</p>}
+				</form>
+			)}
+			{order.paymentStatus === 'Refunded' && (
+				<p className='rounded bg-panel p-3 text-[13px]'>
+					Refunded {formatDate(order.refundedAt)}
+					{order.refundReference && <>, Fawaterak refund {order.refundReference}</>}
 				</p>
 			)}
 			<PriceSummary subTotal={order.subTotal} shippingFee={order.shippingFee} total={order.totalAmount} />

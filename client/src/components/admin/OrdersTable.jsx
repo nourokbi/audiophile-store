@@ -6,7 +6,12 @@ import Pagination from '../ui/Pagination';
 import { formatDate, formatPrice, shortId } from '../../lib/format';
 import { nextStepForward, PAYMENT_LABELS, STATUS_ACTIONS } from '../../lib/orderHelpers';
 
-const PAYMENT_STATUS_COLORS = { Pending: 'text-muted', Succeeded: 'text-emerald-600', Failed: 'text-red-600' };
+const PAYMENT_STATUS_COLORS = {
+	Pending: 'text-muted',
+	Succeeded: 'text-emerald-600',
+	Failed: 'text-red-600',
+	Refunded: 'text-amber-600',
+};
 
 // The orders and their pages, the quick button moves an order one step forward and View opens every control
 const OrdersTable = ({

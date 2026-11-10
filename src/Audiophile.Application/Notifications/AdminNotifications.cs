@@ -39,7 +39,7 @@ public sealed class AdminNotifications(IAppDbContext db)
             OrderStatus.Confirmed => new(AdminNotificationKind.NewOrder, $"New order {number}",
                 $"{order.User.Name} ordered {order.OrderItems.Sum(i => i.Quantity)} items for {total}, " +
                 (paidByCard ? "paid by card." : "cash on delivery."), order.Id),
-            OrderStatus.Cancelled when paidByCard && order.Payment?.Status == PaymentStatus.Succeeded =>
+            OrderStatus.Cancelled when paidByCard && order.Payment?.Status is PaymentStatus.Succeeded or PaymentStatus.Refunded =>
                 new(AdminNotificationKind.RefundNeeded, $"Order {number} cancelled, refund needed",
                     $"Send {total} back from the Fawaterak dashboard, then mark the order refunded.", order.Id),
             OrderStatus.Cancelled when change.From != OrderStatus.Pending =>

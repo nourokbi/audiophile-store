@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Audiophile.Application.Abstractions;
 using Audiophile.Application.Common;
 using Audiophile.Application.Payments;
@@ -65,15 +66,15 @@ public sealed class OrderService(IAppDbContext db, PaymentService payments, ILog
         return new PlaceOrderResult(OrderDto.From(order), Created: true);
       });
 
-  // The customer cancels their own order, a paid card order is refused because the refund is done by support
+  // The customer cancels their own order, a paid card order only until the shop starts preparing it, and the admin refunds it
   public Task<OrderDto> CancelOrderAsync(Guid userId, Guid orderId, CancellationToken ct) =>
       db.RetryOnStockConflictAsync(logger, async () =>
       {
         var order = await OrdersWithDetails().FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId, ct)
             ?? throw new NotFoundException($"Order {orderId} was not found.");
 
-        if (order.Payment?.Status == PaymentStatus.Succeeded)
-          throw new ConflictException("This order is already paid, please contact support to cancel it and get a refund.");
+        if (order.Payment?.Status == PaymentStatus.Succeeded && order.Status != OrderStatus.Confirmed)
+          throw new ConflictException("This order is already being prepared, please contact support to cancel it.");
         if (!order.CanBeCancelled)
           throw new ConflictException($"An order that is {order.Status} can no longer be cancelled.");
 
@@ -184,6 +185,23 @@ public sealed class OrderService(IAppDbContext db, PaymentService payments, ILog
         await db.SaveChangesAsync(ct);
         return AdminOrderDto.From(order);
       });
+
+  // The admin sent a cancelled order's money back in the Fawaterak dashboard and records it here, the customer gets an email
+  public async Task<AdminOrderDto> RefundOrderAsync(Guid orderId, RefundRequest request, CancellationToken ct)
+  {
+    var order = await OrdersWithDetailsAndCustomer().FirstOrDefaultAsync(o => o.Id == orderId, ct)
+        ?? throw new NotFoundException($"Order {orderId} was not found.");
+
+    order.MarkRefunded(request.Reference);
+
+    // Kept with Fawaterak's own messages, so the payment panel shows the whole story of the money
+    var payment = order.Payment!;
+    db.PaymentEvents.Add(new PaymentEvent(payment.Provider ?? IFawaterakGateway.Provider, $"refund:{payment.Id}", "admin:refunded",
+        payment.Id, JsonSerializer.Serialize(new { amount = payment.Amount, reference = payment.RefundReference })));
+
+    await db.SaveChangesAsync(ct);
+    return AdminOrderDto.From(order);
+  }
 
   // The business over the last days: revenue against the days before, sales per day, payment method, category and
   // product, and the work still open

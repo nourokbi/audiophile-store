@@ -17,7 +17,8 @@ public sealed record PaymentDto(
     string? Provider,
     string? ProviderOrderId,
     string? ProviderTransactionId,
-    string? CheckoutUrl);
+    string? CheckoutUrl,
+    DateTime? RefundedAt);
 
 public sealed record OrderDto(
     Guid Id,
@@ -43,7 +44,7 @@ public sealed record OrderDto(
           .ToList(),
       order.Payment is { } p
           ? new PaymentDto(p.Status, p.Amount, p.Provider, p.ProviderOrderId, p.ProviderTransactionId,
-              p.Status == PaymentStatus.Pending ? p.CheckoutUrl : null)
+              p.Status == PaymentStatus.Pending ? p.CheckoutUrl : null, p.RefundedAt)
           : null);
 }
 
@@ -95,7 +96,9 @@ public sealed record AdminOrderDto(
     int ItemCount,
     IReadOnlyList<OrderStatus> NextStatuses,
     ShippingDto Shipping,
-    IReadOnlyList<OrderItemDto> Items)
+    IReadOnlyList<OrderItemDto> Items,
+    DateTime? RefundedAt,
+    string? RefundReference)
 {
   // The user, payment and items must be loaded
   public static AdminOrderDto From(Order order) => new(
@@ -116,7 +119,9 @@ public sealed record AdminOrderDto(
           order.ShippingCountry, order.ShippingPostalCode),
       order.OrderItems
           .Select(i => new OrderItemDto(i.ProductId, i.ProductName, i.ProductImageUrl, i.Quantity, i.UnitPrice, i.LineTotal))
-          .ToList());
+          .ToList(),
+      order.Payment?.RefundedAt,
+      order.Payment?.RefundReference);
 }
 
 // One page of orders plus how many orders each status has, the counts ignore the status filter so every tab keeps its number
@@ -131,6 +136,9 @@ public sealed record AdminOrderPage(
 }
 
 public sealed record ChangeStatusRequest(OrderStatus Status);
+
+// The refund's id in the Fawaterak dashboard, optional
+public sealed record RefundRequest(string? Reference);
 
 // The business numbers for the admin overview and income pages, every period is whole Cairo days ending today
 // Revenue counts paid orders that were not cancelled, the category and product totals leave the shipping out
