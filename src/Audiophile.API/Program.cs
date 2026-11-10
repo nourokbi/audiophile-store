@@ -6,6 +6,7 @@ using Audiophile.Application;
 using Audiophile.Application.Abstractions;
 using Audiophile.Infrastructure;
 using Audiophile.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 using Serilog.Formatting.Compact;
@@ -39,6 +40,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddRateLimitPolicies();
+
+// The database check joins the message bus check MassTransit adds by itself
+builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
 
 // The allowed shop origins come from configuration, so production adds its domain without a code change
 builder.Services.AddCors(o => o.AddDefaultPolicy(policy => policy
@@ -91,6 +95,9 @@ app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
+// The process is up, for restarts, and ready means the database and the message bus answer, for sending traffic
+app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 
 app.Run();

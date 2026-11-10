@@ -17,7 +17,7 @@ public static class StockConflictRetry
     catch (DbUpdateConcurrencyException)
     {
       logger.LogInformation("Stock changed by another request, trying once more");
-      db.ChangeTracker.Clear();
+      db.ClearForRetry();
       return await work();
     }
   }

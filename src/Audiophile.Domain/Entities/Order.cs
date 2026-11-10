@@ -1,10 +1,11 @@
 using Audiophile.Domain.Common;
 using Audiophile.Domain.Enums;
+using Audiophile.Domain.Events;
 
 namespace Audiophile.Domain.Entities;
 
 // An order placed from the cart, its totals are fixed when it is placed and its status only moves along the allowed steps
-public sealed class Order
+public sealed class Order : HasDomainEvents
 {
     public const int IdempotencyKeyMaxLength = 128;
 
@@ -123,8 +124,10 @@ public sealed class Order
                 ? "This card order is not paid yet, it is confirmed once the payment succeeds."
                 : $"An order that is {Status} cannot become {next}.");
 
+        var previous = Status;
         Status = next;
         UpdatedAt = DateTime.UtcNow;
+        Raise(new OrderStatusChanged(Id, previous, next, UpdatedAt));
 
         if (next == OrderStatus.Delivered && PaymentMethod == PaymentMethod.CashOnDelivery)
             Payment!.MarkCashCollected();

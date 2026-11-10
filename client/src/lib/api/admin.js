@@ -42,6 +42,15 @@ export const adminApi = {
 	// GET /orders/{id}/payment/events, what Fawaterak sent about the order, oldest first
 	listPaymentEvents: (orderId) => api(`/orders/${orderId}/payment/events`),
 
+	// GET /admin/notifications?limit=, the newest first, answers { items, unreadCount }
+	listNotifications: (limit = 30) => api(`/admin/notifications?limit=${limit}`),
+
+	// POST /admin/notifications/{id}/read
+	markNotificationRead: (id) => api(`/admin/notifications/${id}/read`, { method: 'POST' }),
+
+	// POST /admin/notifications/read-all
+	markAllNotificationsRead: () => api('/admin/notifications/read-all', { method: 'POST' }),
+
 	// POST /orders/{id}/payment/sync, asks Fawaterak for the invoice and applies it, a 409 when the order has no invoice
 	syncPayment: (orderId) => api(`/orders/${orderId}/payment/sync`, { method: 'POST' }),
 };

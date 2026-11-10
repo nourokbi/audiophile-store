@@ -1,12 +1,15 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { ClipboardList, LayoutDashboard, Package, PanelLeftClose, PanelLeftOpen, Wallet } from 'lucide-react';
+import { Bell, ClipboardList, LayoutDashboard, Package, PanelLeftClose, PanelLeftOpen, Wallet } from 'lucide-react';
+
+import { useAdminNotifications } from '../../hooks/useAdminNotifications';
 
 const SECTIONS = [
 	{ to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
 	{ to: '/admin/products', label: 'Products', icon: Package },
 	{ to: '/admin/orders', label: 'Orders', icon: ClipboardList },
 	{ to: '/admin/income', label: 'Income', icon: Wallet },
+	{ to: '/admin/notifications', label: 'Notifications', icon: Bell, showsUnread: true },
 ];
 
 // Remembered in this browser only, it is a preference and not data
@@ -24,6 +27,7 @@ function readIsCollapsed() {
 // On a phone the menu always stays folded so the page keeps its width
 const AdminLayout = () => {
 	const [isCollapsed, setIsCollapsed] = React.useState(readIsCollapsed);
+	const { unreadCount } = useAdminNotifications();
 
 	React.useEffect(() => {
 		try {
@@ -44,20 +48,27 @@ const AdminLayout = () => {
 			>
 				<p className={`eyebrow px-5 pb-2 pt-6 ${labelClass}`}>Admin</p>
 				<nav aria-label='Admin sections' className='flex flex-1 flex-col gap-1 p-2'>
-					{SECTIONS.map(({ to, label, icon: Icon, end }) => (
+					{SECTIONS.map(({ to, label, icon: Icon, end, showsUnread }) => (
 						<NavLink
 							key={to}
 							to={to}
 							end={end}
 							title={label}
-							aria-label={label}
+							aria-label={showsUnread && unreadCount > 0 ? `${label}, ${unreadCount} unread` : label}
 							className={({ isActive }) =>
 								`label flex h-11 items-center gap-3 rounded px-[14px] transition-colors ${
 									isActive ? 'bg-brand-soft text-brand-dark' : 'text-muted hover:bg-panel hover:text-ink'
 								}`
 							}
 						>
-							<Icon size={20} className='shrink-0' />
+							<span className='relative shrink-0'>
+								<Icon size={20} />
+								{showsUnread && unreadCount > 0 && (
+									<span className='absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold leading-none text-white'>
+										{unreadCount > 99 ? '99+' : unreadCount}
+									</span>
+								)}
+							</span>
 							<span className={`truncate ${labelClass}`}>{label}</span>
 						</NavLink>
 					))}

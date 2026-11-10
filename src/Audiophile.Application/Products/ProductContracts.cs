@@ -21,7 +21,7 @@ public sealed record ProductQuery(
   public const int DefaultPageSize = 12;
   public const int MaxPageSize = 72; // the largest page size the shop offers
   public const int MaxSearchLength = 100;
-  public const int LowStockLimit = 8;
+  public const int LowStockLimit = Product.LowStockLimit;
   public const int DefaultRelatedCount = 3;
   public const int MaxRelatedCount = 12;
 }

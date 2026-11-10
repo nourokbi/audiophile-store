@@ -1,4 +1,4 @@
-# Only the database, for `dotnet run`:   docker compose up -d
+# The database, RabbitMQ and Mailpit, for `dotnet run`:   docker compose up -d
 # The whole app in containers:           docker compose --profile app up -d --build   (copy .env.example to .env first)
 # The load test, with the app running:   docker compose run --rm k6
 services:
@@ -19,6 +19,28 @@ services:
       timeout: 3s
       retries: 10
 
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    container_name: audiophile-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: audiophile   # the default guest user only works from inside its own container
+      RABBITMQ_DEFAULT_PASS: audiophile
+    ports:
+      - "127.0.0.1:5672:5672"     # the API
+      - "127.0.0.1:15672:15672"   # the management page, log in with audiophile / audiophile
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:v1.32
+    container_name: audiophile-mailpit
+    ports:
+      - "127.0.0.1:1025:1025"     # SMTP, catches every email so none reaches a real inbox
+      - "127.0.0.1:8025:8025"     # the inbox page
+
   api:
     profiles: [app]
     build:
@@ -31,9 +53,19 @@ services:
       ConnectionStrings__Default: Host=postgres;Port=5432;Database=audiophile;Username=audiophile;Password=audiophile;GSS Encryption Mode=Disable;Maximum Pool Size=${DB_POOL_SIZE:-20}
       Database__MigrateOnStartup: "true"
       Fawaterak__ClientReturnUrl: http://localhost:8080/orders
+      ConnectionStrings__RabbitMq: amqp://audiophile:audiophile@rabbitmq:5672
+      Shop__Url: http://localhost:8080
+      Email__Provider: Smtp
+      Email__Smtp__Host: mailpit
+      Email__Smtp__Port: "1025"
+      Email__Smtp__UseTls: "false"
     depends_on:
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
     healthcheck:
       # The image has no curl, so bash asks /health itself
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
