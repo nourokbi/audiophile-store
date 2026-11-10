@@ -4,5 +4,6 @@ public enum PaymentStatus
 {
     Pending,      // waiting for the customer to pay
     Succeeded,    // money taken
-    Failed        // declined, abandoned or expired
+    Failed,       // declined, abandoned or expired
+    Refunded      // the money was sent back after the order was cancelled
 }

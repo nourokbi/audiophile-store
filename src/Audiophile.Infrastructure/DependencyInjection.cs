@@ -1,7 +1,10 @@
 using Audiophile.Application.Abstractions;
+using Audiophile.Application.Notifications;
 using Audiophile.Application.Payments;
 using Audiophile.Domain.Entities;
 using Audiophile.Infrastructure.Auth;
+using Audiophile.Infrastructure.Email;
+using Audiophile.Infrastructure.Messaging;
 using Audiophile.Infrastructure.Payments;
 using Audiophile.Infrastructure.Payments.Fawaterak;
 using Audiophile.Infrastructure.Persistence;
@@ -25,7 +28,9 @@ public static class DependencyInjection
         if (string.IsNullOrWhiteSpace(connectionString))
             throw new InvalidOperationException("ConnectionStrings:Default is not configured.");
 
-        services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connectionString));
+        services.AddDbContext<AppDbContext>((sp, o) => o
+            .UseNpgsql(connectionString)
+            .AddInterceptors(sp.GetRequiredService<DomainEventsInterceptor>()));
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
         AddIdentityAndJwt(services, configuration);
@@ -40,7 +45,28 @@ public static class DependencyInjection
 
         // Cancels unpaid card orders every five minutes
         services.AddHostedService<PaymentExpiryWorker>();
+
+        services.AddMessaging(configuration);
+        AddEmail(services, configuration);
         return services;
+    }
+
+    private static void AddEmail(IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<ShopOptions>(configuration.GetSection(ShopOptions.SectionName));
+        services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+
+        var provider = configuration[$"{EmailOptions.SectionName}:Provider"];
+        if (string.Equals(provider, "Smtp", StringComparison.OrdinalIgnoreCase))
+            services.AddScoped<IEmailSender, SmtpEmailSender>();
+        else if (string.Equals(provider, "Brevo", StringComparison.OrdinalIgnoreCase))
+            services.AddHttpClient<IEmailSender, BrevoEmailSender>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.brevo.com/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
+        else
+            services.AddScoped<IEmailSender, LogEmailSender>();
     }
 
     private static void AddIdentityAndJwt(IServiceCollection services, IConfiguration configuration)

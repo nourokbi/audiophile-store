@@ -7,7 +7,9 @@ const OrderHeadline = ({ order, paymentResult, isWaitingForPayment, hasStoppedWa
 			<Message icon={CircleX} tone='text-red-600' title='Order cancelled'>
 				Its items went back into stock.
 				{order.payment?.status === 'Succeeded'
-					? ' Your payment arrived after the cancellation, so it will be refunded.'
+					? ' Your payment will go back to your card, and we will email you when it is sent.'
+					: order.payment?.status === 'Refunded'
+					? ` Your payment was sent back to your card on ${new Date(order.payment.refundedAt).toLocaleDateString()}.`
 					: ' Nothing was charged.'}
 			</Message>
 		);

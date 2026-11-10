@@ -1,6 +1,7 @@
 using Audiophile.Application.Addresses;
 using Audiophile.Application.Auth;
 using Audiophile.Application.Carts;
+using Audiophile.Application.Notifications;
 using Audiophile.Application.Orders;
 using Audiophile.Application.Products;
 using Audiophile.Application.Payments;
@@ -19,6 +20,8 @@ public static class DependencyInjection
         services.AddScoped<OrderService>();
         services.AddScoped<PaymentService>();
         services.AddScoped<PaymentResultApplier>();
+        services.AddScoped<OrderEmails>();
+        services.AddScoped<AdminNotifications>();
         return services;
     }
 }

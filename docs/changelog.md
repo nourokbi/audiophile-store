@@ -2,6 +2,22 @@
 
 What changed and why, newest first. Git history has the line-by-line detail; this file is the readable version.
 
+## 2026-11-10 — Order emails, admin notifications, refunds, logs
+
+- **Emails at every step:** the customer gets an email when the order is confirmed, prepared, shipped, delivered,
+  cancelled or refunded. Orders raise events that go through RabbitMQ with MassTransit; a transactional outbox saves them
+  with the order, so an email is never lost or sent for an order that didn't save, and an inbox makes a repeated message
+  send one email. Locally every email lands in Mailpit at http://localhost:8025.
+- **Admin bell:** a Notifications page in the dashboard, with an unread badge in the menu, for new orders,
+  cancellations, refunds to send and low stock.
+- **Refunds:** a customer can cancel a paid card order until it is prepared. The admin refunds it in the Fawaterak
+  dashboard, then presses *Mark refunded*, and the customer is emailed.
+- **Logs and health:** Serilog writes one line per request, JSON in production. `/health/ready` checks the database and
+  RabbitMQ.
+- **Load test:** `perf/checkout.js` has many customers buy the same product at once.
+- **Database pool:** the API keeps at most 20 connections, which made p95 twice as fast as 100 under load.
+- **Plan:** Redis caching moved to future improvements, it isn't needed to launch.
+
 ## 2026-11-05 — The API filters and pages the shop
 
 - **One page per visit:** the shop used to download the whole catalogue and filter it in the browser. It now asks

@@ -6,9 +6,26 @@ using Audiophile.Application;
 using Audiophile.Application.Abstractions;
 using Audiophile.Infrastructure;
 using Audiophile.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
+using Serilog;
+using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Readable lines while developing, one JSON object per line elsewhere so the host's log search can filter on each field
+builder.Services.AddSerilog((services, logger) =>
+{
+    logger.ReadFrom.Configuration(builder.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "audiophile-api");
+
+    if (builder.Environment.IsDevelopment())
+        logger.WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}");
+    else
+        logger.WriteTo.Console(new RenderedCompactJsonFormatter());
+});
 
 builder.Services
     .AddControllers()
@@ -22,7 +39,10 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
-builder.Services.AddRateLimitPolicies();
+builder.Services.AddRateLimitPolicies(builder.Configuration);
+
+// The database check joins the message bus check MassTransit adds by itself
+builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
 
 // The allowed shop origins come from configuration, so production adds its domain without a code change
 builder.Services.AddCors(o => o.AddDefaultPolicy(policy => policy
@@ -44,6 +64,22 @@ var app = builder.Build();
 await app.Services.InitialiseDatabaseAsync();
 
 app.UseForwardedHeaders();
+
+// One line per request with its status and time, health checks only show when they fail
+app.UseSerilogRequestLogging(o =>
+{
+    o.GetLevel = (http, _, ex) =>
+        ex is not null || http.Response.StatusCode >= 500 ? Serilog.Events.LogEventLevel.Error
+        : http.Request.Path.StartsWithSegments("/health") ? Serilog.Events.LogEventLevel.Verbose
+        : Serilog.Events.LogEventLevel.Information;
+    o.EnrichDiagnosticContext = (diagnostics, http) =>
+    {
+        diagnostics.Set("ClientIp", http.Connection.RemoteIpAddress?.ToString());
+        if (http.User.FindFirst("sub")?.Value is { } userId)
+            diagnostics.Set("UserId", userId);
+    };
+});
+
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
@@ -59,6 +95,9 @@ app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
+// The process is up, for restarts, and ready means the database and the message bus answer, for sending traffic
+app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 
 app.Run();

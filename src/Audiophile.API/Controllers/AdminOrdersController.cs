@@ -31,4 +31,9 @@ public sealed class AdminOrdersController(OrderService _ordersService) : Control
   [HttpPut("{id:guid}/status")]
   public async Task<IActionResult> ChangeStatus(Guid id, ChangeStatusRequest request, CancellationToken ct) =>
       Ok(await _ordersService.ChangeOrderStatusAsync(id, request.Status, ct));
+
+  // Records the refund of a cancelled card order once the money was sent back in the Fawaterak dashboard, anything else is a 409
+  [HttpPost("{id:guid}/refund")]
+  public async Task<IActionResult> Refund(Guid id, RefundRequest request, CancellationToken ct) =>
+      Ok(await _ordersService.RefundOrderAsync(id, request, ct));
 }

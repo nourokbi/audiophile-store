@@ -74,7 +74,8 @@ const OrderDetail = () => {
 	}
 
 	const cancelOrder = () => {
-		if (window.confirm('Cancel this order? Its items go back into stock.')) cancel.mutate();
+		const refundNote = order.payment?.status === 'Succeeded' ? ' Your payment will go back to your card.' : '';
+		if (window.confirm(`Cancel this order? Its items go back into stock.${refundNote}`)) cancel.mutate();
 	};
 
 	return (

@@ -1,3 +1,4 @@
+using Audiophile.Domain.Common;
 using Audiophile.Domain.Enums;
 
 namespace Audiophile.Domain.Entities;
@@ -5,6 +6,8 @@ namespace Audiophile.Domain.Entities;
 // The payment of one order, its amount always equals the order total and it moves from pending to succeeded or failed once
 public sealed class Payment
 {
+    public const int RefundReferenceMaxLength = 255;
+
     private Payment() { } // EF Core
 
     internal Payment(Guid orderId, PaymentMethod paymentMethod, decimal amount)
@@ -37,6 +40,10 @@ public sealed class Payment
     // The payment page the customer is sent to
     public string? CheckoutUrl { get; private set; }
 
+    // When the money went back, and the refund's id in the Fawaterak dashboard if the admin noted it
+    public DateTime? RefundedAt { get; private set; }
+    public string? RefundReference { get; private set; }
+
     public Order Order { get; private set; } = null!;
 
     public bool UsesGateway => PaymentMethod != PaymentMethod.CashOnDelivery;
@@ -65,6 +72,17 @@ public sealed class Payment
         EnsurePending();
         Status = PaymentStatus.Succeeded;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    // Only the order calls it, once it checked the order was cancelled
+    internal void MarkRefunded(string? reference)
+    {
+        if (Status != PaymentStatus.Succeeded)
+            throw new InvalidOperationException($"A {Status} payment has no money to refund.");
+
+        Status = PaymentStatus.Refunded;
+        RefundReference = Guard.OptionalText(reference, RefundReferenceMaxLength, nameof(reference));
+        RefundedAt = UpdatedAt = DateTime.UtcNow;
     }
 
     public void MarkFailed()

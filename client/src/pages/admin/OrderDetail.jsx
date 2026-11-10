@@ -99,6 +99,9 @@ const OrderDetail = () => {
 						isSyncing={payment.isSyncing}
 						syncError={payment.syncError}
 						onSync={payment.syncWithGateway}
+						isRefunding={payment.isRefunding}
+						refundError={payment.refundError}
+						onRefund={payment.markRefunded}
 					/>
 				</aside>
 			</div>
@@ -108,7 +111,7 @@ const OrderDetail = () => {
 					title='Cancel this order?'
 					message={
 						isPaidByCard
-							? 'This card order is paid, so cancelling means refunding it on Fawaterak by hand. Its items go back into stock.'
+							? 'This card order is paid. Its items go back into stock, then refund it in the Fawaterak dashboard and mark it refunded here.'
 							: 'Its items go back into stock and a pending payment is marked failed.'
 					}
 					confirmLabel='Cancel order'

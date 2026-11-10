@@ -1,11 +1,15 @@
 using Audiophile.Domain.Common;
 using Audiophile.Domain.Enums;
+using Audiophile.Domain.Events;
 
 namespace Audiophile.Domain.Entities;
 
 // A catalogue item whose stock only changes through DecreaseStock and Restock, so it can never go negative
-public sealed class Product
+public sealed class Product : HasDomainEvents
 {
+    // At or under this stock the admin is told to restock
+    public const int LowStockLimit = 8;
+
     public const int NameMaxLength = 200;
     public const int DescriptionMaxLength = 2000;
     public const int FeaturesMaxLength = 4000;
@@ -133,7 +137,10 @@ public sealed class Product
         if (Stock < quantity)
             throw new InvalidOperationException($"'{Name}' has {Stock} in stock; {quantity} were requested.");
 
+        var before = Stock;
         Stock -= quantity;
+        if (before > LowStockLimit && Stock <= LowStockLimit)
+            Raise(new ProductStockLow(Id, Name, Stock, DateTime.UtcNow));
     }
 
     public void Deactivate() => IsActive = false;

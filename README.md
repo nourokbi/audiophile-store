@@ -2,7 +2,7 @@
 
 A full-stack e-commerce store for audio gear. ASP.NET Core 10 API with Clean Architecture,
 PostgreSQL (a local install or Docker in development, Neon in production), ASP.NET Core Identity + JWT, Fawaterak payments,
-and a React client.
+RabbitMQ with MassTransit and a transactional outbox for order emails and admin notifications, Serilog, and a React client.
 
 **Start here:** [`docs/project-overview.md`](docs/project-overview.md) (what exists and why) ·
 [`docs/roadmap.md`](docs/roadmap.md) (the plan) · [`docs/use-cases.md`](docs/use-cases.md) ·
@@ -22,7 +22,7 @@ integration is described in [`docs/fawaterak-integration.md`](docs/fawaterak-int
 src/
   Audiophile.Domain          entities, enums, domain rules       — depends on nothing (but Identity's base user)
   Audiophile.Application     use cases, DTOs, interfaces         — depends on Domain
-  Audiophile.Infrastructure  EF Core + PostgreSQL, Identity, JWT, Fawaterak — depends on Application
+  Audiophile.Infrastructure  EF Core + PostgreSQL, Identity, JWT, Fawaterak, MassTransit, email — depends on Application
   Audiophile.API             controllers, middleware, DI         — depends on both
 client/                      React + Vite storefront
 tests/                       unit tests and HTTP integration tests
@@ -42,6 +42,10 @@ No controller ever `using Audiophile.Infrastructure`.
 | Infrastructure | `Npgsql.EntityFrameworkCore.PostgreSQL` | The database provider: an implementation detail. |
 | Infrastructure | `Microsoft.AspNetCore.Authentication.JwtBearer` | Issuing and validating tokens. |
 | Infrastructure | `Microsoft.Extensions.Http.Resilience` | Timeouts, retries and circuit breaker for the payment gateway. |
+| Infrastructure | `MassTransit.RabbitMQ`, `MassTransit.EntityFrameworkCore` | The message bus and its outbox and inbox tables. Pinned to 8.5, the last open source version; 9 needs a paid licence. |
+| Infrastructure | `MailKit` | Sends email over SMTP, to Mailpit locally. |
+| API | `Serilog.AspNetCore` | Structured logs: readable text in Development, JSON lines elsewhere, one line per request. |
+| API | `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore` | The database check of `/health/ready`. |
 | API | `Microsoft.EntityFrameworkCore.Design` | Needed by `dotnet ef` in the startup project. |
 | API | `Microsoft.OpenApi` | Pinned to 2.11.0; the template's 2.0.0 has a published advisory. |
 
@@ -62,7 +66,10 @@ dotnet user-secrets set "Admin:Password" "<at least 8 characters, with a digit>"
 dotnet run --launch-profile http          # http://localhost:5040
 ```
 
-No local PostgreSQL? Skip the connection-string secret and run `docker compose up -d` from the repo root instead.
+`docker compose up -d` from the repo root starts PostgreSQL, RabbitMQ and Mailpit (with a local PostgreSQL install, skip
+`postgres` or set `POSTGRES_PORT=5433` in `.env`). Every email the API sends lands in Mailpit's inbox at
+**http://localhost:8025**, and RabbitMQ's queues are at **http://localhost:15672** (`audiophile` / `audiophile`). Without
+RabbitMQ running the API still works: the outbox keeps the events in the database and sends them once it connects.
 
 ### The whole app in containers
 
@@ -74,7 +81,8 @@ docker compose --profile app up -d --build     # the shop on http://localhost:80
 docker compose --profile app down              # stop it, add -v to delete the data too
 ```
 
-Cash on delivery works as is. Card payments also need the Fawaterak values in `.env`.
+Cash on delivery works as is. Card payments also need the Fawaterak values in `.env`. The emails are at
+http://localhost:8025 and RabbitMQ at http://localhost:15672.
 Load test results and how to run them: [`docs/performance.md`](docs/performance.md).
 
 ### The shop (React client), with card payments

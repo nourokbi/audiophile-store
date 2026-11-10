@@ -32,4 +32,5 @@ export const queryKeys = {
 	adminOrder: (id) => ['admin', 'orders', 'one', id],
 	orderStats: (days) => ['admin', 'orders', 'stats', days],
 	paymentEvents: (orderId) => ['admin', 'orders', 'payment-events', orderId],
+	adminNotifications: ['admin', 'notifications'],
 };

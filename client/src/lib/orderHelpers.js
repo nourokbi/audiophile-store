@@ -6,8 +6,9 @@ export const PAYMENT_LABELS = { Card: 'Card', CashOnDelivery: 'Cash on delivery'
 
 export const isActiveOrder = (order) => !FINISHED_STATUSES.includes(order.status);
 
-// A paid card order needs a refund, so only support can cancel it
-export const canCancel = (order) => CANCELLABLE_STATUSES.includes(order.status) && order.payment?.status !== 'Succeeded';
+// A paid card order can be cancelled only until the shop starts preparing it, the admin then refunds it
+export const canCancel = (order) =>
+	CANCELLABLE_STATUSES.includes(order.status) && (order.payment?.status !== 'Succeeded' || order.status === 'Confirmed');
 
 // A card order still waiting for Fawaterak's webhook to say it was paid
 export const isWaitingForPayment = (order) =>

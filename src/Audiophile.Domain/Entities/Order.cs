@@ -1,10 +1,11 @@
 using Audiophile.Domain.Common;
 using Audiophile.Domain.Enums;
+using Audiophile.Domain.Events;
 
 namespace Audiophile.Domain.Entities;
 
 // An order placed from the cart, its totals are fixed when it is placed and its status only moves along the allowed steps
-public sealed class Order
+public sealed class Order : HasDomainEvents
 {
     public const int IdempotencyKeyMaxLength = 128;
 
@@ -57,6 +58,9 @@ public sealed class Order
         paymentMethod == PaymentMethod.Card && paymentStatus != PaymentStatus.Succeeded
             ? AllowedNextStatuses[status].Where(s => s != OrderStatus.Confirmed).ToList()
             : AllowedNextStatuses[status];
+
+    // A cancelled card order whose money is still with the shop
+    public bool NeedsRefund => Status == OrderStatus.Cancelled && Payment?.Status == PaymentStatus.Succeeded;
 
     // Income is a paid order that was not cancelled, a cancelled paid card order is waiting for its refund
     public static bool CountsAsRevenue(OrderStatus status, PaymentStatus? paymentStatus) =>
@@ -116,6 +120,19 @@ public sealed class Order
             item.Product.Restock(item.Quantity);
     }
 
+    // Records that the admin sent the money back, Fawaterak has no refund call so the admin refunds in its dashboard first
+    public void MarkRefunded(string? reference)
+    {
+        if (!NeedsRefund)
+            throw new InvalidOperationException(Status == OrderStatus.Cancelled
+                ? "This order has no payment to refund."
+                : "Only a cancelled order can be refunded, cancel it first.");
+
+        Payment!.MarkRefunded(reference);
+        UpdatedAt = DateTime.UtcNow;
+        Raise(new OrderRefunded(Id, Payment.Amount, UpdatedAt));
+    }
+
     public void ChangeStatus(OrderStatus next)
     {
         if (!NextStatuses.Contains(next))
@@ -123,8 +140,10 @@ public sealed class Order
                 ? "This card order is not paid yet, it is confirmed once the payment succeeds."
                 : $"An order that is {Status} cannot become {next}.");
 
+        var previous = Status;
         Status = next;
         UpdatedAt = DateTime.UtcNow;
+        Raise(new OrderStatusChanged(Id, previous, next, UpdatedAt));
 
         if (next == OrderStatus.Delivered && PaymentMethod == PaymentMethod.CashOnDelivery)
             Payment!.MarkCashCollected();

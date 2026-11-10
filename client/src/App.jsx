@@ -24,6 +24,7 @@ const AdminProducts = React.lazy(() => import('./pages/admin/Products'));
 const AdminOrders = React.lazy(() => import('./pages/admin/Orders'));
 const AdminOrderDetail = React.lazy(() => import('./pages/admin/OrderDetail'));
 const AdminIncome = React.lazy(() => import('./pages/admin/Income'));
+const AdminNotifications = React.lazy(() => import('./pages/admin/Notifications'));
 
 // The cache for every API answer first, then the theme and who you are, the cart and the catalogue are queries in the cache
 const App = () => (
@@ -52,6 +53,7 @@ const App = () => (
 									<Route path='orders' element={<AdminOrders />} />
 									<Route path='orders/:id' element={<AdminOrderDetail />} />
 									<Route path='income' element={<AdminIncome />} />
+									<Route path='notifications' element={<AdminNotifications />} />
 								</Route>
 							</Route>
 							<Route path=':category' element={<Home />} />
