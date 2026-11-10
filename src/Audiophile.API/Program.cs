@@ -7,8 +7,24 @@ using Audiophile.Application.Abstractions;
 using Audiophile.Infrastructure;
 using Audiophile.Infrastructure.Persistence;
 using Microsoft.AspNetCore.HttpOverrides;
+using Serilog;
+using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Readable lines while developing, one JSON object per line elsewhere so the host's log search can filter on each field
+builder.Services.AddSerilog((services, logger) =>
+{
+    logger.ReadFrom.Configuration(builder.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "audiophile-api");
+
+    if (builder.Environment.IsDevelopment())
+        logger.WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}");
+    else
+        logger.WriteTo.Console(new RenderedCompactJsonFormatter());
+});
 
 builder.Services
     .AddControllers()
@@ -44,6 +60,22 @@ var app = builder.Build();
 await app.Services.InitialiseDatabaseAsync();
 
 app.UseForwardedHeaders();
+
+// One line per request with its status and time, health checks only show when they fail
+app.UseSerilogRequestLogging(o =>
+{
+    o.GetLevel = (http, _, ex) =>
+        ex is not null || http.Response.StatusCode >= 500 ? Serilog.Events.LogEventLevel.Error
+        : http.Request.Path.StartsWithSegments("/health") ? Serilog.Events.LogEventLevel.Verbose
+        : Serilog.Events.LogEventLevel.Information;
+    o.EnrichDiagnosticContext = (diagnostics, http) =>
+    {
+        diagnostics.Set("ClientIp", http.Connection.RemoteIpAddress?.ToString());
+        if (http.User.FindFirst("sub")?.Value is { } userId)
+            diagnostics.Set("UserId", userId);
+    };
+});
+
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
