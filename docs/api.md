@@ -120,7 +120,7 @@ shop saves back what `quote` returns and a login never fails because of the cart
 | POST | `/orders` + header `Idempotency-Key` | **201** new order · **200** same key seen before | 400 · 404 address · 409 empty cart / stock / product no longer sold · 502 / 504 gateway |
 | GET | `/orders` | 200 my orders, newest first | 401 |
 | GET | `/orders/{id}` | 200 | 404 |
-| POST | `/orders/{id}/cancel` | 200 the cancelled order, stock returned | 404 · 409 already cancelled, shipped, or a paid card order (contact support) |
+| POST | `/orders/{id}/cancel` | 200 the cancelled order, stock returned | 404 · 409 already cancelled or shipped, or a paid card order the shop started preparing |
 | POST | `/orders/{id}/payment/retry` | 200 the order with a new `payment.checkoutUrl`, or confirmed if the last attempt was paid after all | 404 · 409 not an unpaid card order, or its 30 minutes ran out |
 | GET | `/orders/{id}/payment/events` | 200 what Fawaterak sent about this order | 🛡 admin · 404 |
 | POST | `/orders/{id}/payment/sync` | 200 the order after asking Fawaterak | 🛡 admin · 404 · 409 not a gateway order |
@@ -141,6 +141,7 @@ shop saves back what `quote` returns and a login never fails because of the cart
 | GET | `/admin/orders/stats?days=30` | 200 the overview numbers | 400 days not 1–365 · 401 · 403 |
 | GET | `/admin/orders/{id}` | 200 order with `shipping` and `items` | 401 · 403 · 404 |
 | PUT | `/admin/orders/{id}/status` | 200 the changed order | 400 unknown status · 401 · 403 · 404 · 409 not a next status, or Confirmed before the card payment succeeded |
+| POST | `/admin/orders/{id}/refund` | 200 the order, payment `Refunded` | 401 · 403 · 404 · 409 not cancelled, or no paid card payment |
 
 - Every customer's orders, newest first. A row has `customerName`, `customerEmail`, `paymentStatus`, `itemCount`
   (the sum of the quantities) and `nextStatuses`, the buttons the dashboard shows.
@@ -150,7 +151,7 @@ shop saves back what `quote` returns and a login never fails because of the cart
   keeps its number while one tab is open.
 - **Status body**: `{ "status": "Shipped" }`. The steps are Pending → Confirmed → Processing → Shipped → Delivered, and
   Cancelled from any step before Shipped. `Cancelled` returns the stock and fails a payment still pending; a paid card
-  order can be cancelled here, and its refund is then made by hand on Fawaterak. A card order leaves `Confirmed` out of
+  order can be cancelled here, and its payment stays `Succeeded` until it is refunded. A card order leaves `Confirmed` out of
   its `nextStatuses` until the payment succeeded, the webhook or *Sync with gateway* confirms it. A cash order's
   payment becomes `Succeeded` when the order is `Delivered`, the courier collected the cash.
 - **Stats**: the period is `days` whole **Cairo days** ending today (`Africa/Cairo`, summer time included).
@@ -164,12 +165,49 @@ shop saves back what `quote` returns and a login never fails because of the cart
     product revenue add up the items, so they leave the shipping out
   - `statusCounts`: the orders placed in the period by their status now, every status listed
 - The `from` and `to` filters of `GET /admin/orders` are Cairo days too.
+- **Refund**: Fawaterak's API has no refund call, so the admin sends the money back in the Fawaterak dashboard first, then
+  records it here with `{ "reference": "RF-123" }` (optional, up to 255 characters). The payment becomes `Refunded`, the
+  order shows `refundedAt` and `refundReference`, the step is kept with the payment events as `admin:refunded`, and the
+  customer gets an email. A refunded order is not revenue. A customer can cancel a paid card order while it is still
+  `Confirmed`; the admin is then told a refund is needed.
+
+## Admin notifications — `AdminNotificationsController` (all 👑)
+
+| Method | Path | Success | Errors |
+|---|---|---|---|
+| GET | `/admin/notifications?limit=20` | 200 `{ items, unreadCount }`, newest first | 400 limit not 1–50 · 401 · 403 |
+| POST | `/admin/notifications/{id}/read` | 204 | 401 · 403 · 404 |
+| POST | `/admin/notifications/read-all` | 204 | 401 · 403 |
+
+- An item is `{ id, kind, title, message, orderId, productId, createdAt, isRead }`. `kind` is `NewOrder` (a cash order
+  placed or a card order paid), `OrderCancelled` (a confirmed order cancelled), `RefundNeeded` (a paid card order
+  cancelled) or `LowStock` (a sale took a product to 8 or fewer). Every admin shares them, one admin reading one marks it
+  read for all.
+- They are written by a message bus consumer a moment after the change, not by the request itself, see *Messaging* below.
+
+## Messaging and emails
+
+Every order status step and every sale that takes a product down to the low stock limit raises a domain event. When the
+change is saved, an EF Core interceptor publishes the events through MassTransit's **bus outbox**, so they are stored in
+the same transaction as the order, and a background service sends them to **RabbitMQ** a moment later. Two consumers
+each have their own queue:
+
+| Consumer | Events | Does |
+|---|---|---|
+| `CustomerEmailConsumer` | `OrderStatusChanged`, `OrderRefunded` | Emails the customer: confirmed, preparing, on its way, delivered, cancelled, refund sent |
+| `AdminNotificationConsumer` | `OrderStatusChanged`, `ProductStockLow` | Adds a notification for the dashboard's bell |
+
+- A failed message is tried again after 5 s, 30 s, 2 min and 10 min, then moved to the queue's `_error` queue.
+- Each consumer keeps an **inbox** in the database, so a message RabbitMQ delivers twice is handled once.
+- A card order whose payment page never opened gets no email, the customer saw the error straight away.
+- Without `ConnectionStrings:RabbitMq` the bus runs in memory inside the API, which is what the tests use.
 
 ## Other
 
 | Method | Path | Access | Notes |
 |---|---|---|---|
-| GET | `/health` | 🔓 | `{ "status": "ok" }` |
+| GET | `/health` | 🔓 | `Healthy` while the process runs, for restarts |
+| GET | `/health/ready` | 🔓 | `Healthy` when the database and the message bus answer, `Unhealthy` with 503 otherwise |
 | POST | `/payments/fawaterak/webhook_json` | 🔓 signed | Fawaterak's webhook; 401 when the `hashKey` is wrong (see `fawaterak-integration.md`) |
 | GET | `/payments/fawaterak/return` | 🔓 | Where the browser lands after paying; redirects to `Fawaterak:ClientReturnUrl` |
 
@@ -198,4 +236,11 @@ Every error is an RFC 7807 **ProblemDetails** body: `{ type, title, status, deta
 | `Jwt:Issuer`, `Jwt:Audience`, `Jwt:AccessTokenMinutes`, `Jwt:RefreshTokenDays` | appsettings | Token settings |
 | `Admin:Email`, `Admin:Password`, `Admin:Name` | user-secrets / env var | The admin account created at startup |
 | `Cors:AllowedOrigins` | appsettings | Origins allowed to call the API (`http://localhost:5173` in Development) |
+| `ConnectionStrings:RabbitMq` | env var | `amqp://user:password@host:5672`, or CloudAMQP's `amqps://` URL. Empty runs the bus in memory |
+| `Email:Provider` | appsettings / env var | `Log` (default, sends nothing), `Smtp` (Mailpit locally) or `Brevo` (production) |
+| `Email:FromAddress`, `Email:FromName` | appsettings / env var | The sender, with Brevo it must be a sender verified in Brevo |
+| `Email:Smtp:Host`, `Port`, `UseTls`, `Username`, `Password` | appsettings / user-secrets | The SMTP server, `localhost:1025` without TLS for Mailpit |
+| `Email:BrevoApiKey` | env var | Brevo's API key, a secret |
+| `Shop:Url` | appsettings / env var | The shop's public address, for the links in emails |
+| `RateLimiting:Enabled` | env var | `false` turns the limits off, only for the checkout load test |
 | `Fawaterak:*` | user-secrets | Payment gateway. `ClientReturnUrl` (default `http://localhost:5173/orders`) is where customers land after paying |

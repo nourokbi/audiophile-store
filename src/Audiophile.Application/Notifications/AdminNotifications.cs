@@ -32,12 +32,13 @@ public sealed class AdminNotifications(IAppDbContext db)
         var number = OrderNumber.Of(order.Id);
         var total = OrderEmails.Money(order.TotalAmount);
         var paidByCard = order.PaymentMethod == PaymentMethod.Card;
+        var itemCount = order.OrderItems.Sum(i => i.Quantity);
 
         // An order the admin never saw confirmed, such as an unpaid card order, needs no notification when it is cancelled
         AdminNotification? notification = change.To switch
         {
             OrderStatus.Confirmed => new(AdminNotificationKind.NewOrder, $"New order {number}",
-                $"{order.User.Name} ordered {order.OrderItems.Sum(i => i.Quantity)} items for {total}, " +
+                $"{order.User.Name} ordered {itemCount} {(itemCount == 1 ? "item" : "items")} for {total}, " +
                 (paidByCard ? "paid by card." : "cash on delivery."), order.Id),
             OrderStatus.Cancelled when paidByCard && order.Payment?.Status is PaymentStatus.Succeeded or PaymentStatus.Refunded =>
                 new(AdminNotificationKind.RefundNeeded, $"Order {number} cancelled, refund needed",

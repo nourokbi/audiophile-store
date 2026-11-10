@@ -39,7 +39,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
-builder.Services.AddRateLimitPolicies();
+builder.Services.AddRateLimitPolicies(builder.Configuration);
 
 // The database check joins the message bus check MassTransit adds by itself
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);

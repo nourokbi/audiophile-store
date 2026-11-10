@@ -111,3 +111,31 @@ for CPU and for memory, and every query gets slower. With 20, the extra requests
 milliseconds instead, and nothing was refused. A pool of 10 wasn't measured because the laptop ran out of memory.
 
 On a hosted database, keep the pool under the plan's connection limit, minus a few for migrations and `psql`.
+
+## Checkout under load
+
+[`perf/checkout.js`](../perf/checkout.js) has many customers buy the same product at the same moment: add it to the cart,
+check out with cash on delivery, open the order. Every purchase changes the same stock row, so it presses on the `xmin`
+check and its one retry, the connection pool, and the outbox that sends each order's email and notification.
+
+Setup creates one product per `HOT_PRODUCTS` (1 by default, the worst case) with a large stock and one customer per
+shopper, then hides the products again at the end. Its logins come from one container address, so the API's rate
+limits must be off for the run, and the admin login comes from `.env`.
+
+```bash
+RATE_LIMITING=false docker compose --profile app up -d api       # limits off for this run only
+docker compose run --rm k6 run /scripts/checkout.js              # 20 customers, 1 s pauses
+VUS=50 THINK_SECONDS=0 docker compose run --rm k6 run /scripts/checkout.js
+docker compose --profile app up -d api                           # limits back on
+```
+
+**What to read in the summary:**
+
+- `http_req_duration{step:checkout}` p95, which should stay under 1 s
+- `stock_conflicts`: a 409 means the stock changed twice under one request and the customer is asked to try again;
+  nothing is lost, but a high count means the single product row is the bottleneck
+- After the run, Mailpit (http://localhost:8025) should hold one email per order placed, and RabbitMQ's queues
+  (http://localhost:15672) should be empty, which shows the outbox kept up
+
+**Not measured yet.** The script was written on 2026-11-10, when virtualization was off on the test laptop and
+Docker couldn't start. Put the numbers here after the first run.

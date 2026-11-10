@@ -1,6 +1,6 @@
 # The database, RabbitMQ and Mailpit, for `dotnet run`:   docker compose up -d
 # The whole app in containers:           docker compose --profile app up -d --build   (copy .env.example to .env first)
-# The load test, with the app running:   docker compose run --rm k6
+# The load tests, with the app running:  docker compose run --rm k6   and   docker compose run --rm k6 run /scripts/checkout.js
 services:
   postgres:
     image: postgres:17-alpine          # same major version as Neon's default
@@ -59,6 +59,7 @@ services:
       Email__Smtp__Host: mailpit
       Email__Smtp__Port: "1025"
       Email__Smtp__UseTls: "false"
+      RateLimiting__Enabled: ${RATE_LIMITING:-true}   # false only for the checkout load test, see docs/performance.md
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,6 +92,9 @@ services:
       BASE_URL: http://api:8080
       VUS: ${VUS:-50}
       THINK_SECONDS: ${THINK_SECONDS:-1}
+      HOT_PRODUCTS: ${HOT_PRODUCTS:-1}
+      ADMIN_EMAIL: ${Admin__Email:-}        # from .env, the checkout test creates its own products
+      ADMIN_PASSWORD: ${Admin__Password:-}
     volumes:
       - ./perf:/scripts:ro
     command: run /scripts/products.js

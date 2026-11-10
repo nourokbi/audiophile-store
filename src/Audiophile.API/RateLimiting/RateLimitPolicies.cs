@@ -10,17 +10,24 @@ public static class RateLimitPolicies
     public const string Refresh = "refresh";    // thirty a minute, every page load restores the session with one
     public const string Register = "register";  // five new accounts an hour
 
-    public static IServiceCollection AddRateLimitPolicies(this IServiceCollection services) =>
-        services.AddRateLimiter(o =>
+    // RateLimiting Enabled false turns every limit off, only for a load test whose shoppers all come from one address
+    public static IServiceCollection AddRateLimitPolicies(this IServiceCollection services, IConfiguration configuration)
+    {
+        var isEnabled = configuration.GetValue("RateLimiting:Enabled", true);
+
+        return services.AddRateLimiter(o =>
         {
             o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            o.AddPolicy(Login, http => PerIp(http, 10, TimeSpan.FromMinutes(1)));
-            o.AddPolicy(Refresh, http => PerIp(http, 30, TimeSpan.FromMinutes(1)));
-            o.AddPolicy(Register, http => PerIp(http, 5, TimeSpan.FromHours(1)));
+            o.AddPolicy(Login, http => PerIp(http, 10, TimeSpan.FromMinutes(1), isEnabled));
+            o.AddPolicy(Refresh, http => PerIp(http, 30, TimeSpan.FromMinutes(1), isEnabled));
+            o.AddPolicy(Register, http => PerIp(http, 5, TimeSpan.FromHours(1), isEnabled));
         });
+    }
 
-    private static RateLimitPartition<string> PerIp(HttpContext http, int permits, TimeSpan window) =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = window });
+    private static RateLimitPartition<string> PerIp(HttpContext http, int permits, TimeSpan window, bool isEnabled) =>
+        isEnabled
+            ? RateLimitPartition.GetFixedWindowLimiter(
+                http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = window })
+            : RateLimitPartition.GetNoLimiter("off");
 }

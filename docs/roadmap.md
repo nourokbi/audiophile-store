@@ -14,7 +14,7 @@ there still apply.
 | **3** | ✅ Login, roles, addresses, product admin API, PostgreSQL | done | UC-01 … UC-05, UC-11 (API) | Identity, JWT, refresh tokens, **API tests with auth** |
 | **4** | Connect the React client | 1 week | UC-01 … UC-10 | TanStack Query, auth in a SPA |
 | **5** | Admin dashboard | 1 week | UC-11 … UC-15 | Role-guarded routes, paging, filtering |
-| **6** | Caching + messaging | 1 week | UC-01, UC-18 | Redis, HybridCache, RabbitMQ, outbox |
+| **6** | Messaging (caching moved to future improvements) | 1 week | UC-18 | RabbitMQ, MassTransit, outbox, inbox |
 | **7** | Docker, CI, deploy, README | 1 week | — | Dockerfile, compose, GitHub Actions, HTTPS hosting |
 
 **Scope rule:** if something isn't in this table, it waits until Phase 7 is live. That includes
@@ -27,7 +27,14 @@ A finished, deployed project beats a bigger unfinished one on a CV.
 
 ---
 
-## Where we are now (2026-10-25)
+## Where we are now (2026-11-10)
+
+**Going live next.** Redis caching moved to *Future improvements*: with server paging and the search indexes the shop
+answers in milliseconds at the expected traffic (see [`performance.md`](performance.md)), so it isn't needed to launch.
+Branch `feat/go-live` adds structured logs, RabbitMQ order emails and admin notifications, refunds and the checkout load
+test. Left before going live: the check by hand of every page, then deploy (Phase 7).
+
+### Earlier (2026-10-25)
 
 **Phase 1 is done** (`v0.2.0`) and the **shop is redesigned** from the Stitch project (PR #6): light and dark theme,
 22 products in five categories, filters and pagination, a cart page, checkout with saved addresses, order tracking
@@ -41,9 +48,9 @@ page is finished end to end, and the orders pages run on the admin orders API.
 | 1 Checkout + concurrency | ✅ done: checkout from the cart, `xmin` + one retry, cancel, order tests, CI |
 | 2 Pluggable payments | 🟡 Fawaterak is on (card only) and tested for real; **the pluggable design and fake-gateway tests left** |
 | 3 Login, roles, addresses | ✅ done |
-| 4 React client | ✅ every customer page, redesigned from Stitch with a dark theme; **guest cart and httpOnly cookie left** |
+| 4 React client | ✅ every customer page, redesigned from Stitch with a dark theme, guest cart and httpOnly cookie (2026-10-28) |
 | 5 Admin dashboard | 🟡 every page done end to end; **the check by hand and `v0.3.0` are next** (branch `phase-5/admin-api`) |
-| 6 Caching + messaging | ⬜ not started |
+| 6 Messaging | ✅ RabbitMQ, outbox, inbox, customer emails and admin notifications (2026-11-10); caching moved to future improvements |
 | 7 Docker, CI, deploy | 🟡 Dockerfiles and compose for client, API and database done; **CI images and deploy left** |
 
 ### Next up, in this order
@@ -598,20 +605,17 @@ Use `UserManager` (`AddToRoleAsync` / `RemoveFromRoleAsync`), and refuse to remo
 **Done when** every number and button on the dashboard comes from the API (no file left in `client/src/data/admin*`),
 a customer gets 403 on every `/admin` endpoint, and a check by hand of every admin page passes. Tag `v0.3.0`.
 
-## Phase 6 — Caching + messaging · 1 week
+## Phase 6 — Messaging · ✅ done 2026-11-10 (branch `feat/go-live`)
 
-**Caching (2 days)**
-- [ ] Redis in `docker-compose.yml`
-- [ ] **HybridCache** (`Microsoft.Extensions.Caching.Hybrid`) with Redis as the shared layer, for product list and details: *cache-aside*
-- [ ] Remove cache entries when an admin edits a product (invalidate on write)
-- [ ] Measure before and after with a simple load test: k6 baseline done ([`performance.md`](performance.md)), the after run left
+Caching moved to *Future improvements*. How it works is in [`api.md`](api.md#messaging-and-emails).
 
-**Messaging (3 days)**
-- [ ] RabbitMQ in compose; **MassTransit v8** (open source; v9 is commercial)
-- [ ] Events: `OrderPlaced`, `PaymentSucceeded`, `OrderStatusChanged`, `StockLow`
-- [ ] **Transactional outbox** (MassTransit EF Core outbox), so events are saved in the same transaction as the order
-- [ ] Consumer: send emails (use **Mailpit** in Docker locally, so no real emails are sent)
-- [ ] Consumers must be idempotent (the same message twice = one email)
+- [x] RabbitMQ and Mailpit in compose; **MassTransit 8.5** (open source; 9 is commercial)
+- [x] Domain events: `OrderStatusChanged` (every step, so placing a cash order and a card payment are its `Confirmed`),
+      `OrderRefunded`, `ProductStockLow`, published by an EF Core interceptor on save
+- [x] **Transactional outbox** (MassTransit EF Core bus outbox), so events are saved in the same transaction as the order
+- [x] Consumers: customer emails (Mailpit locally, Brevo's HTTP API in production) and admin notifications with a bell
+- [x] Idempotent consumers: a database inbox per consumer, so the same message twice is handled once
+- [x] Tests with the in memory bus: emails per step, the admin's bell, low stock once
 
 ## Phase 7 — Docker, CI, deploy, README · 1 week
 
@@ -621,7 +625,7 @@ a customer gets 403 on every `/admin` endpoint, and a check by hand of every adm
 - [ ] Deploy: the simplest path is **one small VPS + docker compose + Caddy** (automatic HTTPS, which the Fawaterak webhook needs)
 - [ ] Database: **Neon** (free tier). CI runs the EF migration bundle against Neon's direct connection before
       deploying; the API uses the pooled one. Every step is in [`database.md`](database.md)
-- [ ] Health checks (`/health` checks the DB, Redis and RabbitMQ); structured logs (Serilog)
+- [x] Health checks: `/health` for restarts, `/health/ready` checks the database and RabbitMQ; structured logs (Serilog) (2026-11-10)
 - [ ] README: live link, screenshots, architecture diagram, *"hard problems and how I solved them"*, how to run
 - [ ] Make the repo public, pin it on your GitHub profile, add it to your CV
 
@@ -629,13 +633,14 @@ a customer gets 403 on every `/admin` endpoint, and a check by hand of every adm
 
 Run these against the deployed server, or one like it, never the dev laptop, so the numbers mean something.
 
-- [ ] **k6** scripts in `tests/load/`: `products.js` (browse the shop) and `checkout.js` (many users buy the same
-      product at once, so the `xmin` retry and the database connections are under pressure)
+- [x] **k6** scripts in `perf/`: `products.js` (browse the shop) and `checkout.js` (many users buy the same
+      product at once, so the `xmin` retry, the database connections and the outbox are under pressure) (2026-11-10)
 - [ ] Find the capacity: raise the virtual users step by step (100, 200, 500) until p95 goes over 500 ms or errors
       go over 1%; the last step that passed is how many users the site handles. Put the numbers in the README
-- [ ] Rate limiting with ASP.NET Core's `AddRateLimiter` on `/auth/login`, `/auth/register` and checkout, answering
-      429 when one IP sends too many requests
-- [ ] Lock an account for a few minutes after repeated failed logins (Identity `LockoutOptions`)
+- [x] Rate limiting with ASP.NET Core's `AddRateLimiter` on `/auth/login`, `/auth/register` and `/auth/refresh`,
+      answering 429 when one IP sends too many requests; `RateLimiting__Enabled=false` only for the checkout load test
+- [ ] Rate limit checkout per customer
+- [x] Lock an account for 5 minutes after 5 failed logins (Identity `LockoutOptions`)
 - [ ] **OWASP ZAP** baseline scan against the running API and client; fix what it reports (security headers, CORS,
       cookies)
 - [ ] Dependency checks: `dotnet list package --vulnerable` and `npm audit` in CI; turn on **Dependabot** and
@@ -647,10 +652,31 @@ Run these against the deployed server, or one like it, never the dev laptop, so 
 
 Ideas kept out of scope on purpose, each one is worth doing only once the store is live.
 
+### Caching with Redis and HybridCache
+
+Moved here from Phase 6 on 2026-11-10. With server paging and the trigram indexes, a shop page answers in about 50 ms
+at 50 shoppers, so a cache isn't needed to launch. It becomes worth it with more traffic, or with 2+ API instances that
+need a shared cache.
+
+- [ ] Redis in `docker-compose.yml` (a free Redis Cloud or Upstash plan in production)
+- [ ] **HybridCache** (`Microsoft.Extensions.Caching.Hybrid`) with Redis as the shared layer, for the shop pages,
+      product details and related products: *cache-aside*
+- [ ] Invalidate on write: an admin edit and every sale change the stock, so tag entries by product and remove the tag
+      (the `OrderStatusChanged` and `ProductStockLow` consumers are a natural place)
+- [ ] Measure with the same k6 runs as [`performance.md`](performance.md) and compare
+
+### More on messaging
+
+- [ ] Delayed redelivery (RabbitMQ's delayed message plugin), so a long email outage doesn't hold a consumer
+- [ ] An admin page for the `_error` queues, or an alert when a message lands in one
+- [ ] Email the admin as well as the bell, and let each admin choose which kinds
+
 ### Refunds through the Fawaterak API
 
-Today a cancel never moves money. A paid card order cancelled by the admin keeps its payment `Succeeded`, and the refund
-is made by hand in the Fawaterak dashboard. The API this project uses (API key, `FawaterakGateway`) has no refund call.
+Since 2026-11-10 a refund is **recorded** in the app: the admin sends the money back in the Fawaterak dashboard, then
+presses *Mark refunded* with the refund's id, the payment becomes `Refunded` and the customer gets an email. The money
+itself still moves by hand, because the API this project uses (API key, `FawaterakGateway`) has no refund call, and the
+public docs at fawaterak-api.readme.io list none (checked 2026-11-10).
 
 Found on 2026-10-27, **not confirmed yet**: Fawaterak's official documentation lists a *Refund APIs* section, and an
 unofficial SDK for **API v3** (OAuth2 client credentials) creates, lists and cancels refund requests for an invoice or a
@@ -661,8 +687,8 @@ once it is approved.
       API v3 and its refunds
 - [ ] **Gateway**: `RefundAsync(payment, amount, reason)` on the payment gateway (it fits the `IPaymentGateway` of
       Phase 2), plus the v3 OAuth2 token
-- [ ] **Domain**: `Refunded` payment status and `Payment.MarkRefunded()`; a refund request that is still pending shows
-      as *Refund requested*
+- [x] **Domain**: `Refunded` payment status and `Payment.MarkRefunded()` (2026-11-10)
+- [ ] A refund request that is still pending at Fawaterak shows as *Refund requested*
 - [ ] **Flow**: the admin cancel of a paid card order asks for the refund, the signed refund webhook (or a lookup, like
       *Sync with gateway*) marks it `Refunded`, every step recorded as a `PaymentEvent`
 - [ ] **Tests** with the fake gateway: refund asked once, webhook twice, refund refused
